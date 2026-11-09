@@ -1,5 +1,4 @@
-// ==========================================================
-// API & STORAGE SERVICE: SISTEM PENCATATAN KERJA & PENGELUARAN
+// ===================================================// API & STORAGE SERVICE: SISTEM PENCATATAN KERJA & PENGELUARAN
 // ==========================================================
 
 const API_BASE = '/api';
@@ -1327,4 +1326,61 @@ export function formatRupiah(val) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(Number(val) || 0);
+}
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost/pencatatan-kerja/backend/public/api'
+).replace(/\/+$/, '')
+
+async function request(path, method, body) {
+  const headers = { Accept: 'application/json' }
+  const options = { method, headers }
+
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    options.body = JSON.stringify(body)
+  }
+
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, options)
+  } catch {
+    throw new Error(
+      `API tidak dapat dihubungi. Periksa server backend di ${API_BASE_URL}.`,
+    )
+  }
+
+  let result
+  try {
+    result = await response.json()
+  } catch {
+    throw new Error(`Respons API tidak valid (HTTP ${response.status}).`)
+  }
+
+  if (!response.ok || result?.success !== true) {
+    const error = new Error(
+      result?.message || `Permintaan API gagal (HTTP ${response.status}).`,
+    )
+    error.status = response.status
+    throw error
+  }
+
+  return result.data
+}
+
+export function apiGet(path) {
+  return request(path, 'GET')
+}
+
+export function apiPost(path, body) {
+  return request(path, 'POST', body)
+}
+
+export function apiPut(path, body) {
+  return request(path, 'PUT', body)
+}
+
+export function apiDelete(path) {
+  return request(path, 'DELETE')
 }

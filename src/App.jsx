@@ -13,6 +13,20 @@ import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage'
 import LokasiKerjaPage from './pages/admin-absen/LokasiKerjaPage'
 import AbsensiPage from './pages/pekerja_absen/AbsensiPage'
 
+
+// Fitur Pengembang 2: Manajemen Karyawan, Pekerjaan, Penugasan & Profil
+import DataKaryawan from './pages/admin/DataKaryawan.jsx'
+import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
+import Penugasan from './pages/admin/Penugasan.jsx'
+import ProfilAdmin from './pages/admin/ProfilAdmin.jsx'
+import PengaturanAdmin from './pages/admin/PengaturanAdmin.jsx'
+import PekerjaLocalTest from './pages/pekerja/PekerjaLocalTest.jsx'
+import PekerjaanSaya from './pages/pekerja/PekerjaanSaya.jsx'
+import PekerjaanTersedia from './pages/pekerja/PekerjaanTersedia.jsx'
+import RiwayatPengajuan from './pages/pekerja/RiwayatPengajuan.jsx'
+import ProfilPekerja from './pages/pekerja/ProfilPekerja.jsx'
+import PengaturanPekerja from './pages/pekerja/PengaturanPekerja.jsx'
+
 import './index.css'
 import './App.css'
 
@@ -284,13 +298,21 @@ function AppLayout() {
     ...(user.role === 'admin'
       ? [
           { to: '/admin', label: 'Manajemen pengguna', icon: '👥' },
+          { to: '/admin/karyawan', label: 'Data Karyawan', icon: '👔' },
+          { to: '/admin/pekerjaan', label: 'Data Pekerjaan', icon: '💼' },
+          { to: '/admin/penugasan', label: 'Penugasan', icon: '📋' },
           { to: '/admin/pengeluaran', label: 'Pengeluaran & Kwitansi', icon: '🧾' },
           { to: '/admin/lokasi', label: 'Lokasi Kerja', icon: '📍' },
+          { to: '/admin/profil', label: 'Profil Administrator', icon: '👤' },
+          { to: '/admin/pengaturan', label: 'Pengaturan', icon: '⚙' },
         ]
       : [
+          { to: '/karyawan/pekerjaan-tersedia', label: 'Pekerjaan Tersedia', icon: '🔍' },
+          { to: '/karyawan/pekerjaan-saya', label: 'Pekerjaan Saya', icon: '💼' },
+          { to: '/karyawan/riwayat-pengajuan', label: 'Riwayat Pengajuan', icon: '⏱' },
           { to: '/karyawan/pengeluaran', label: 'Pengeluaran Saya', icon: '🧾' },
           { to: '/karyawan/absensi', label: 'Presensi & Jam Kerja', icon: '⏱️' },
-          { to: '/karyawan', label: 'Pencatatan kerja', icon: '▤' },
+          { to: '/karyawan/profil', label: 'Profil Saya', icon: '👤' },
         ]),
   ]
 
@@ -555,6 +577,11 @@ function AppRoutes() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route element={<ProtectedRoute roles={['admin']} />}>
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/karyawan" element={<DataKaryawan />} />
+            <Route path="/admin/pekerjaan" element={<DataPekerjaan />} />
+            <Route path="/admin/penugasan" element={<Penugasan />} />
+            <Route path="/admin/profil" element={<ProfilAdmin />} />
+            <Route path="/admin/pengaturan" element={<PengaturanAdmin />} />
             <Route
               path="/admin/pengeluaran"
               element={<PengeluaranAdminPage currentUser={mappedUser} />}
@@ -564,11 +591,48 @@ function AppRoutes() {
           <Route element={<ProtectedRoute roles={['karyawan']} />}>
             <Route path="/karyawan" element={<KaryawanPage />} />
             <Route
+              path="/karyawan/pekerjaan-tersedia"
+              element={<PekerjaanTersedia workerId={mappedUser?.id_karyawan} workerName={mappedUser?.nama} />}
+            />
+            <Route
+              path="/karyawan/pekerjaan-saya"
+              element={<PekerjaanSaya workerId={mappedUser?.id_karyawan} />}
+            />
+            <Route
+              path="/karyawan/riwayat-pengajuan"
+              element={<RiwayatPengajuan />}
+            />
+            <Route
+              path="/karyawan/profil"
+              element={
+                <ProfilPekerja
+                  worker={{
+                    id_karyawan: mappedUser?.id_karyawan,
+                    nama: mappedUser?.nama,
+                    email: mappedUser?.email,
+                    jabatan: mappedUser?.jabatan,
+                  }}
+                />
+              }
+            />
+            <Route
+              path="/karyawan/pengaturan"
+              element={
+                <PengaturanPekerja
+                  worker={{
+                    id_karyawan: mappedUser?.id_karyawan,
+                    nama: mappedUser?.nama,
+                  }}
+                />
+              }
+            />
+            <Route
               path="/karyawan/pengeluaran"
               element={<PengeluaranKaryawanPage currentUser={mappedUser} />}
             />
             <Route path="/karyawan/absensi" element={<AbsensiPage />} />
           </Route>
+          <Route path="/pekerja" element={<PekerjaLocalTest />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
