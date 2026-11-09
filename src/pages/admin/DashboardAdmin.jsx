@@ -1,32 +1,43 @@
 import { useEffect, useMemo, useState } from 'react'
-import { STATUS_PEKERJAAN, STATUS_PEKERJAAN_OPTIONS } from '../../data/pekerjaan.js'
+import {
+  STATUS_PEKERJAAN,
+  STATUS_PEKERJAAN_OPTIONS,
+} from '../../data/pekerjaan.js'
 import { getKaryawan } from '../../services/karyawanApi.js'
 import { getPekerjaan } from '../../services/pekerjaanApi.js'
 import { getPenugasan } from '../../services/penugasanApi.js'
+import {
+  AbsensiService,
+  GajiService,
+  PengeluaranService,
+  formatRupiah,
+} from '../../services/api.js'
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
 })
+
 const STATUS_PRESENTATION = {
   [STATUS_PEKERJAAN.BELUM_MULAI]: {
     label: 'Belum Dimulai',
-    className: 'dashboard-status-pending',
-    color: '#d97706',
-    dot: 'dashboard-status-dot-pending',
+    className: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
+    color: '#f59e0b',
+    dot: 'bg-amber-500',
   },
   [STATUS_PEKERJAAN.BERJALAN]: {
     label: 'Sedang Berjalan',
-    className: 'dashboard-status-running',
+    className: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/20',
     color: '#2563eb',
-    dot: 'dashboard-status-dot-running',
+    dot: 'bg-blue-600',
   },
   [STATUS_PEKERJAAN.SELESAI]: {
     label: 'Selesai',
-    className: 'dashboard-status-complete',
-    color: '#059669',
-    dot: 'dashboard-status-dot-complete',
+    className:
+      'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20',
+    color: '#10b981',
+    dot: 'bg-emerald-500',
   },
 }
 
@@ -36,9 +47,20 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
 }
 
-function getNumericSuffix(value) {
-  const match = String(value).match(/(\d+)$/)
-  return match ? Number(match[1]) : 0
+function getJakartaToday() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
+function formatCurrency(val) {
+  if (val === null || val === undefined || Number.isNaN(Number(val))) {
+    return 'Rp 0'
+  }
+  return formatRupiah(val)
 }
 
 function Icon({ name, className = 'h-5 w-5' }) {
@@ -52,8 +74,8 @@ function Icon({ name, className = 'h-5 w-5' }) {
     ),
     work: (
       <>
-        <rect x="3" y="7" width="18" height="14" rx="2" />
-        <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18" />
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
       </>
     ),
     assignments: (
@@ -68,6 +90,26 @@ function Icon({ name, className = 'h-5 w-5' }) {
         <path d="M16 3v4M8 3v4M3 10h18" />
       </>
     ),
+    'calendar-check': (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M16 3v4M8 3v4M3 10h18M9 14l2 2 4-4" />
+      </>
+    ),
+    banknote: (
+      <>
+        <rect x="2" y="6" width="20" height="12" rx="2" />
+        <circle cx="12" cy="12" r="2" />
+        <path d="M6 12h.01M18 12h.01" />
+      </>
+    ),
+    wallet: (
+      <>
+        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+      </>
+    ),
     location: (
       <>
         <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
@@ -75,9 +117,27 @@ function Icon({ name, className = 'h-5 w-5' }) {
       </>
     ),
     arrow: <path d="M5 12h14m-7-7 7 7-7 7" />,
-    activity: (
+    activity: <path d="M3 12h4l3-8 4 16 3-8h4" />,
+    alert: (
       <>
-        <path d="M3 12h4l3-8 4 16 3-8h4" />
+        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </>
+    ),
+    check: <path d="M20 6 9 17l-5-5" />,
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </>
+    ),
+    refresh: (
+      <>
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+        <path d="M21 3v5h-5" />
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+        <path d="M3 21v-5h5" />
       </>
     ),
   }
@@ -93,7 +153,7 @@ function Icon({ name, className = 'h-5 w-5' }) {
       strokeWidth="1.8"
       viewBox="0 0 24 24"
     >
-      {paths[name]}
+      {paths[name] || null}
     </svg>
   )
 }
@@ -105,97 +165,463 @@ function StatusBadge({ status }) {
   }
 
   return (
-    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${presentation.className}`}>
+    <span
+      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${presentation.className}`}
+    >
       {presentation.label}
     </span>
   )
 }
 
-function StatisticsCard({
-  label,
-  value,
-  icon,
-  tone,
-  cardTone,
-  valueTone,
-  isLoading,
-}) {
+function StatisticsCard({ label, value, sublabel, icon, tone, isLoading }) {
   return (
-    <article className={`dashboard-stat-card dashboard-stat-card-${cardTone} flex items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-sm sm:p-5`}>
-      <div className="min-w-0">
-        <p className="dashboard-stat-label text-sm font-medium text-slate-500">{label}</p>
-        <p className={`dashboard-stat-value dashboard-stat-value-${valueTone} mt-2 text-2xl font-bold tracking-tight sm:text-3xl`}>
+    <article className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition hover:border-slate-300">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          {label}
+        </p>
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}
+        >
+          <Icon className="h-5 w-5" name={icon} />
+        </span>
+      </div>
+      <div className="mt-2">
+        <p className="text-2xl font-bold tracking-tight text-slate-900">
           {isLoading ? '—' : value}
         </p>
+        {sublabel && (
+          <p className="mt-1 text-[11px] text-slate-400 truncate">{sublabel}</p>
+        )}
       </div>
-      <span className={`dashboard-stat-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${tone}`}>
-        <Icon className="h-5 w-5 sm:h-6 sm:w-6" name={icon} />
-      </span>
     </article>
   )
 }
 
-function WorkStatusChart({ counts, total }) {
+function WorkStatusDonutChart({ counts, total }) {
   const radius = 48
+  const strokeWidth = 14
   const circumference = 2 * Math.PI * radius
-  const segments = STATUS_PEKERJAAN_OPTIONS.map(({ value }) => ({
-    value,
-    count: counts[value],
-    ...STATUS_PRESENTATION[value],
-  }))
-  const chartSegments = segments.reduce(
-    (result, segment) => {
-      const length = total > 0 ? (segment.count / total) * circumference : 0
-      result.items.push({ ...segment, length, offset: result.offset })
-      result.offset += length
-      return result
+
+  const statusConfig = [
+    {
+      key: STATUS_PEKERJAAN.BERJALAN,
+      label: 'Sedang Berjalan',
+      count: counts[STATUS_PEKERJAAN.BERJALAN] || 0,
+      color: '#2563eb',
+      dotClass: 'bg-blue-600',
     },
-    { items: [], offset: 0 },
-  ).items
+    {
+      key: STATUS_PEKERJAAN.BELUM_MULAI,
+      label: 'Belum Dimulai',
+      count: counts[STATUS_PEKERJAAN.BELUM_MULAI] || 0,
+      color: '#f59e0b',
+      dotClass: 'bg-amber-500',
+    },
+    {
+      key: STATUS_PEKERJAAN.SELESAI,
+      label: 'Selesai',
+      count: counts[STATUS_PEKERJAAN.SELESAI] || 0,
+      color: '#10b981',
+      dotClass: 'bg-emerald-500',
+    },
+  ]
+
+  let accumulatedLength = 0
+  const segments = statusConfig.map((item) => {
+    const length = total > 0 ? (item.count / total) * circumference : 0
+    const offset = accumulatedLength
+    accumulatedLength += length
+    const percent = total > 0 ? Math.round((item.count / total) * 100) : 0
+    return { ...item, length, offset, percent }
+  })
 
   return (
-    <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10">
-      <div className="relative h-44 w-44 shrink-0">
+    <div className="flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-8">
+      {/* Donut Chart SVG */}
+      <div className="relative h-40 w-40 shrink-0">
         <svg
-          aria-label={`Grafik status pekerjaan: ${segments.map(({ label, count }) => `${label} ${count}`).join(', ')}`}
+          aria-label="Distribusi status pekerjaan"
           className="h-full w-full -rotate-90"
-          role="img"
           viewBox="0 0 120 120"
         >
-          <circle cx="60" cy="60" fill="none" r={radius} stroke="#f1f5f9" strokeWidth="14" />
+          <circle
+            cx="60"
+            cy="60"
+            fill="none"
+            r={radius}
+            stroke="#f1f5f9"
+            strokeWidth={strokeWidth}
+          />
           {total > 0 &&
-            chartSegments.map((segment) => {
-              return (
-                <circle
-                  cx="60"
-                  cy="60"
-                  fill="none"
-                  key={segment.value}
-                  r={radius}
-                  stroke={segment.color}
-                  strokeDasharray={`${segment.length} ${circumference - segment.length}`}
-                  strokeDashoffset={-segment.offset}
-                  strokeWidth="14"
-                />
-              )
-            })}
+            segments.map((segment) => (
+              <circle
+                key={segment.key}
+                cx="60"
+                cy="60"
+                fill="none"
+                r={radius}
+                stroke={segment.color}
+                strokeDasharray={`${segment.length} ${
+                  circumference - segment.length
+                }`}
+                strokeDashoffset={-segment.offset}
+                strokeWidth={strokeWidth}
+                className="transition-all duration-500 ease-out"
+              />
+            ))}
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold tracking-tight text-slate-900">{total}</span>
-          <span className="mt-1 text-xs font-medium text-slate-500">Total Pekerjaan</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="text-2xl font-bold tracking-tight text-slate-900">
+            {total}
+          </span>
+          <span className="text-[11px] font-medium text-slate-400">
+            Total Proyek
+          </span>
         </div>
       </div>
-      <ul className="w-full max-w-xs space-y-4">
+
+      {/* Legend */}
+      <ul className="w-full max-w-xs space-y-3">
         {segments.map((segment) => (
-          <li className="flex items-center justify-between gap-4" key={segment.value}>
-            <span className="flex min-w-0 items-center gap-2.5 text-sm text-slate-600">
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${segment.dot}`} />
+          <li
+            key={segment.key}
+            className="flex items-center justify-between gap-3 text-xs"
+          >
+            <span className="flex items-center gap-2 text-slate-600 font-medium">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${segment.dotClass}`}
+              />
               <span>{segment.label}</span>
             </span>
-            <span className="font-semibold tabular-nums text-slate-900">{segment.count}</span>
+            <span className="tabular-nums font-bold text-slate-900">
+              {segment.count}{' '}
+              <span className="font-normal text-slate-400">
+                ({segment.percent}%)
+              </span>
+            </span>
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function WeeklyAttendanceBarChart({ attendanceList = [] }) {
+  const days = useMemo(() => {
+    const result = []
+    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const dateString = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d)
+
+      const dayName = dayNames[d.getDay()]
+      const shortDate = new Intl.DateTimeFormat('id-ID', {
+        day: 'numeric',
+        month: 'short',
+      }).format(d)
+
+      const dayAttendances = attendanceList.filter(
+        (a) => a.tanggal === dateString,
+      )
+      const count = dayAttendances.length
+
+      result.push({
+        date: dateString,
+        dayName,
+        shortDate,
+        isToday: i === 0,
+        count,
+      })
+    }
+    return result
+  }, [attendanceList])
+
+  const maxCount = Math.max(1, ...days.map((d) => d.count))
+  const totalWeekly = days.reduce((sum, d) => sum + d.count, 0)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>Kehadiran per Hari (7 Hari Terakhir)</span>
+        <span className="font-semibold text-slate-800">
+          Total: {totalWeekly} kehadiran
+        </span>
+      </div>
+
+      <div className="flex h-36 items-end justify-between gap-2 pt-6">
+        {days.map((day) => {
+          const heightPercent =
+            day.count > 0 ? Math.max(16, (day.count / maxCount) * 100) : 6
+
+          return (
+            <div
+              key={day.date}
+              className="flex flex-1 flex-col items-center gap-1.5 h-full justify-end"
+            >
+              <span
+                className={`text-[11px] font-bold ${
+                  day.count > 0 ? 'text-slate-700' : 'text-slate-300'
+                }`}
+              >
+                {day.count}
+              </span>
+
+              <div className="w-full max-w-[28px] rounded-t-md bg-slate-100 h-24 flex items-end">
+                <div
+                  style={{ height: `${heightPercent}%` }}
+                  className={`w-full rounded-t-md transition-all duration-500 ${
+                    day.isToday
+                      ? 'bg-blue-600 shadow-sm shadow-blue-500/20'
+                      : day.count > 0
+                        ? 'bg-blue-400'
+                        : 'bg-slate-200'
+                  }`}
+                  title={`${day.shortDate}: ${day.count} presensi`}
+                />
+              </div>
+
+              <div className="text-center">
+                <span
+                  className={`block text-[11px] font-semibold ${
+                    day.isToday ? 'text-blue-600' : 'text-slate-600'
+                  }`}
+                >
+                  {day.dayName}
+                </span>
+                <span className="block text-[9px] text-slate-400">
+                  {day.shortDate.split(' ')[0]}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function DeadlineWarningSection({ jobs = [], onNavigate }) {
+  const today = useMemo(() => getJakartaToday(), [])
+
+  const criticalJobs = useMemo(() => {
+    return jobs
+      .filter((job) => job.status !== 'selesai' && Boolean(job.target_selesai))
+      .map((job) => {
+        const target = new Date(`${job.target_selesai}T00:00:00`)
+        const curr = new Date(`${today}T00:00:00`)
+        const diffDays = Math.round((target - curr) / (1000 * 60 * 60 * 24))
+        return { ...job, diffDays }
+      })
+      .filter((job) => job.diffDays <= 3)
+      .sort((a, b) => a.diffDays - b.diffDays)
+  }, [jobs, today])
+
+  return (
+    <div className="space-y-3">
+      {criticalJobs.length === 0 ? (
+        <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-6 text-center">
+          <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <Icon name="check" className="h-5 w-5" />
+          </span>
+          <p className="mt-2 text-sm font-semibold text-slate-800">
+            Semua Proyek Sesuai Jadwal
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Tidak ada pekerjaan yang terlambat atau mendekati tenggat (H-3).
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {criticalJobs.map((job) => {
+            let badgeStyle = ''
+            let badgeLabel = ''
+
+            if (job.diffDays < 0) {
+              badgeStyle =
+                'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20'
+              badgeLabel = `Terlambat ${Math.abs(job.diffDays)} hari`
+            } else if (job.diffDays === 0) {
+              badgeStyle =
+                'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/20'
+              badgeLabel = 'Tenggat Hari Ini'
+            } else if (job.diffDays === 1) {
+              badgeStyle =
+                'bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-600/20'
+              badgeLabel = 'Tenggat Besok (H-1)'
+            } else {
+              badgeStyle =
+                'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/20'
+              badgeLabel = `Tenggat H-${job.diffDays}`
+            }
+
+            return (
+              <div
+                key={job.id_pekerjaan}
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between first:pt-0 last:pb-0"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {job.nama_pekerjaan}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                    <Icon name="location" className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span className="truncate">
+                      {job.lokasi || 'Lokasi belum ditentukan'}
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span>Target: {formatDate(job.target_selesai)}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeStyle}`}
+                  >
+                    {badgeLabel}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FinancialSummaryCard({ expenses = [], payrolls = [] }) {
+  const stats = useMemo(() => {
+    const uangKantor = expenses
+      .filter(
+        (p) =>
+          p.jenis_dana === 'kantor' && p.status_verifikasi === 'disetujui',
+      )
+      .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
+
+    const uangPribadi = expenses
+      .filter(
+        (p) =>
+          p.jenis_dana === 'pribadi' && p.status_verifikasi === 'disetujui',
+      )
+      .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
+
+    const pendingExpenses = expenses.filter(
+      (p) => p.status_verifikasi === 'menunggu',
+    ).length
+
+    const totalPengeluaran = uangKantor + uangPribadi
+
+    const gajiDibayar = payrolls
+      .filter((g) => g.status_bayar === 'sudah')
+      .reduce(
+        (sum, g) => sum + (Number(g.total_dibayar || g.total_upah) || 0),
+        0,
+      )
+
+    const gajiBelumDibayar = payrolls
+      .filter((g) => g.status_bayar === 'belum')
+      .reduce(
+        (sum, g) => sum + (Number(g.total_dibayar || g.total_upah) || 0),
+        0,
+      )
+
+    const totalGaji = gajiDibayar + gajiBelumDibayar
+    const activePeriod = payrolls[0]?.periode || 'Periode Aktif'
+
+    return {
+      uangKantor,
+      uangPribadi,
+      pendingExpenses,
+      totalPengeluaran,
+      gajiDibayar,
+      gajiBelumDibayar,
+      totalGaji,
+      activePeriod,
+    }
+  }, [expenses, payrolls])
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        {/* Kolom Pengeluaran Operasional */}
+        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+              <Icon name="banknote" className="h-4 w-4 text-amber-600" />
+              Operasional Proyek
+            </span>
+            <span className="text-[11px] text-slate-400">Disetujui</span>
+          </div>
+
+          <div>
+            <p className="text-lg font-bold text-slate-900">
+              {formatCurrency(stats.totalPengeluaran)}
+            </p>
+          </div>
+
+          <div className="border-t border-slate-200/60 pt-2 space-y-1 text-xs">
+            <div className="flex justify-between text-slate-600">
+              <span>Dana Kantor:</span>
+              <span className="font-semibold text-slate-800">
+                {formatCurrency(stats.uangKantor)}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Reimburse Pribadi:</span>
+              <span className="font-semibold text-slate-800">
+                {formatCurrency(stats.uangPribadi)}
+              </span>
+            </div>
+            {stats.pendingExpenses > 0 && (
+              <div className="flex justify-between text-amber-700 font-medium">
+                <span>Nota Menunggu:</span>
+                <span>{stats.pendingExpenses} nota</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Kolom Penggajian */}
+        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+              <Icon name="wallet" className="h-4 w-4 text-purple-600" />
+              Penggajian Karyawan
+            </span>
+            <span className="text-[11px] text-slate-400">
+              {stats.activePeriod}
+            </span>
+          </div>
+
+          <div>
+            <p className="text-lg font-bold text-slate-900">
+              {formatCurrency(stats.totalGaji)}
+            </p>
+          </div>
+
+          <div className="border-t border-slate-200/60 pt-2 space-y-1 text-xs">
+            <div className="flex justify-between text-slate-600">
+              <span>Sudah Dibayarkan:</span>
+              <span className="font-semibold text-emerald-700">
+                {formatCurrency(stats.gajiDibayar)}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Belum Dibayarkan:</span>
+              <span className="font-semibold text-slate-800">
+                {formatCurrency(stats.gajiBelumDibayar)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -205,310 +631,650 @@ function DashboardAdmin({ onNavigate = () => {} }) {
     employees: [],
     jobs: [],
     assignments: [],
+    expenses: [],
+    attendances: [],
+    payrolls: [],
     isLoading: true,
     error: '',
   })
-  const { employees, jobs, assignments, isLoading, error } = store
+
+  const {
+    employees,
+    jobs,
+    assignments,
+    expenses,
+    attendances,
+    payrolls,
+    isLoading,
+    error,
+  } = store
+
+  const today = useMemo(() => getJakartaToday(), [])
 
   useEffect(() => {
     let isMounted = true
 
-    Promise.all([getKaryawan(), getPekerjaan(), getPenugasan()])
-      .then(([loadedEmployees, loadedJobs, loadedAssignments]) => {
-          if (isMounted) {
-            setStore({
-              employees: loadedEmployees,
-              jobs: loadedJobs,
-              assignments: loadedAssignments,
-              isLoading: false,
-              error: '',
-            })
-          }
-        })
-        .catch((loadError) => {
-          if (isMounted) {
-            setStore((current) => ({
-              ...current,
-              isLoading: false,
-              error: `Data dashboard tidak dapat dimuat: ${loadError.message}`,
-            }))
-          }
-        })
+    async function loadDashboardData() {
+      try {
+        const currentPeriod = today.slice(0, 7) // '2026-11'
+
+        const [
+          loadedEmployees,
+          loadedJobs,
+          loadedAssignments,
+          loadedExpenses,
+          loadedAttendances,
+          loadedPayrolls,
+        ] = await Promise.all([
+          getKaryawan().catch(() => []),
+          getPekerjaan().catch(() => []),
+          getPenugasan().catch(() => []),
+          PengeluaranService.getAll().catch(() => []),
+          AbsensiService.getAll().catch(() => []),
+          GajiService.getByPeriode(currentPeriod).catch(() => []),
+        ])
+
+        if (isMounted) {
+          setStore({
+            employees: Array.isArray(loadedEmployees) ? loadedEmployees : [],
+            jobs: Array.isArray(loadedJobs) ? loadedJobs : [],
+            assignments: Array.isArray(loadedAssignments)
+              ? loadedAssignments
+              : [],
+            expenses: Array.isArray(loadedExpenses) ? loadedExpenses : [],
+            attendances: Array.isArray(loadedAttendances)
+              ? loadedAttendances
+              : [],
+            payrolls: Array.isArray(loadedPayrolls) ? loadedPayrolls : [],
+            isLoading: false,
+            error: '',
+          })
+        }
+      } catch (loadError) {
+        if (isMounted) {
+          setStore((current) => ({
+            ...current,
+            isLoading: false,
+            error: `Data dashboard tidak dapat dimuat: ${loadError.message}`,
+          }))
+        }
+      }
+    }
+
+    loadDashboardData()
+
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [today])
 
-  const statistics = useMemo(() => {
-    const counts = Object.fromEntries(
+  // Lookup maps
+  const employeeMap = useMemo(
+    () =>
+      new Map(employees.map((emp) => [Number(emp.id_karyawan), emp])),
+    [employees],
+  )
+
+  const jobMap = useMemo(
+    () => new Map(jobs.map((job) => [Number(job.id_pekerjaan), job])),
+    [jobs],
+  )
+
+  // Status counts for Pekerjaan
+  const jobStatusCounts = useMemo(() => {
+    return Object.fromEntries(
       STATUS_PEKERJAAN_OPTIONS.map(({ value }) => [
         value,
         jobs.filter((job) => job.status === value).length,
       ]),
     )
-    return {
-      counts,
-      totalEmployees: employees.length,
-      totalJobs: jobs.length,
-      totalAssignments: assignments.length,
-    }
-  }, [assignments, employees, jobs])
+  }, [jobs])
 
-  const latestJobs = useMemo(
-    () =>
-      [...jobs]
-        .sort(
-          (left, right) =>
-            getNumericSuffix(right.id_pekerjaan) -
-            getNumericSuffix(left.id_pekerjaan),
-        )
-        .slice(0, 5),
-    [jobs],
-  )
+  // Presensi hari ini
+  const todayAttendanceCount = useMemo(() => {
+    return attendances.filter((a) => a.tanggal === today).length
+  }, [attendances, today])
 
-  const employeeMap = useMemo(
-    () => new Map(employees.map((employee) => [employee.id_karyawan, employee])),
-    [employees],
-  )
-  const jobMap = useMemo(
-    () => new Map(jobs.map((job) => [job.id_pekerjaan, job])),
-    [jobs],
-  )
-  const latestAssignments = useMemo(
-    () =>
-      [...assignments]
-        .sort((left, right) => right.id_penugasan - left.id_penugasan)
-        .slice(0, 5),
-    [assignments],
-  )
-  const latestEmployees = useMemo(
-    () =>
-      [...employees]
-        .sort(
-          (left, right) =>
-            getNumericSuffix(right.id_karyawan) -
-            getNumericSuffix(left.id_karyawan),
-        )
-        .slice(0, 4),
-    [employees],
-  )
+  // Financial summary
+  const totalExpensesAmount = useMemo(() => {
+    return expenses
+      .filter((p) => p.status_verifikasi === 'disetujui')
+      .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
+  }, [expenses])
 
-  const cards = [
-    { label: 'Total Karyawan', value: statistics.totalEmployees, icon: 'employees', tone: 'bg-blue-50 text-blue-600', cardTone: 'employees', valueTone: 'blue' },
-    { label: 'Total Pekerjaan', value: statistics.totalJobs, icon: 'work', tone: 'bg-indigo-50 text-indigo-600', cardTone: 'jobs', valueTone: 'indigo' },
-    { label: 'Belum Dimulai', value: statistics.counts[STATUS_PEKERJAAN.BELUM_MULAI], icon: 'calendar', tone: 'bg-amber-50 text-amber-600', cardTone: 'pending', valueTone: 'amber' },
-    { label: 'Sedang Berjalan', value: statistics.counts[STATUS_PEKERJAAN.BERJALAN], icon: 'activity', tone: 'bg-blue-50 text-blue-600', cardTone: 'running', valueTone: 'blue' },
-    { label: 'Pekerjaan Selesai', value: statistics.counts[STATUS_PEKERJAAN.SELESAI], icon: 'work', tone: 'bg-emerald-50 text-emerald-600', cardTone: 'complete', valueTone: 'green' },
-    { label: 'Total Penugasan', value: statistics.totalAssignments, icon: 'assignments', tone: 'bg-violet-50 text-violet-600', cardTone: 'assignments', valueTone: 'violet' },
+  const totalPayrollAmount = useMemo(() => {
+    return payrolls.reduce(
+      (sum, g) => sum + (Number(g.total_dibayar || g.total_upah) || 0),
+      0,
+    )
+  }, [payrolls])
+
+  // 6 Kartu Statistik Utama
+  const statCards = [
+    {
+      label: 'Total Karyawan',
+      value: employees.length,
+      sublabel: `${employees.length} terdaftar`,
+      icon: 'employees',
+      tone: 'bg-blue-50 text-blue-600 ring-1 ring-blue-600/10',
+    },
+    {
+      label: 'Total Pekerjaan',
+      value: jobs.length,
+      sublabel: `${jobStatusCounts[STATUS_PEKERJAAN.BERJALAN] || 0} sedang berjalan`,
+      icon: 'work',
+      tone: 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-600/10',
+    },
+    {
+      label: 'Total Penugasan',
+      value: assignments.length,
+      sublabel: `${assignments.length} penugasan teknisi`,
+      icon: 'assignments',
+      tone: 'bg-violet-50 text-violet-600 ring-1 ring-violet-600/10',
+    },
+    {
+      label: 'Kehadiran Hari Ini',
+      value: todayAttendanceCount,
+      sublabel:
+        todayAttendanceCount > 0
+          ? `${todayAttendanceCount} hadir hari ini`
+          : 'Belum ada presensi hari ini',
+      icon: 'calendar-check',
+      tone: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/10',
+    },
+    {
+      label: 'Total Pengeluaran',
+      value: formatCurrency(totalExpensesAmount),
+      sublabel: 'Biaya disetujui',
+      icon: 'banknote',
+      tone: 'bg-amber-50 text-amber-600 ring-1 ring-amber-600/10',
+    },
+    {
+      label: 'Total Gaji',
+      value: formatCurrency(totalPayrollAmount),
+      sublabel: `${payrolls[0]?.periode || 'Bulan ini'}`,
+      icon: 'wallet',
+      tone: 'bg-purple-50 text-purple-600 ring-1 ring-purple-600/10',
+    },
   ]
 
+  // Aktivitas Terbaru (Aktual dari sistem)
+  const recentActivities = useMemo(() => {
+    const list = []
+
+    // Penugasan
+    assignments.forEach((a) => {
+      const emp = employeeMap.get(Number(a.id_karyawan))
+      const job = jobMap.get(Number(a.id_pekerjaan))
+      list.push({
+        id: `assign-${a.id_penugasan}`,
+        title: 'Penugasan Teknisi',
+        description: `${emp?.nama || 'Karyawan'} ditugaskan pada "${
+          job?.nama_pekerjaan || `Proyek #${a.id_pekerjaan}`
+        }"`,
+        date: a.tanggal_penugasan || '',
+        timestamp: Number(a.id_penugasan) || 0,
+        badge: 'Penugasan',
+        badgeColor: 'bg-blue-50 text-blue-700 ring-blue-700/10',
+        icon: 'assignments',
+      })
+    })
+
+    // Pekerjaan
+    jobs.forEach((j) => {
+      list.push({
+        id: `job-${j.id_pekerjaan}`,
+        title: 'Pendaftaran Proyek',
+        description: `Proyek "${j.nama_pekerjaan}" (${
+          j.lokasi || 'Lokasi belum diatur'
+        })`,
+        date: j.tanggal_mulai || '',
+        timestamp: Number(j.id_pekerjaan) || 0,
+        badge: 'Pekerjaan',
+        badgeColor: 'bg-indigo-50 text-indigo-700 ring-indigo-700/10',
+        icon: 'work',
+      })
+    })
+
+    // Pengeluaran
+    expenses.slice(0, 6).forEach((e) => {
+      list.push({
+        id: `exp-${e.id_pengeluaran}`,
+        title: 'Pengajuan Biaya Operasional',
+        description: `${e.keterangan || 'Nota operasional'} (${formatCurrency(
+          e.nominal,
+        )})`,
+        date: e.tanggal || '',
+        timestamp: Number(e.id_pengeluaran) || 0,
+        badge: 'Pengeluaran',
+        badgeColor: 'bg-amber-50 text-amber-700 ring-amber-700/10',
+        icon: 'banknote',
+      })
+    })
+
+    // Absensi
+    attendances.slice(0, 6).forEach((att) => {
+      list.push({
+        id: `att-${att.id_absensi}`,
+        title: 'Presensi Kerja Karyawan',
+        description: `${att.nama_karyawan || 'Pekerja'} mencatat kehadiran (Jam: ${
+          att.jam_masuk || '—'
+        })`,
+        date: att.tanggal || '',
+        timestamp: Number(att.id_absensi) || 0,
+        badge: 'Presensi',
+        badgeColor: 'bg-emerald-50 text-emerald-700 ring-emerald-700/10',
+        icon: 'calendar',
+      })
+    })
+
+    return list
+      .sort((left, right) => {
+        if (left.date && right.date && left.date !== right.date) {
+          return right.date.localeCompare(left.date)
+        }
+        return right.timestamp - left.timestamp
+      })
+      .slice(0, 5)
+  }, [assignments, employeeMap, expenses, attendances, jobMap, jobs])
+
+  // 5 Pekerjaan Terbaru
+  const latestJobs = useMemo(() => {
+    return [...jobs]
+      .sort((a, b) => Number(b.id_pekerjaan) - Number(a.id_pekerjaan))
+      .slice(0, 5)
+  }, [jobs])
+
   return (
-    <div className="dashboard-admin mx-auto w-full max-w-[1440px] space-y-6">
-      <header className="dashboard-welcome-banner relative flex flex-col gap-5 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-800 p-5 text-white shadow-lg shadow-blue-900/10 sm:flex-row sm:items-center sm:justify-between sm:p-7">
-        <div className="dashboard-welcome-copy min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-100">
-            Panel Manajemen Administrator
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Selamat Datang, Administrator!
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-blue-100">
-            Pantau ringkasan aktivitas, pekerjaan, dan penugasan dalam satu
-            tempat.
-          </p>
+    <div className="mx-auto w-full max-w-[1440px] space-y-6 pb-10">
+      {/* 2. Banner Sambutan Gradasi Biru-Ungu */}
+      <header className="relative flex flex-col gap-5 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-6 sm:p-7 text-white shadow-lg shadow-blue-900/10">
+        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wider uppercase text-blue-100 backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-300 animate-pulse" />
+              Panel Manajemen Administrator
+            </span>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+              Selamat Datang, Administrator!
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm leading-relaxed text-blue-100/90">
+              Pantau performa proyek, penetapan penugasan teknisi, presensi
+              harian, dan pergerakan anggaran operasional perusahaan CV. Putra
+              Anugrah Mandiri secara terpadu.
+            </p>
+          </div>
+
+          {/* Quick Actions */}
+          <nav
+            aria-label="Aksi Cepat Admin"
+            className="flex flex-wrap items-center gap-2.5 shrink-0"
+          >
+            {[
+              {
+                label: 'Kelola Karyawan',
+                icon: 'employees',
+                target: 'Data Karyawan',
+              },
+              {
+                label: 'Kelola Pekerjaan',
+                icon: 'work',
+                target: 'Data Pekerjaan',
+              },
+              {
+                label: 'Atur Penugasan',
+                icon: 'assignments',
+                target: 'Penugasan',
+              },
+            ].map((action) => (
+              <button
+                key={action.target}
+                type="button"
+                onClick={() => onNavigate(action.target)}
+                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-sm border border-white/15 transition hover:bg-white/20 active:scale-95"
+              >
+                <Icon name={action.icon} className="h-4 w-4" />
+                <span>{action.label}</span>
+                <Icon name="arrow" className="h-3 w-3 opacity-70" />
+              </button>
+            ))}
+          </nav>
         </div>
-        <nav
-          aria-label="Quick Action"
-          className="dashboard-quick-actions grid shrink-0 gap-2 sm:grid-cols-3"
-        >
-          {[
-            { label: 'Kelola Karyawan', icon: 'employees', page: 'Data Karyawan' },
-            { label: 'Kelola Pekerjaan', icon: 'work', page: 'Data Pekerjaan' },
-            { label: 'Atur Penugasan', icon: 'assignments', page: 'Penugasan' },
-          ].map((action) => (
-            <button
-              className="dashboard-quick-action"
-              key={action.page}
-              onClick={() => onNavigate(action.page)}
-              type="button"
-            >
-              <Icon className="h-4 w-4" name={action.icon} />
-              <span>{action.label}</span>
-              <Icon className="dashboard-quick-action-arrow h-3.5 w-3.5" name="arrow" />
-            </button>
-          ))}
-        </nav>
+
+        {/* Dekorasi Visual Halus */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-10 -bottom-10 h-64 w-64 rounded-full bg-white/5 blur-2xl"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute right-40 top-0 h-40 w-40 rounded-full bg-purple-500/10 blur-xl"
+        />
       </header>
+
+      {/* Error Notice */}
       {error && (
-        <div className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between" role="alert">
-          <p>{error}</p>
+        <div
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
+          role="alert"
+        >
+          <div className="flex items-center gap-2.5">
+            <Icon name="alert" className="h-5 w-5 shrink-0 text-rose-600" />
+            <p className="font-medium">{error}</p>
+          </div>
           <button
-            className="shrink-0 font-semibold underline underline-offset-2"
-            onClick={() => window.location.reload()}
             type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-1 font-semibold text-rose-700 underline underline-offset-2 hover:text-rose-900"
           >
             Coba lagi
           </button>
         </div>
       )}
 
-      <section aria-label="Statistik ringkasan" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {cards.map((card) => (
-          <StatisticsCard {...card} isLoading={isLoading} key={card.label} />
+      {/* 3. Enam Kartu Statistik Utama */}
+      <section
+        aria-label="Statistik Utama"
+        className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5 sm:gap-4"
+      >
+        {statCards.map((card) => (
+          <StatisticsCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            sublabel={card.sublabel}
+            icon={card.icon}
+            tone={card.tone}
+            isLoading={isLoading}
+          />
         ))}
       </section>
 
+      {/* 4 & 7. Baris Grafik: Status Pekerjaan (Donut) & Rekap Absensi Mingguan (Bar) */}
       <div className="grid gap-6 xl:grid-cols-5">
-        <section aria-label="Grafik pekerjaan berdasarkan status" className="dashboard-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.02] sm:p-6 xl:col-span-2">
-          <div className="dashboard-panel-heading mb-6">
-            <h2 className="text-base font-semibold text-slate-900">Status Pekerjaan</h2>
-            <p className="mt-1 text-sm text-slate-500">Distribusi pekerjaan berdasarkan status saat ini.</p>
+        {/* Donut Chart Status Pekerjaan */}
+        <section
+          aria-label="Distribusi status pekerjaan"
+          className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm xl:col-span-2 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Status Pekerjaan
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Distribusi proyek berdasarkan status penyelesaian.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('Data Pekerjaan')}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition"
+              >
+                Lihat Proyek →
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="flex h-44 items-center justify-center">
+                <div className="h-32 w-32 animate-pulse rounded-full bg-slate-100" />
+              </div>
+            ) : (
+              <WorkStatusDonutChart
+                counts={jobStatusCounts}
+                total={jobs.length}
+              />
+            )}
           </div>
-          {isLoading ? (
-            <div className="mx-auto h-44 w-44 animate-pulse rounded-full bg-slate-100" role="status" aria-label="Memuat grafik pekerjaan" />
-          ) : (
-            <WorkStatusChart counts={statistics.counts} total={statistics.totalJobs} />
-          )}
         </section>
 
-        <section aria-label="Pekerjaan terbaru" className="dashboard-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.02] xl:col-span-3">
-          <div className="dashboard-panel-heading flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Pekerjaan Terbaru</h2>
-              <p className="mt-1 text-sm text-slate-500">Daftar pekerjaan yang terakhir ditambahkan.</p>
+        {/* Rekap Absensi Mingguan Bar Chart */}
+        <section
+          aria-label="Rekap absensi mingguan"
+          className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm xl:col-span-3 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Rekap Presensi Mingguan
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Aktivitas kehadiran karyawan dalam 7 hari kalender terakhir.
+                </p>
+              </div>
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                Minggu Ini
+              </span>
             </div>
-            <button
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-50 sm:px-3 sm:text-sm"
-              onClick={() => onNavigate('Data Pekerjaan')}
-              type="button"
-            >
-              Data Pekerjaan
-              <Icon className="h-4 w-4" name="arrow" />
-            </button>
+
+            {isLoading ? (
+              <div className="h-44 flex items-center justify-center">
+                <p className="text-xs text-slate-400">Memuat data presensi...</p>
+              </div>
+            ) : (
+              <WeeklyAttendanceBarChart attendanceList={attendances} />
+            )}
           </div>
-          {isLoading ? (
-            <div className="space-y-3 p-5" role="status" aria-label="Memuat pekerjaan terbaru">
-              {Array.from({ length: 3 }, (_, index) => (
-                <div className="h-16 animate-pulse rounded-xl bg-slate-100" key={index} />
-              ))}
-            </div>
-          ) : latestJobs.length > 0 ? (
-            <div className="divide-y divide-slate-100">
-              {latestJobs.map((job) => (
-                <article className="dashboard-job-row flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6" key={job.id_pekerjaan}>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-800">{job.nama_pekerjaan}</p>
-                    <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                      <Icon className="h-3.5 w-3.5 shrink-0" name="location" />
-                      <span className="truncate">{job.lokasi || 'Lokasi belum ditentukan'}</span>
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
-                    <span className="text-xs text-slate-500">
-                      {formatDate(job.tanggal_mulai)} <span className="text-slate-300">—</span> {formatDate(job.target_selesai)}
-                    </span>
-                    <StatusBadge status={job.status} />
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="px-6 py-10 text-center text-sm text-slate-500">Belum ada data pekerjaan.</p>
-          )}
         </section>
       </div>
 
+      {/* 6 & 8. Baris Operasional: Pekerjaan Mendekati Tenggat & Ringkasan Keuangan */}
       <div className="grid gap-6 xl:grid-cols-5">
-        <section aria-label="Aktivitas penugasan terbaru" className="dashboard-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.02] xl:col-span-3">
-          <div className="dashboard-panel-heading flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Aktivitas Penugasan</h2>
-              <p className="mt-1 text-sm text-slate-500">Penugasan yang terakhir tercatat.</p>
+        {/* Pekerjaan Mendekati Tenggat (H-3 / Terlambat) */}
+        <section
+          aria-label="Pekerjaan mendekati tenggat"
+          className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm xl:col-span-3 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                  <Icon name="clock" className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                    Pekerjaan Mendekati Tenggat
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Peringatan deadline kritis (H-3) dan proyek yang melewati
+                    target.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('Data Pekerjaan')}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition"
+              >
+                Semua Proyek →
+              </button>
             </div>
-            <button
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-50 sm:px-3 sm:text-sm"
-              onClick={() => onNavigate('Penugasan')}
-              type="button"
-            >
-              Kelola Penugasan
-              <Icon className="h-4 w-4" name="arrow" />
-            </button>
+
+            {isLoading ? (
+              <div className="h-32 flex items-center justify-center">
+                <p className="text-xs text-slate-400">Memeriksa jadwal proyek...</p>
+              </div>
+            ) : (
+              <DeadlineWarningSection jobs={jobs} onNavigate={onNavigate} />
+            )}
           </div>
-          {isLoading ? (
-            <div className="space-y-3 p-5" role="status" aria-label="Memuat aktivitas penugasan">
-              {Array.from({ length: 3 }, (_, index) => (
-                <div className="h-16 animate-pulse rounded-xl bg-slate-100" key={index} />
-              ))}
-            </div>
-          ) : latestAssignments.length > 0 ? (
-            <div className="divide-y divide-slate-100">
-              {latestAssignments.map((assignment) => {
-                const employee = employeeMap.get(assignment.id_karyawan)
-                const job = jobMap.get(assignment.id_pekerjaan)
-                return (
-                  <article className="flex items-start gap-3 px-5 py-4 sm:px-6" key={assignment.id_penugasan}>
-                    <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                      <Icon className="h-4 w-4" name="assignments" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-800">{employee?.nama ?? 'Karyawan tidak tersedia'}</p>
-                      <p className="mt-1 truncate text-sm text-slate-500">
-                        Ditugaskan pada {job?.nama_pekerjaan ?? `Pekerjaan #${assignment.id_pekerjaan}`}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-400">Waktu penugasan tidak tersedia</p>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="px-6 py-10 text-center text-sm text-slate-500">Belum ada penugasan.</p>
-          )}
         </section>
 
-        <section aria-label="Ringkasan karyawan" className="dashboard-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.02] xl:col-span-2">
-          <div className="dashboard-panel-heading flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Ringkasan Karyawan</h2>
-              <p className="mt-1 text-sm text-slate-500">{isLoading ? '—' : `${employees.length} karyawan terdaftar`}</p>
+        {/* Ringkasan Finansial Operasional */}
+        <section
+          aria-label="Ringkasan finansial operasional"
+          className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm xl:col-span-2 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Ringkasan Keuangan
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Anggaran pengeluaran dan status upah gaji.
+                </p>
+              </div>
+              <span className="font-mono text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                Aktif
+              </span>
             </div>
-            <button
-              aria-label="Buka Data Karyawan"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50"
-              onClick={() => onNavigate('Data Karyawan')}
-              type="button"
-            >
-              <Icon className="h-4 w-4" name="arrow" />
-            </button>
+
+            {isLoading ? (
+              <div className="h-32 flex items-center justify-center">
+                <p className="text-xs text-slate-400">Menghitung rincian dana...</p>
+              </div>
+            ) : (
+              <FinancialSummaryCard
+                expenses={expenses}
+                payrolls={payrolls}
+              />
+            )}
           </div>
-          {isLoading ? (
-            <div className="space-y-3 p-5" role="status" aria-label="Memuat ringkasan karyawan">
-              {Array.from({ length: 3 }, (_, index) => (
-                <div className="h-12 animate-pulse rounded-xl bg-slate-100" key={index} />
-              ))}
+        </section>
+      </div>
+
+      {/* 5. Baris Aktivitas Aktual & Pekerjaan Terbaru */}
+      <div className="grid gap-6 xl:grid-cols-5">
+        {/* Aktivitas Terbaru Aktual */}
+        <section
+          aria-label="Aktivitas operasional terbaru"
+          className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm xl:col-span-3 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Aktivitas Terbaru
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Catatan transaksi penugasan, proyek, dan kehadiran terkini.
+                </p>
+              </div>
+              <span className="text-[11px] font-medium text-slate-400">
+                Real-time
+              </span>
             </div>
-          ) : latestEmployees.length > 0 ? (
-            <>
-              <ul className="divide-y divide-slate-100">
-                {latestEmployees.map((employee) => (
-                  <li className="flex items-center gap-3 px-5 py-3 sm:px-6" key={employee.id_karyawan}>
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
-                      {employee.nama.trim().charAt(0).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-800">{employee.nama}</span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">{employee.jabatan} · {employee.id_karyawan}</span>
-                    </span>
-                  </li>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="h-12 animate-pulse rounded-lg bg-slate-100"
+                  />
                 ))}
-              </ul>
-              <p className="border-t border-slate-100 px-5 py-3 text-xs leading-5 text-slate-400 sm:px-6">
-                Tanggal penambahan karyawan belum tersedia; daftar diurutkan berdasarkan ID.
+              </div>
+            ) : recentActivities.length === 0 ? (
+              <p className="py-8 text-center text-xs text-slate-400">
+                Belum ada rekaman aktivitas.
               </p>
-            </>
-          ) : (
-            <p className="px-6 py-10 text-center text-sm text-slate-500">Belum ada data karyawan.</p>
-          )}
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {recentActivities.map((act) => (
+                  <article
+                    key={act.id}
+                    className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                      <Icon name={act.icon} className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-xs font-bold text-slate-900">
+                          {act.title}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${act.badgeColor}`}
+                        >
+                          {act.badge}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-600">
+                        {act.description}
+                      </p>
+                      {act.date && (
+                        <p className="mt-1 text-[10px] text-slate-400">
+                          Tanggal: {formatDate(act.date)}
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className="mt-3 border-t border-slate-100 pt-2 text-[10px] text-slate-400">
+            Aktivitas dihimpun langsung dari entri terbaru tabel database operasional.
+          </p>
+        </section>
+
+        {/* Pekerjaan Terbaru */}
+        <section
+          aria-label="Pekerjaan terbaru terdaftar"
+          className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm xl:col-span-2 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Pekerjaan Terkini
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Daftar proyek yang baru ditambahkan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('Data Pekerjaan')}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition"
+              >
+                Semua →
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="h-12 animate-pulse rounded-lg bg-slate-100"
+                  />
+                ))}
+              </div>
+            ) : latestJobs.length === 0 ? (
+              <p className="py-8 text-center text-xs text-slate-400">
+                Belum ada data pekerjaan.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {latestJobs.map((job) => (
+                  <div
+                    key={job.id_pekerjaan}
+                    className="py-2.5 first:pt-0 last:pb-0"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate text-xs font-bold text-slate-900">
+                        {job.nama_pekerjaan}
+                      </p>
+                      <StatusBadge status={job.status} />
+                    </div>
+                    <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500 truncate">
+                      <Icon name="location" className="h-3 w-3 shrink-0 text-slate-400" />
+                      <span className="truncate">
+                        {job.lokasi || 'Lokasi belum diatur'}
+                      </span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className="mt-3 border-t border-slate-100 pt-2 text-[10px] text-slate-400">
+            {jobs.length} total proyek tercatat di sistem.
+          </p>
         </section>
       </div>
     </div>
