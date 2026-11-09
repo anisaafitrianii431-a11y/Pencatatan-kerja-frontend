@@ -21,7 +21,8 @@ import {
   AlertTriangle,
   ZoomIn,
   Search,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
 import { PengeluaranService, PekerjaanService, PekerjaService } from '../../services/api';
 import Modal from '../../components/Modal';
@@ -122,6 +123,25 @@ export default function PengeluaranAdminPage({ currentUser }) {
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       setErrorMsg(err.message || 'Gagal mengubah status penggantian');
+    }
+  };
+
+  const handleDelete = async (p) => {
+    if (!p) return;
+    const confirmText = `Apakah Anda yakin ingin menghapus catatan pengeluaran ini?\n\n• Pekerja: ${p.nama_karyawan}\n• Proyek: ${p.nama_pekerjaan}\n• Keterangan: ${p.keterangan || '-'}\n• Nominal: ${formatRupiah(p.nominal)}\n\nTindakan ini akan menghapus data secara permanen.`;
+    
+    if (window.confirm(confirmText)) {
+      try {
+        await PengeluaranService.delete(p.id_pengeluaran);
+        setSuccessMsg(`Catatan pengeluaran "${p.keterangan || 'Pengeluaran'}" berhasil dihapus.`);
+        loadData();
+        if (selectedExpense && selectedExpense.id_pengeluaran === p.id_pengeluaran) {
+          setSelectedExpense(null);
+        }
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } catch (err) {
+        setErrorMsg(err.message || 'Gagal menghapus catatan pengeluaran.');
+      }
     }
   };
 
@@ -534,6 +554,13 @@ export default function PengeluaranAdminPage({ currentUser }) {
                               >
                                 <XCircle className="w-3.5 h-3.5" />
                               </button>
+                              <button
+                                onClick={() => handleDelete(p)}
+                                title="Hapus Catatan Pengeluaran"
+                                className="p-1.5 rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition shadow-xs"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -918,6 +945,14 @@ export default function PengeluaranAdminPage({ currentUser }) {
                     </span>
                   </button>
                 )}
+
+                <button
+                  onClick={() => handleDelete(selectedExpense)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition flex items-center space-x-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Hapus</span>
+                </button>
               </div>
 
               <button
