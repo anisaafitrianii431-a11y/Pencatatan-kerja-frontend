@@ -837,7 +837,15 @@ function AppRoutes() {
               path="/karyawan/pengeluaran"
               element={<PengeluaranKaryawanPage currentUser={mappedUser} />}
             />
-            <Route path="/karyawan/absensi" element={<AbsensiPage />} />
+            <Route
+              path="/karyawan/absensi"
+              element={
+                <AbsensiPage
+                  workerId={mappedUser?.id_karyawan}
+                  workerName={mappedUser?.nama}
+                />
+              }
+            />
           </Route>
         </Route>
 
