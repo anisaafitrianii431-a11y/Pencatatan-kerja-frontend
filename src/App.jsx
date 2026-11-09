@@ -14,9 +14,11 @@ import LokasiKerjaPage from './pages/admin-absen/LokasiKerjaPage'
 import AbsensiPage from './pages/pekerja_absen/AbsensiPage'
 
 
-// Fitur Pengembang 2: Layout & Dashboard Admin Asli
+// Fitur Pengembang 2: Layout & Dashboard Admin & Pekerja Asli
 import AdminLayout from './layouts/AdminLayout.jsx'
 import DashboardAdmin from './pages/admin/DashboardAdmin.jsx'
+import PekerjaLayout from './layouts/PekerjaLayout.jsx'
+import DashboardPekerja from './pages/pekerja/DashboardPekerja.jsx'
 
 // Fitur Pengembang 2: Manajemen Karyawan, Pekerjaan, Penugasan & Profil
 import DataKaryawan from './pages/admin/DataKaryawan.jsx'
@@ -634,6 +636,91 @@ function AdminLayoutWrapper() {
   )
 }
 
+function DashboardPekerjaPage({ mappedUser }) {
+  const navigate = useNavigate()
+  return (
+    <DashboardPekerja
+      onNavigate={(target) => {
+        if (target === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
+        else if (target === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
+        else if (target === 'Riwayat Pengajuan') navigate('/karyawan/riwayat-pengajuan')
+        else if (target === 'Dashboard') navigate('/karyawan')
+        else navigate(target)
+      }}
+      workerId={mappedUser?.id_karyawan}
+    />
+  )
+}
+
+function RiwayatPengajuanPage() {
+  const navigate = useNavigate()
+  return (
+    <RiwayatPengajuan
+      onNavigate={(target) => {
+        if (target === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
+        else if (target === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
+      }}
+    />
+  )
+}
+
+function PekerjaLayoutWrapper({ mappedUser }) {
+  const { user, signOut } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  let activeItem = 'Dashboard'
+  const path = location.pathname
+  if (path === '/karyawan' || path === '/karyawan/dashboard') {
+    activeItem = 'Dashboard'
+  } else if (path.startsWith('/karyawan/pekerjaan-tersedia')) {
+    activeItem = 'Pekerjaan Tersedia'
+  } else if (path.startsWith('/karyawan/pekerjaan-saya')) {
+    activeItem = 'Pekerjaan Saya'
+  } else if (path.startsWith('/karyawan/riwayat-pengajuan')) {
+    activeItem = 'Riwayat Pengajuan'
+  } else if (path.startsWith('/karyawan/pengeluaran')) {
+    activeItem = 'Pengeluaran Saya'
+  } else if (path.startsWith('/karyawan/absensi')) {
+    activeItem = 'Presensi & Jam Kerja'
+  } else if (path.startsWith('/karyawan/profil')) {
+    activeItem = 'Profil Saya'
+  } else if (path.startsWith('/karyawan/pengaturan')) {
+    activeItem = 'Pengaturan'
+  }
+
+  function handleSelectMenuItem(item) {
+    if (item === 'Dashboard') navigate('/karyawan')
+    else if (item === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
+    else if (item === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
+    else if (item === 'Riwayat Pengajuan') navigate('/karyawan/riwayat-pengajuan')
+    else if (item === 'Pengeluaran Saya') navigate('/karyawan/pengeluaran')
+    else if (item === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
+    else if (item === 'Profil Saya') navigate('/karyawan/profil')
+    else if (item === 'Pengaturan') navigate('/karyawan/pengaturan')
+  }
+
+  async function handleLogout() {
+    try {
+      await signOut()
+      navigate('/login', { replace: true })
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
+  return (
+    <PekerjaLayout
+      activeItem={activeItem}
+      onLogout={handleLogout}
+      onSelectMenuItem={handleSelectMenuItem}
+      workerName={mappedUser?.nama || user?.name || 'Pekerja'}
+    >
+      <Outlet />
+    </PekerjaLayout>
+  )
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   const mappedUser = user
@@ -670,15 +757,11 @@ function AppRoutes() {
           </Route>
         </Route>
 
-        {/* Rute Pekerja & Shared: Menggunakan AppLayout */}
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to={user ? roleHome(user.role) : '/dashboard'} replace />} />
-          <Route
-            path="/dashboard"
-            element={user?.role === 'admin' ? <Navigate to="/admin" replace /> : <DashboardPage />}
-          />
-          <Route element={<ProtectedRoute roles={['karyawan']} />}>
-            <Route path="/karyawan" element={<KaryawanPage />} />
+        {/* Rute khusus Karyawan: Menggunakan PekerjaLayout asli tanpa tabrakan AppLayout */}
+        <Route element={<ProtectedRoute roles={['karyawan']} />}>
+          <Route element={<PekerjaLayoutWrapper mappedUser={mappedUser} />}>
+            <Route path="/karyawan" element={<DashboardPekerjaPage mappedUser={mappedUser} />} />
+            <Route path="/karyawan/dashboard" element={<DashboardPekerjaPage mappedUser={mappedUser} />} />
             <Route
               path="/karyawan/pekerjaan-tersedia"
               element={<PekerjaanTersedia workerId={mappedUser?.id_karyawan} workerName={mappedUser?.nama} />}
@@ -689,7 +772,7 @@ function AppRoutes() {
             />
             <Route
               path="/karyawan/riwayat-pengajuan"
-              element={<RiwayatPengajuan />}
+              element={<RiwayatPengajuanPage />}
             />
             <Route
               path="/karyawan/profil"
@@ -721,8 +804,15 @@ function AppRoutes() {
             />
             <Route path="/karyawan/absensi" element={<AbsensiPage />} />
           </Route>
-          <Route path="/pekerja" element={<PekerjaLocalTest />} />
         </Route>
+
+        {/* Rute Navigasi Global & Testing */}
+        <Route path="/" element={<Navigate to={user ? roleHome(user.role) : '/login'} replace />} />
+        <Route
+          path="/dashboard"
+          element={<Navigate to={user ? roleHome(user.role) : '/login'} replace />}
+        />
+        <Route path="/pekerja" element={<PekerjaLocalTest />} />
       </Route>
       <Route path="*" element={<Navigate to={user ? roleHome(user.role) : '/login'} replace />} />
     </Routes>

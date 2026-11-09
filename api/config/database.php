@@ -46,7 +46,7 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
 $host = "localhost";
 $username = "root";
 $password = "";
-$candidateDbs = ["jam_kerja", "db_jam_kerja"];
+$candidateDbs = ["db_pencatatan_kerja", "jam_kerja", "db_jam_kerja"];
 $pdo = null;
 
 foreach ($candidateDbs as $dbName) {

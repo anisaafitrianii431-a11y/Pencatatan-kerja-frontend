@@ -27,6 +27,18 @@ const iconContent = {
       <path d="M3 3v5h5M12 7v5l3 2" />
     </>
   ),
+  receipt: (
+    <>
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
+      <path d="M8 7h8M8 11h8M8 15h5" />
+    </>
+  ),
+  attendance: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 6v6l4 2" />
+    </>
+  ),
   profile: (
     <>
       <circle cx="12" cy="8" r="4" />
@@ -65,6 +77,8 @@ const mainMenuItems = [
   { label: 'Pekerjaan Tersedia', icon: 'available' },
   { label: 'Pekerjaan Saya', icon: 'mine' },
   { label: 'Riwayat Pengajuan', icon: 'history' },
+  { label: 'Pengeluaran Saya', icon: 'receipt' },
+  { label: 'Presensi & Jam Kerja', icon: 'attendance' },
 ]
 
 function SidebarPekerja({
@@ -112,7 +126,7 @@ function SidebarPekerja({
         <button
           aria-expanded={isOpen}
           aria-label={isOpen ? 'Tutup menu pekerja' : 'Buka menu pekerja'}
-          className="fixed left-4 top-4 z-[60] inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 lg:hidden"
+          className="fixed left-4 top-4 z-[60] inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 lg:hidden"
           onClick={toggleSidebar}
           type="button"
         >
@@ -183,7 +197,7 @@ function SidebarPekerja({
                 aria-current={isActive ? 'page' : undefined}
                 className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
                   isActive
-                    ? 'bg-emerald-600 text-white shadow-sm'
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
                 key={label}
@@ -198,9 +212,9 @@ function SidebarPekerja({
                   }`}
                   name={icon}
                 />
-                <span>{label}</span>
+                <span className="truncate">{label}</span>
                 {isActive && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-200" />
+                  <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
                 )}
               </button>
             )
@@ -209,17 +223,17 @@ function SidebarPekerja({
 
         <div className="shrink-0 border-t border-slate-800 p-4">
           <button
-            className="flex w-full items-center gap-3 rounded-xl bg-slate-800 p-3 text-left transition hover:bg-slate-700/80 focus-visible:outline-2 focus-visible:outline-emerald-500"
+            className="flex w-full items-center gap-3 rounded-xl bg-slate-800/80 p-3 text-left transition hover:bg-slate-700/80 focus-visible:outline-2 focus-visible:outline-emerald-500"
             onClick={() => selectMenuItem('Profil Saya')}
             title="Buka Profil Saya"
             type="button"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
-              {workerName.trim().charAt(0).toUpperCase()}
+              {(workerName || 'P').trim().charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">
-                {workerName}
+                {workerName || 'Pekerja'}
               </p>
               <p className="text-xs text-slate-400">Pekerja</p>
             </div>
