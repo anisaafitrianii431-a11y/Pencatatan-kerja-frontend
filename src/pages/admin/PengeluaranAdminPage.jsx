@@ -19,7 +19,9 @@ import {
   MapPin,
   FileText,
   AlertTriangle,
-  ZoomIn
+  ZoomIn,
+  Search,
+  RotateCcw
 } from 'lucide-react';
 import { PengeluaranService, PekerjaanService, PekerjaService } from '../../services/api';
 import Modal from '../../components/Modal';
@@ -34,11 +36,16 @@ export default function PengeluaranAdminPage({ currentUser }) {
   // Tab view: 'daftar' | 'rekap'
   const [activeTab, setActiveTab] = useState('daftar');
 
-  // Filters
+  // Filters Tab Daftar
   const [filterDana, setFilterDana] = useState('semua');
   const [filterJob, setFilterJob] = useState('');
   const [filterWorker, setFilterWorker] = useState('');
   const [filterStatus, setFilterStatus] = useState('semua');
+
+  // Filters Tab Rekapitulasi Proyek
+  const [rekapFilterJob, setRekapFilterJob] = useState('');
+  const [rekapSearch, setRekapSearch] = useState('');
+  const [rekapOnlyWithExpenses, setRekapOnlyWithExpenses] = useState(false);
 
   // Modal Detail Pengeluaran & Bukti Nota
   const [selectedExpense, setSelectedExpense] = useState(null);
@@ -178,6 +185,40 @@ export default function PengeluaranAdminPage({ currentUser }) {
       }
     };
   }, [pengeluaranList, pekerjaanList]);
+
+  // Filter khusus untuk Tab Rekapitulasi Proyek
+  const filteredRekapList = useMemo(() => {
+    return computedRekap.daftar.filter(item => {
+      // 1. Filter dropdown spesifik proyek
+      if (rekapFilterJob && String(item.id_pekerjaan) !== String(rekapFilterJob)) {
+        return false;
+      }
+      // 2. Filter pencarian teks nama proyek atau lokasi
+      if (rekapSearch.trim()) {
+        const query = rekapSearch.toLowerCase().trim();
+        const matchNama = (item.nama_pekerjaan || '').toLowerCase().includes(query);
+        const matchLokasi = (item.lokasi || '').toLowerCase().includes(query);
+        if (!matchNama && !matchLokasi) return false;
+      }
+      // 3. Filter hanya yang memiliki pengeluaran
+      if (rekapOnlyWithExpenses && item.total_pengeluaran === 0) {
+        return false;
+      }
+      return true;
+    });
+  }, [computedRekap.daftar, rekapFilterJob, rekapSearch, rekapOnlyWithExpenses]);
+
+  // Ringkasan total untuk proyek yang sedang difilter
+  const filteredRekapSummary = useMemo(() => {
+    const totalPribadi = filteredRekapList.reduce((sum, d) => sum + d.uang_pribadi, 0);
+    const totalKantor = filteredRekapList.reduce((sum, d) => sum + d.uang_kantor, 0);
+    const grandTotal = totalPribadi + totalKantor;
+    return {
+      total_uang_pribadi: totalPribadi,
+      total_uang_kantor: totalKantor,
+      grand_total: grandTotal,
+    };
+  }, [filteredRekapList]);
 
   const totalMenunggu = pengeluaranList.filter(p => p.status_verifikasi === 'menunggu').length;
   const totalReimbursBelum = pengeluaranList.filter(p => p.jenis_dana === 'pribadi' && p.status_verifikasi === 'disetujui' && p.status_ganti === 'belum').reduce((a, c) => a + Number(c.nominal), 0);
@@ -506,42 +547,136 @@ export default function PengeluaranAdminPage({ currentUser }) {
         </div>
       ) : (
         /* Rekapitulasi Proyek Tab */
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-800 text-sm">Rekapitulasi Biaya Pengeluaran Per Proyek Multi-Hari</h3>
-            <p className="text-xs text-slate-500">Akumulasi pengeluaran yang telah disetujui (disaring berdasarkan Uang Pribadi yang diganti & Kas Kantor).</p>
+        <div className="space-y-4">
+          {/* Filter Bar Khusus Rekapitulasi Proyek */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <Filter className="w-3.5 h-3.5 text-blue-600" />
+                <span>Filter Rekapitulasi Proyek</span>
+              </div>
+              {(rekapFilterJob || rekapSearch || rekapOnlyWithExpenses) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRekapFilterJob('');
+                    setRekapSearch('');
+                    setRekapOnlyWithExpenses(false);
+                  }}
+                  className="inline-flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 font-semibold transition"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset Filter</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              {/* Dropdown Pilih Proyek */}
+              <div className="sm:col-span-5">
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                  Pilih Proyek Spesifik:
+                </label>
+                <select
+                  value={rekapFilterJob}
+                  onChange={(e) => setRekapFilterJob(e.target.value)}
+                  className="w-full px-3 py-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                >
+                  <option value="">Semua Proyek ({pekerjaanList.length} Proyek Terdaftar)</option>
+                  {pekerjaanList.map((pj) => (
+                    <option key={pj.id_pekerjaan} value={pj.id_pekerjaan}>
+                      {pj.nama_pekerjaan}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Pencarian Nama Proyek / Lokasi */}
+              <div className="sm:col-span-4">
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                  Cari Nama / Lokasi Proyek:
+                </label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Ketik kata kunci proyek..."
+                    value={rekapSearch}
+                    onChange={(e) => setRekapSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Toggle Hanya yang Ada Pengeluaran */}
+              <div className="sm:col-span-3 flex items-end">
+                <label className="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer p-2 rounded-xl hover:bg-slate-50 transition w-full border border-slate-200 bg-slate-50/50">
+                  <input
+                    type="checkbox"
+                    checked={rekapOnlyWithExpenses}
+                    onChange={(e) => setRekapOnlyWithExpenses(e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="font-medium text-[11px] select-none">Hanya yang ada biaya</span>
+                </label>
+              </div>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600">
-              <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-100">
-                <tr>
-                  <th className="py-3 px-4">Nama Proyek</th>
-                  <th className="py-3 px-4">Lokasi</th>
-                  <th className="py-3 px-4 text-right">Uang Pribadi (Reimburs)</th>
-                  <th className="py-3 px-4 text-right">Kas Kantor</th>
-                  <th className="py-3 px-4 text-right font-bold text-slate-700">Total Biaya</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {computedRekap.daftar.map((item) => (
-                  <tr key={item.id_pekerjaan} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3 px-4 font-bold text-slate-800">{item.nama_pekerjaan}</td>
-                    <td className="py-3 px-4 text-slate-600">{item.lokasi}</td>
-                    <td className="py-3 px-4 text-right font-medium text-amber-600">{formatRupiah(item.uang_pribadi)}</td>
-                    <td className="py-3 px-4 text-right font-medium text-blue-600">{formatRupiah(item.uang_kantor)}</td>
-                    <td className="py-3 px-4 text-right font-bold text-slate-800">{formatRupiah(item.total_pengeluaran)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs text-slate-800">
-                <tr>
-                  <td colSpan={2} className="py-3.5 px-4 text-right uppercase tracking-wider">Grand Total Keseluruhan:</td>
-                  <td className="py-3.5 px-4 text-right text-amber-600">{formatRupiah(computedRekap.summary.total_uang_pribadi)}</td>
-                  <td className="py-3.5 px-4 text-right text-blue-600">{formatRupiah(computedRekap.summary.total_uang_kantor)}</td>
-                  <td className="py-3.5 px-4 text-right text-emerald-700 text-sm font-extrabold">{formatRupiah(computedRekap.summary.grand_total)}</td>
-                </tr>
-              </tfoot>
-            </table>
+
+          {/* Tabel Rekapitulasi */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Rekapitulasi Biaya Pengeluaran Per Proyek Multi-Hari</h3>
+                <p className="text-xs text-slate-500">Akumulasi pengeluaran yang telah disetujui (disaring berdasarkan Uang Pribadi yang diganti & Kas Kantor).</p>
+              </div>
+              <div className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full self-start sm:self-auto">
+                Menampilkan {filteredRekapList.length} dari {computedRekap.daftar.length} Proyek
+              </div>
+            </div>
+
+            {filteredRekapList.length === 0 ? (
+              <div className="p-10 text-center text-slate-400">
+                <Building className="w-9 h-9 mx-auto mb-2 text-slate-300" />
+                <p className="text-xs font-semibold text-slate-600">Tidak ada proyek yang sesuai dengan kriteria filter.</p>
+                <p className="text-[11px] text-slate-400 mt-1">Coba ubah pilihan proyek atau kata kunci pencarian Anda.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-100">
+                    <tr>
+                      <th className="py-3 px-4">Nama Proyek</th>
+                      <th className="py-3 px-4">Lokasi</th>
+                      <th className="py-3 px-4 text-right">Uang Pribadi (Reimburs)</th>
+                      <th className="py-3 px-4 text-right">Kas Kantor</th>
+                      <th className="py-3 px-4 text-right font-bold text-slate-700">Total Biaya</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRekapList.map((item) => (
+                      <tr key={item.id_pekerjaan} className="hover:bg-slate-50/70 transition">
+                        <td className="py-3 px-4 font-bold text-slate-800">{item.nama_pekerjaan}</td>
+                        <td className="py-3 px-4 text-slate-600">{item.lokasi}</td>
+                        <td className="py-3 px-4 text-right font-medium text-amber-600">{formatRupiah(item.uang_pribadi)}</td>
+                        <td className="py-3 px-4 text-right font-medium text-blue-600">{formatRupiah(item.uang_kantor)}</td>
+                        <td className="py-3 px-4 text-right font-bold text-slate-800">{formatRupiah(item.total_pengeluaran)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs text-slate-800">
+                    <tr>
+                      <td colSpan={2} className="py-3.5 px-4 text-right uppercase tracking-wider">
+                        {rekapFilterJob ? 'Total Proyek Terpilih:' : 'Grand Total Keseluruhan:'}
+                      </td>
+                      <td className="py-3.5 px-4 text-right text-amber-600">{formatRupiah(filteredRekapSummary.total_uang_pribadi)}</td>
+                      <td className="py-3.5 px-4 text-right text-blue-600">{formatRupiah(filteredRekapSummary.total_uang_kantor)}</td>
+                      <td className="py-3.5 px-4 text-right text-emerald-700 text-sm font-extrabold">{formatRupiah(filteredRekapSummary.grand_total)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
