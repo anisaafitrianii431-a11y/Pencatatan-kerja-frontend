@@ -1,89 +1,214 @@
-import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import LoginPage from './pages/auth/LoginPage';
+import React from 'react';
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AbsensiProvider } from './hooks/useAbsensi.jsx';
+import AbsensiPage from './pages/pekerja_absen/AbsensiPage';
+import LokasiKerjaPage from './pages/admin-absen/LokasiKerjaPage';
+import AdminDashboard from './pages/admin-absen/AdminDashboard';
+import WorkerDashboard from './pages/pekerja_absen/WorkerDashboard';
+
+// Fitur Pengeluaran & Kwitansi
 import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage';
 import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage';
-import { AuthService, checkBackendStatus, safeFetchJson } from './services/api';
 
-export default function App() {
-  const [currentUser, setCurrentUser] = useState(() => AuthService.getCurrentUser());
-  const [activeTab, setActiveTab] = useState('pengeluaran');
-  const [isBackendLive, setIsBackendLive] = useState(false);
-  const [loadingSession, setLoadingSession] = useState(true);
+import './index.css';
+import './App.css';
 
-  useEffect(() => {
-    // Sinkronkan status koneksi backend dan sesi login pengguna
-    checkBackendStatus().then(async (status) => {
-      setIsBackendLive(status);
-      if (status) {
-        try {
-          const { ok, data } = await safeFetchJson('/api/auth.php?action=me');
-          if (ok && data && data.success && data.data) {
-            setCurrentUser(data.data);
-            AuthService.setCurrentUser(data.data);
-          }
-        } catch (err) {
-          console.warn('Gagal memverifikasi sesi login:', err);
-        }
-      }
-      setLoadingSession(false);
-    });
-  }, []);
+const todayLabel = new Intl.DateTimeFormat('id-ID', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}).format(new Date());
 
-  const handleLoginSuccess = (user) => {
-    setCurrentUser(user);
-    AuthService.setCurrentUser(user);
-    setActiveTab('pengeluaran');
+function AppShell() {
+  const { currentUser } = useAuth();
+
+  if (currentUser.role === 'admin') return <AdminLayout />;
+  if (currentUser.role === 'pekerja') return <PekerjaLayout />;
+
+  return null;
+}
+
+function AdminLayout() {
+  const { currentUser, pilihRole, users } = useAuth();
+  const mappedUser = {
+    ...currentUser,
+    peran: 'admin',
+    nama: currentUser.nama || 'Administrator'
   };
 
-  const handleLogout = async () => {
-    try {
-      await AuthService.logout();
-    } catch (err) {
-      console.warn('Gagal logout backend:', err);
-    }
-    setCurrentUser(null);
-  };
-
-  // 1. Jika pengguna BELUM LOGIN, tampilkan Halaman Login Resmi
-  if (!currentUser) {
-    return (
-      <LoginPage 
-        onLoginSuccess={handleLoginSuccess} 
-        isBackendLive={isBackendLive} 
-      />
-    );
-  }
-
-  const isAdmin = currentUser.peran === 'admin';
-
-  // 2. Jika SUDAH LOGIN, tampilkan layout Main Fitur (Sidebar dengan menu Pengeluaran)
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-col lg:flex-row font-sans">
-      {/* Sidebar Navigasi Utama */}
-      <Sidebar 
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        isBackendLive={isBackendLive}
+    <div className="admin-layout">
+      <AppTopbar
+        role="admin"
+        nama={currentUser.nama}
+        currentUserId={currentUser.id_user}
+        users={users}
+        onSelectRole={pilihRole}
       />
-
-      {/* Area Konten Utama Halaman Pengeluaran */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
-          {isAdmin ? (
-            <PengeluaranAdminPage currentUser={currentUser} />
-          ) : (
-            <PengeluaranKaryawanPage currentUser={currentUser} />
-          )}
-        </main>
-
-        {/* Footer */}
-        <footer className="bg-white border-t border-slate-200 py-3.5 px-6 text-center text-xs text-slate-400">
-          © 2026 Sistem Pencatatan Pengeluaran Proyek & Reimbursement — CV Putra Anugrah Mandiri
-        </footer>
+      <div className="admin-body">
+        <AppSidebar role="admin" navLinks={[
+          { to: '/admin', label: '▤  Riwayat Sesi' },
+          { to: '/admin/lokasi', label: '📍 Lokasi Kerja' },
+          { to: '/admin/pengeluaran', label: '🧾 Pengeluaran & Kwitansi' },
+        ]} />
+        <div className="admin-workspace">
+          <main className="admin-content">
+            <Routes>
+              <Route path="/" element={<Navigate to="/admin" replace />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/lokasi" element={<LokasiKerjaPage />} />
+              <Route path="/admin/pengeluaran" element={<div className="p-4 sm:p-6"><PengeluaranAdminPage currentUser={mappedUser} /></div>} />
+              <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
+            </Routes>
+          </main>
+        </div>
       </div>
     </div>
+  );
+}
+
+function PekerjaLayout() {
+  const { currentUser, pilihRole, users } = useAuth();
+  const mappedUser = {
+    ...currentUser,
+    peran: 'karyawan',
+    nama: currentUser.karyawan?.nama ?? currentUser.nama,
+    id_karyawan: currentUser.id_karyawan || currentUser.karyawan?.id_karyawan || 1
+  };
+
+  return (
+    <div className="worker-layout">
+      <AppTopbar
+        role="pekerja"
+        nama={currentUser.karyawan?.nama ?? currentUser.nama}
+        currentUserId={currentUser.id_user}
+        users={users}
+        onSelectRole={pilihRole}
+      />
+      <div className="worker-body">
+        <AppSidebar role="pekerja" navLinks={[
+          { to: '/pekerja', label: '▦  Dashboard' },
+          { to: '/pekerja/absensi', label: '◷  Absensi Saya' },
+          { to: '/pekerja/pengeluaran', label: '🧾 Pengeluaran Saya' },
+        ]} />
+        <main className="worker-content">
+          <Routes>
+            <Route path="/" element={<Navigate to="/pekerja" replace />} />
+            <Route path="/pekerja" element={<WorkerDashboard />} />
+            <Route path="/pekerja/absensi" element={<AbsensiPage />} />
+            <Route path="/pekerja/pengeluaran" element={<div className="p-4 sm:p-6"><PengeluaranKaryawanPage currentUser={mappedUser} /></div>} />
+            <Route path="/pekerja/riwayat" element={<Navigate to="/pekerja" replace />} />
+            <Route path="*" element={<Navigate to="/pekerja/absensi" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function AppSidebar({ role, navLinks }) {
+  const isAdmin = role === 'admin';
+  return (
+    <aside className={`app-sidebar ${isAdmin ? 'admin-sidebar' : 'worker-sidebar'}`}>
+      <span className="sidebar-section-label">Menu Utama</span>
+      <nav className="sidebar-nav" aria-label="Navigasi halaman">
+        {navLinks.map((link) => (
+          <SideNavLink key={link.to} to={link.to}>
+            {link.label}
+          </SideNavLink>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
+function AppTopbar({ role, nama, currentUserId, users, onSelectRole }) {
+  const navigate = useNavigate();
+  const isAdmin = role === 'admin';
+  const pekerjaUsers = users.filter((user) => user.role === 'pekerja');
+  const switchRole = (nextRole, userId) => {
+    onSelectRole(nextRole, userId);
+    navigate(nextRole === 'admin' ? '/admin' : '/pekerja');
+  };
+
+  return (
+    <header className={`admin-topbar app-topbar ${isAdmin ? 'admin-app-topbar' : 'worker-app-topbar'}`}>
+      <div className="admin-topbar-title">
+        <span className="sidebar-brand-mark">PK</span>
+        <div>
+          <strong>Sistem Pencatatan Kerja</strong>
+          <span>{isAdmin ? 'Panel Administrasi' : 'Area Pekerja'}</span>
+        </div>
+      </div>
+
+      <div className="admin-topbar-actions">
+        <div className="role-switch" aria-label="Pindah peran">
+          <button
+            type="button"
+            className={isAdmin ? 'role-switch-button active' : 'role-switch-button'}
+            aria-pressed={isAdmin}
+            onClick={() => switchRole('admin')}
+          >
+            Admin
+          </button>
+          <button
+            type="button"
+            className={!isAdmin ? 'role-switch-button active' : 'role-switch-button'}
+            aria-pressed={!isAdmin}
+            onClick={() => switchRole('pekerja', isAdmin ? undefined : currentUserId)}
+          >
+            Pekerja
+          </button>
+        </div>
+        {!isAdmin && (
+          <label className="topbar-worker-select-label">
+            <span className="sr-only">Pilih pekerja</span>
+            <select
+              className="topbar-worker-select"
+              value={currentUserId}
+              onChange={(event) => switchRole('pekerja', Number(event.target.value))}
+            >
+              {pekerjaUsers.map((user) => (
+                <option key={user.id_user} value={user.id_user}>{user.nama}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {isAdmin && <span className="admin-today">{todayLabel}</span>}
+        <span className="admin-user">
+          <span className="admin-avatar">{nama?.charAt(0)?.toUpperCase() ?? (isAdmin ? 'A' : 'P')}</span>
+          <span>
+            <strong>{nama}</strong>
+            <small>{isAdmin ? 'Administrator' : 'Pekerja'}</small>
+          </span>
+        </span>
+      </div>
+    </header>
+  );
+}
+
+function SideNavLink({ to, children }) {
+  return (
+    <NavLink
+      to={to}
+      end={to === '/admin' || to === '/pekerja'}
+      className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+    >
+      {children}
+    </NavLink>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AbsensiProvider>
+          <AppShell />
+        </AbsensiProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
