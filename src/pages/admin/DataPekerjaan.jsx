@@ -11,11 +11,9 @@ import {
   updatePekerjaan,
 } from '../../services/pekerjaanApi.js'
 import { getKaryawan } from '../../services/karyawanApi.js'
-import AdminPageBanner from '../../components/AdminPageBanner.jsx'
-import ActionButtons from '../../components/ActionButtons.jsx'
 import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog.jsx'
 
-const PAGE_SIZE = 5
+const PAGE_SIZE = 8
 const EMPTY_FORM = {
   nama_pekerjaan: '',
   deskripsi: '',
@@ -36,17 +34,18 @@ const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
 const STATUS_PRESENTATION = {
   [STATUS_PEKERJAAN.BELUM_MULAI]: {
     label: 'Belum Mulai',
-    className:
-      'admin-status-pending bg-amber-100 text-amber-700 ring-amber-600/10',
+    className: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
+    color: '#f59e0b',
   },
   [STATUS_PEKERJAAN.BERJALAN]: {
-    label: 'Berjalan',
-    className: 'admin-status-running bg-blue-50 text-blue-700 ring-blue-600/10',
+    label: 'Sedang Berjalan',
+    className: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/20',
+    color: '#2563eb',
   },
   [STATUS_PEKERJAAN.SELESAI]: {
     label: 'Selesai',
-    className:
-      'admin-status-complete bg-emerald-100 text-emerald-700 ring-emerald-600/10',
+    className: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20',
+    color: '#10b981',
   },
 }
 
@@ -64,12 +63,12 @@ function getJakartaToday() {
   }).format(new Date())
 }
 
-function WorkIcon({ name, className = 'h-5 w-5' }) {
+function WorkIcon({ name, className = 'h-4 w-4' }) {
   const paths = {
     work: (
       <>
-        <rect x="3" y="7" width="18" height="14" rx="2" />
-        <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M10 12v2h4v-2" />
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
       </>
     ),
     search: (
@@ -115,6 +114,19 @@ function WorkIcon({ name, className = 'h-5 w-5' }) {
       </>
     ),
     check: <path d="M20 6 9 17l-5-5" />,
+    'rotate-ccw': (
+      <>
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+      </>
+    ),
+    alert: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </>
+    ),
   }
 
   return (
@@ -128,26 +140,30 @@ function WorkIcon({ name, className = 'h-5 w-5' }) {
       strokeWidth="1.8"
       viewBox="0 0 24 24"
     >
-      {paths[name]}
+      {paths[name] || null}
     </svg>
   )
 }
 
 function StatusBadge({ status }) {
-  const presentation = STATUS_PRESENTATION[status]
+  const presentation = STATUS_PRESENTATION[status] ?? {
+    label: status || 'Tidak tersedia',
+    className: 'bg-slate-100 text-slate-700',
+  }
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${presentation?.className ?? 'bg-slate-100 text-slate-700'}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${presentation.className}`}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {presentation?.label ?? status}
+      {presentation.label}
     </span>
   )
 }
 
 function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
   const isDetail = mode === 'detail'
+  const isEdit = mode === 'edit'
 
   const initialEmployeeIds = useMemo(() => {
     if (!job) return []
@@ -166,12 +182,12 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
   const [values, setValues] = useState(
     job
       ? {
-          nama_pekerjaan: job.nama_pekerjaan,
-          deskripsi: job.deskripsi,
-          lokasi: job.lokasi,
-          tanggal_mulai: job.tanggal_mulai,
-          target_selesai: job.target_selesai,
-          status: job.status,
+          nama_pekerjaan: job.nama_pekerjaan || '',
+          deskripsi: job.deskripsi || '',
+          lokasi: job.lokasi || '',
+          tanggal_mulai: job.tanggal_mulai || '',
+          target_selesai: job.target_selesai || '',
+          status: job.status || STATUS_PEKERJAAN.BELUM_MULAI,
           metode_penentuan: job.metode_penentuan || 'terbuka',
           id_karyawan_list: initialEmployeeIds,
         }
@@ -207,8 +223,8 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       nama_pekerjaan: values.nama_pekerjaan.trim(),
       deskripsi: values.deskripsi.trim(),
       lokasi: values.lokasi.trim(),
-      tanggal_mulai: values.tanggal_mulai,
-      target_selesai: values.target_selesai,
+      tanggal_mulai: values.tanggal_mulai || null,
+      target_selesai: values.target_selesai || null,
       status: values.status,
       metode_penentuan: values.metode_penentuan,
       id_karyawan_list:
@@ -217,14 +233,6 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
 
     if (!normalized.nama_pekerjaan) {
       setValidationMessage('Nama pekerjaan wajib diisi.')
-      return
-    }
-    if (normalized.nama_pekerjaan.length > 150) {
-      setValidationMessage('Nama pekerjaan maksimal 150 karakter.')
-      return
-    }
-    if (normalized.lokasi.length > 150) {
-      setValidationMessage('Lokasi maksimal 150 karakter.')
       return
     }
     if (
@@ -237,268 +245,261 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       )
       return
     }
-    if (!Object.values(STATUS_PEKERJAAN).includes(normalized.status)) {
-      setValidationMessage('Status pekerjaan tidak valid.')
-      return
-    }
     if (
       normalized.metode_penentuan === 'langsung' &&
       normalized.id_karyawan_list.length === 0
     ) {
       setValidationMessage(
-        'Silakan pilih minimal satu pekerja dari database untuk metode penetapan langsung.',
+        'Pilih minimal satu pekerja untuk metode penetapan langsung.',
       )
       return
     }
 
+    setValidationMessage('')
     await onSave(normalized)
   }
 
   const title =
     mode === 'create'
-      ? 'Tambah Pekerjaan'
-      : mode === 'edit'
-        ? 'Edit Pekerjaan'
+      ? 'Tambah Pekerjaan Baru'
+      : isEdit
+        ? 'Edit Data Pekerjaan'
         : 'Detail Pekerjaan'
-
-  const assignedWorkerDisplay = useMemo(() => {
-    if (!job) return null
-    if (job.assigned_workers && job.assigned_workers.length > 0) {
-      return job.assigned_workers
-        .map(
-          (w) =>
-            `${w.nama} (${w.jabatan || 'Pekerja'}) [${w.jenis_penugasan === 'mandiri' ? 'Diambil Mandiri' : 'Ditetapkan Admin'}]`,
-        )
-        .join(', ')
-    }
-    if (job.nama_karyawan_list) {
-      return job.nama_karyawan_list
-    }
-    return null
-  }, [job])
+  const subtitle =
+    mode === 'create'
+      ? 'Masukkan informasi proyek dan tentukan metode penugasan kerja.'
+      : isEdit
+        ? `Perbarui rincian jadwal atau penugasan untuk proyek ${job?.nama_pekerjaan}.`
+        : `Rincian lengkap spesifikasi proyek dan pekerja yang bertugas.`
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isSaving) onClose()
+      className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm transition-all"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !isSaving) onClose()
       }}
     >
       <section
-        aria-labelledby="work-dialog-title"
-        aria-modal="true"
-        className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl shadow-slate-950/20"
         role="dialog"
+        aria-modal="true"
+        aria-labelledby="job-modal-title"
+        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all my-6"
       >
-        <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
           <div>
             <h2
-              className="text-lg font-semibold text-slate-900"
-              id="work-dialog-title"
+              id="job-modal-title"
+              className="text-base sm:text-lg font-bold text-slate-900"
             >
               {title}
             </h2>
-            {job && (
-              <p className="mt-1 text-sm text-slate-500">
-                ID Pekerjaan: {job.id_pekerjaan}
-              </p>
-            )}
+            <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
           </div>
           <button
-            aria-label="Tutup dialog"
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            disabled={isSaving}
-            onClick={onClose}
             type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition disabled:opacity-50"
+            title="Tutup dialog"
+            aria-label="Tutup dialog"
           >
-            <WorkIcon className="h-5 w-5" name="close" />
+            <WorkIcon name="close" className="h-4 w-4" />
           </button>
         </div>
 
         {isDetail ? (
-          <div className="space-y-5 px-5 py-6 sm:px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Nama Pekerjaan
-                </p>
-                <p className="mt-1 text-lg font-semibold text-slate-900">
-                  {job.nama_pekerjaan}
-                </p>
+          <div className="p-6 space-y-5">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-xs font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  ID: {job?.id_pekerjaan}
+                </span>
+                <StatusBadge status={job?.status} />
               </div>
-              <StatusBadge status={job.status} />
+              <h3 className="mt-2 text-lg font-bold text-slate-900">
+                {job?.nama_pekerjaan}
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
+                <WorkIcon name="location" className="h-3.5 w-3.5 text-slate-400" />
+                {job?.lokasi || 'Lokasi belum ditentukan'}
+              </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-medium text-slate-500">Metode Penentuan</p>
-                <p className="mt-1 text-sm font-semibold text-slate-800">
-                  {job.metode_penentuan === 'langsung'
-                    ? 'Tetapkan Pekerja Secara Langsung'
-                    : 'Buka Pekerjaan untuk Dipilih Pekerja'}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+              <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">
+                <span className="text-slate-500 font-medium">Tanggal Mulai</span>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {formatDate(job?.tanggal_mulai)}
                 </p>
               </div>
-
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-medium text-slate-500">Pekerja yang Mengerjakan</p>
-                <p className="mt-1 text-sm font-semibold text-slate-800">
-                  {assignedWorkerDisplay ||
-                    (job.metode_penentuan === 'terbuka'
-                      ? 'Belum diambil oleh pekerja (Tersedia)'
-                      : 'Belum ditetapkan')}
+              <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">
+                <span className="text-slate-500 font-medium">Target Selesai (Deadline)</span>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {formatDate(job?.target_selesai)}
                 </p>
               </div>
+            </div>
 
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-medium text-slate-500">Lokasi</p>
-                <p className="mt-1 text-sm font-semibold text-slate-800">
-                  {job.lokasi || 'Belum ditentukan'}
+            <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm text-xs">
+              <span className="text-slate-500 font-medium">Metode Penugasan</span>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded-md px-2.5 py-1 font-semibold ${
+                    job?.metode_penentuan === 'langsung'
+                      ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-600/10'
+                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/10'
+                  }`}
+                >
+                  {job?.metode_penentuan === 'langsung'
+                    ? 'Penetapan Langsung oleh Admin'
+                    : 'Terbuka (Bisa Diambil Mandiri)'}
+                </span>
+              </div>
+              <p className="mt-2 text-slate-600">
+                Pekerja Terlibat:{' '}
+                <strong className="text-slate-900">
+                  {job?.nama_karyawan_list || 'Belum ada pekerja'}
+                </strong>
+              </p>
+            </div>
+
+            {job?.deskripsi && (
+              <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm text-xs">
+                <span className="text-slate-500 font-medium">Deskripsi Pekerjaan</span>
+                <p className="mt-1 text-slate-700 leading-relaxed whitespace-pre-line">
+                  {job.deskripsi}
                 </p>
               </div>
+            )}
 
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-medium text-slate-500">Tanggal Mulai</p>
-                <p className="mt-1 text-sm font-semibold text-slate-800">
-                  {formatDate(job.tanggal_mulai)}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 p-4 sm:col-span-2">
-                <p className="text-xs font-medium text-slate-500">Target Selesai (Deadline)</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-800">
-                    {formatDate(job.target_selesai)}
-                  </span>
-                  {job.target_selesai && (
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        job.target_selesai < getJakartaToday() && job.status !== STATUS_PEKERJAAN.SELESAI
-                          ? 'bg-rose-100 text-rose-700'
-                          : job.target_selesai === getJakartaToday() && job.status !== STATUS_PEKERJAAN.SELESAI
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                      }`}
-                    >
-                      {job.target_selesai < getJakartaToday() && job.status !== STATUS_PEKERJAAN.SELESAI
-                        ? 'Melewati Deadline'
-                        : job.target_selesai === getJakartaToday() && job.status !== STATUS_PEKERJAAN.SELESAI
-                          ? 'Tenggat Hari Ini'
-                          : 'Aktif'}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 p-4 sm:col-span-2">
-                <p className="text-xs font-medium text-slate-500">Deskripsi</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                  {job.deskripsi || 'Tidak ada deskripsi.'}
-                </p>
-              </div>
+            <div className="flex justify-end border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+              >
+                Tutup
+              </button>
             </div>
           </div>
         ) : (
-          <form className="space-y-4 px-5 py-6 sm:px-6" onSubmit={handleSubmit}>
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                Nama Pekerjaan <span className="text-rose-500">*</span>
-              </span>
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            {validationMessage && (
+              <div
+                className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700"
+                role="alert"
+              >
+                <WorkIcon name="alert" className="h-4 w-4 shrink-0 text-rose-600" />
+                <span>{validationMessage}</span>
+              </div>
+            )}
+
+            {/* Nama Pekerjaan */}
+            <div>
+              <label
+                htmlFor="job-nama"
+                className="block text-xs font-semibold text-slate-700 mb-1.5"
+              >
+                Nama Pekerjaan / Proyek <span className="text-rose-500">*</span>
+              </label>
               <input
-                autoFocus
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                maxLength={150}
-                onChange={(event) =>
-                  updateField('nama_pekerjaan', event.target.value)
-                }
-                placeholder="Masukkan nama pekerjaan"
+                id="job-nama"
+                type="text"
                 required
-                value={values.nama_pekerjaan}
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                Deskripsi
-              </span>
-              <textarea
-                className="min-h-24 w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                onChange={(event) =>
-                  updateField('deskripsi', event.target.value)
-                }
-                placeholder="Tambahkan deskripsi singkat (opsional)"
-                rows="3"
-                value={values.deskripsi}
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                Lokasi
-              </span>
-              <input
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                autoFocus
                 maxLength={150}
-                onChange={(event) => updateField('lokasi', event.target.value)}
-                placeholder="Masukkan lokasi pekerjaan"
-                value={values.lokasi}
+                placeholder="Contoh: Instalasi Jaringan Gedung B"
+                value={values.nama_pekerjaan}
+                onChange={(e) => updateField('nama_pekerjaan', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
               />
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Tanggal Mulai
-                </span>
-                <input
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                  onChange={(event) =>
-                    updateField('tanggal_mulai', event.target.value)
-                  }
-                  type="date"
-                  value={values.tanggal_mulai}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Target Selesai (Deadline)
-                </span>
-                <input
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                  min={values.tanggal_mulai || undefined}
-                  onChange={(event) =>
-                    updateField('target_selesai', event.target.value)
-                  }
-                  type="date"
-                  value={values.target_selesai}
-                />
-              </label>
             </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                Status Pekerjaan <span className="text-rose-500">*</span>
-              </span>
-              <select
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                onChange={(event) => updateField('status', event.target.value)}
-                required
-                value={values.status}
+            {/* Lokasi */}
+            <div>
+              <label
+                htmlFor="job-lokasi"
+                className="block text-xs font-semibold text-slate-700 mb-1.5"
               >
-                {STATUS_PEKERJAAN_OPTIONS.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {/* METODE PENENTUAN PEKERJA */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-              <label className="block text-sm font-semibold text-slate-900">
-                Metode Penentuan Pekerja <span className="text-rose-500">*</span>
+                Lokasi Pekerjaan
               </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-slate-400">
+                  <WorkIcon name="location" className="h-4 w-4" />
+                </span>
+                <input
+                  id="job-lokasi"
+                  type="text"
+                  maxLength={150}
+                  placeholder="Contoh: Kantor Cabang Sudirman, Lantai 2"
+                  value={values.lokasi}
+                  onChange={(e) => updateField('lokasi', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                />
+              </div>
+            </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+            {/* Tanggal & Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div>
+                <label
+                  htmlFor="job-tgl-mulai"
+                  className="block text-xs font-semibold text-slate-700 mb-1.5"
+                >
+                  Tanggal Mulai
+                </label>
+                <input
+                  id="job-tgl-mulai"
+                  type="date"
+                  value={values.tanggal_mulai}
+                  onChange={(e) => updateField('tanggal_mulai', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="job-target-selesai"
+                  className="block text-xs font-semibold text-slate-700 mb-1.5"
+                >
+                  Target Selesai (Deadline)
+                </label>
+                <input
+                  id="job-target-selesai"
+                  type="date"
+                  value={values.target_selesai}
+                  onChange={(e) => updateField('target_selesai', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="job-status"
+                  className="block text-xs font-semibold text-slate-700 mb-1.5"
+                >
+                  Status Pekerjaan
+                </label>
+                <select
+                  id="job-status"
+                  value={values.status}
+                  onChange={(e) => updateField('status', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                >
+                  <option value={STATUS_PEKERJAAN.BELUM_MULAI}>Belum Mulai</option>
+                  <option value={STATUS_PEKERJAAN.BERJALAN}>Sedang Berjalan</option>
+                  <option value={STATUS_PEKERJAAN.SELESAI}>Selesai</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Metode Penentuan Pekerja */}
+            <div className="space-y-2 pt-1">
+              <span className="block text-xs font-semibold text-slate-700">
+                Metode Penentuan Pekerja <span className="text-rose-500">*</span>
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label
                   className={`flex cursor-pointer flex-col rounded-xl border p-3.5 transition ${
                     values.metode_penentuan === 'terbuka'
@@ -506,21 +507,21 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                       : 'border-slate-200 bg-white hover:border-slate-300'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <input
-                      checked={values.metode_penentuan === 'terbuka'}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                      name="metode_penentuan"
-                      onChange={() => updateField('metode_penentuan', 'terbuka')}
                       type="radio"
+                      name="metode_penentuan"
                       value="terbuka"
+                      checked={values.metode_penentuan === 'terbuka'}
+                      onChange={() => updateField('metode_penentuan', 'terbuka')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm font-semibold text-slate-800">
+                    <span className="text-xs sm:text-sm font-bold text-slate-800">
                       Buka untuk Pekerja
                     </span>
                   </div>
-                  <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                    Pekerjaan muncul di menu Pekerjaan Tersedia bagi seluruh pekerja dan dapat diambil secara mandiri.
+                  <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                    Muncul di halaman Pekerjaan Tersedia dan dapat diambil mandiri oleh teknisi.
                   </p>
                 </label>
 
@@ -531,127 +532,122 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                       : 'border-slate-200 bg-white hover:border-slate-300'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <input
-                      checked={values.metode_penentuan === 'langsung'}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                      name="metode_penentuan"
-                      onChange={() => updateField('metode_penentuan', 'langsung')}
                       type="radio"
+                      name="metode_penentuan"
                       value="langsung"
+                      checked={values.metode_penentuan === 'langsung'}
+                      onChange={() => updateField('metode_penentuan', 'langsung')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm font-semibold text-slate-800">
+                    <span className="text-xs sm:text-sm font-bold text-slate-800">
                       Tetapkan Langsung
                     </span>
                   </div>
-                  <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                    Admin menentukan pekerja tertentu. Pekerja lain tidak dapat melihat atau mengambil pekerjaan ini.
+                  <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                    Admin menunjuk teknisi secara spesifik. Tidak dapat diambil oleh pekerja lain.
                   </p>
                 </label>
               </div>
-
-              {values.metode_penentuan === 'langsung' ? (
-                <div className="pt-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
-                      Pilih Pekerja yang Ditetapkan <span className="text-rose-500">*</span>
-                    </span>
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
-                      {values.id_karyawan_list.length} pekerja dipilih
-                    </span>
-                  </div>
-
-                  <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 divide-y divide-slate-100">
-                    {employees.length === 0 ? (
-                      <p className="p-3 text-center text-xs text-slate-500">
-                        Belum ada data karyawan di database.
-                      </p>
-                    ) : (
-                      employees.map((employee) => {
-                        const isChecked = values.id_karyawan_list.includes(employee.id_karyawan)
-                        return (
-                          <label
-                            className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition ${
-                              isChecked
-                                ? 'bg-blue-50/80 text-blue-900 font-medium'
-                                : 'hover:bg-slate-50 text-slate-700'
-                            }`}
-                            key={employee.id_karyawan}
-                          >
-                            <input
-                              checked={isChecked}
-                              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                              onChange={() => toggleEmployee(employee.id_karyawan)}
-                              type="checkbox"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate">{employee.nama}</p>
-                              <p className="text-xs text-slate-500">
-                                {employee.jabatan || 'Pekerja'} · ID: {employee.id_karyawan}
-                              </p>
-                            </div>
-                          </label>
-                        )
-                      })
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Centang satu atau beberapa pekerja yang akan secara otomatis mendapatkan pekerjaan ini.
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800">
-                  Pekerjaan ini akan otomatis masuk ke daftar <strong>Pekerjaan Tersedia</strong> milik seluruh pekerja.
-                </div>
-              )}
-
-              {mode === 'edit' && job?.nama_karyawan_list && (
-                <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                  Perhatian: Saat ini pekerjaan sudah memiliki penugasan (pekerja: <strong>{job.nama_karyawan_list}</strong>). Memperbarui metode atau pekerja akan memperbarui relasi penugasan tanpa menghapus data riwayat absensi atau pengeluaran.
-                </p>
-              )}
             </div>
 
-            {validationMessage && (
-              <p className="text-sm text-rose-600" role="alert">
-                {validationMessage}
-              </p>
+            {/* Checkbox Karyawan jika Penetapan Langsung */}
+            {values.metode_penentuan === 'langsung' && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-700">
+                    Pilih Pekerja yang Ditugaskan <span className="text-rose-500">*</span>
+                  </span>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                    {values.id_karyawan_list.length} dipilih
+                  </span>
+                </div>
+
+                <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 p-1">
+                  {employees.length === 0 ? (
+                    <p className="p-3 text-center text-xs text-slate-400">
+                      Belum ada data karyawan.
+                    </p>
+                  ) : (
+                    employees.map((emp) => {
+                      const isChecked = values.id_karyawan_list.includes(emp.id_karyawan)
+                      return (
+                        <label
+                          key={emp.id_karyawan}
+                          className={`flex items-center gap-2.5 p-2 rounded-md cursor-pointer transition text-xs ${
+                            isChecked
+                              ? 'bg-blue-50/80 text-blue-900 font-semibold'
+                              : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleEmployee(emp.id_karyawan)}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="flex-1 truncate">{emp.nama}</span>
+                          <span className="text-[11px] text-slate-400">
+                            {emp.jabatan || 'Teknisi'}
+                          </span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
             )}
 
-            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            {/* Deskripsi */}
+            <div>
+              <label
+                htmlFor="job-deskripsi"
+                className="block text-xs font-semibold text-slate-700 mb-1.5"
+              >
+                Deskripsi Pekerjaan
+              </label>
+              <textarea
+                id="job-deskripsi"
+                rows={3}
+                placeholder="Rincian instruksi teknis dan lingkup pekerjaan..."
+                value={values.deskripsi}
+                onChange={(e) => updateField('deskripsi', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4">
               <button
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                disabled={isSaving}
-                onClick={onClose}
                 type="button"
+                onClick={onClose}
+                disabled={isSaving}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
               >
                 Batal
               </button>
               <button
-                className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
-                disabled={isSaving}
                 type="submit"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-70 disabled:cursor-wait"
               >
-                {isSaving
-                  ? 'Menyimpan...'
-                  : mode === 'create'
-                    ? 'Simpan Pekerjaan'
-                    : 'Simpan Perubahan'}
+                {isSaving ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span>Menyimpan...</span>
+                  </>
+                ) : mode === 'create' ? (
+                  'Simpan Pekerjaan'
+                ) : (
+                  'Simpan Perubahan'
+                )}
               </button>
             </div>
           </form>
-        )}
-
-        {isDetail && (
-          <div className="flex justify-end border-t border-slate-100 px-5 py-4 sm:px-6">
-            <button
-              className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-              onClick={onClose}
-              type="button"
-            >
-              Tutup
-            </button>
-          </div>
         )}
       </section>
     </div>
@@ -670,13 +666,14 @@ function DataPekerjaan() {
   const [notice, setNotice] = useState(null)
   const [modal, setModal] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
+
+  // Filters & Sorting
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [methodFilter, setMethodFilter] = useState('')
   const [sortOrder, setSortOrder] = useState('asc')
   const [page, setPage] = useState(1)
   const [loadingDetailId, setLoadingDetailId] = useState(null)
-  const toastTimer = useRef(null)
   const isMounted = useRef(false)
 
   async function loadData() {
@@ -710,9 +707,13 @@ function DataPekerjaan() {
     loadData()
     return () => {
       isMounted.current = false
-      if (toastTimer.current) window.clearTimeout(toastTimer.current)
     }
   }, [])
+
+  function showToast(message, type = 'success') {
+    setNotice({ message, type })
+    window.setTimeout(() => setNotice(null), 3500)
+  }
 
   const filteredJobs = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('id-ID')
@@ -723,8 +724,10 @@ function DataPekerjaan() {
         const matchesName =
           !normalizedSearch ||
           job.nama_pekerjaan.toLocaleLowerCase('id-ID').includes(normalizedSearch) ||
+          String(job.id_pekerjaan).includes(normalizedSearch) ||
           (job.lokasi && job.lokasi.toLocaleLowerCase('id-ID').includes(normalizedSearch)) ||
-          (job.nama_karyawan_list && job.nama_karyawan_list.toLocaleLowerCase('id-ID').includes(normalizedSearch))
+          (job.nama_karyawan_list &&
+            job.nama_karyawan_list.toLocaleLowerCase('id-ID').includes(normalizedSearch))
 
         const matchesStatus = !statusFilter || job.status === statusFilter
 
@@ -782,10 +785,13 @@ function DataPekerjaan() {
     [pekerjaan],
   )
 
-  function showToast(message, type = 'success') {
-    setNotice({ message, type })
-    if (toastTimer.current) window.clearTimeout(toastTimer.current)
-    toastTimer.current = window.setTimeout(() => setNotice(null), 4000)
+  const hasActiveFilters = Boolean(search || statusFilter || methodFilter)
+
+  function resetFilters() {
+    setSearch('')
+    setStatusFilter('')
+    setMethodFilter('')
+    setPage(1)
   }
 
   async function handleSaveJob(values) {
@@ -830,10 +836,6 @@ function DataPekerjaan() {
     }
   }
 
-  function requestDeleteJob(job) {
-    setPendingDelete(job)
-  }
-
   async function editJob(job) {
     setLoadingDetailId(job.id_pekerjaan)
     try {
@@ -858,37 +860,89 @@ function DataPekerjaan() {
     }
   }
 
-  function createJob() {
-    setModal({ mode: 'create' })
-  }
-
   return (
-    <div className="admin-management-page admin-management-jobs mx-auto w-full max-w-[1440px] space-y-6">
-      <AdminPageBanner
-        action={
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60"
-            disabled={isLoading || Boolean(error)}
-            onClick={createJob}
-            type="button"
+    <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-8">
+      {/* Header Halaman Modern */}
+      <header className="flex flex-col gap-3.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-4">
+        <div>
+          <nav
+            aria-label="Breadcrumb"
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"
           >
-            <WorkIcon className="h-4 w-4" name="plus" />
-            Tambah Pekerjaan
-          </button>
-        }
-        description="Kelola seluruh pekerjaan, penentuan pekerja langsung maupun terbuka, serta batas waktu (deadline)."
-        icon={<WorkIcon className="h-6 w-6" name="work" />}
-        title="Data Pekerjaan"
-      />
+            <span className="text-slate-400">Admin</span>
+            <span className="text-slate-300">/</span>
+            <span className="font-semibold text-blue-600">Data Pekerjaan</span>
+          </nav>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              Data Pekerjaan
+            </h1>
+            {!isLoading && (
+              <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                {statistics.total} proyek
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+            Kelola seluruh proyek pekerjaan, metode penentuan penugasan, lokasi,
+            dan batas waktu target selesai.
+          </p>
+        </div>
 
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setModal({ mode: 'create' })}
+            disabled={isLoading || Boolean(error)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
+          >
+            <WorkIcon name="plus" className="h-4 w-4" />
+            <span>Tambah Pekerjaan</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Toast Alert */}
+      {notice && (
+        <div
+          className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 text-sm shadow-sm transition-all ${
+            notice.type === 'error'
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+          role="status"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <WorkIcon
+              name={notice.type === 'error' ? 'alert' : 'check'}
+              className={`h-4 w-4 shrink-0 ${
+                notice.type === 'error' ? 'text-rose-600' : 'text-emerald-600'
+              }`}
+            />
+            <span className="font-medium text-xs sm:text-sm">{notice.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="rounded p-1 text-slate-400 hover:text-slate-600 transition"
+          >
+            <WorkIcon name="close" className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Error Server */}
       {error && (
         <div
-          className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
           role="alert"
         >
-          <p>{error}</p>
+          <div className="flex items-center gap-2.5">
+            <WorkIcon name="alert" className="h-5 w-5 shrink-0 text-rose-600" />
+            <p className="font-medium">{error}</p>
+          </div>
           <button
-            className="shrink-0 font-semibold underline underline-offset-2"
+            type="button"
             onClick={() => {
               setStore((current) => ({
                 ...current,
@@ -897,120 +951,114 @@ function DataPekerjaan() {
               }))
               loadData()
             }}
-            type="button"
+            className="inline-flex items-center gap-1 font-semibold text-rose-700 underline underline-offset-2 hover:text-rose-900"
           >
             Coba lagi
           </button>
         </div>
       )}
 
-      {notice && (
-        <div
-          className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
-            notice.type === 'error'
-              ? 'border-rose-200 bg-rose-50 text-rose-700'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-          }`}
-          role="status"
-        >
-          <p>{notice.message}</p>
-          <button
-            aria-label="Tutup notifikasi"
-            className="font-semibold opacity-60 hover:opacity-100"
-            onClick={() => setNotice(null)}
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      <div className="admin-stat-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 4 Kartu Statistik */}
+      <section
+        aria-label="Statistik Pekerjaan"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4"
+      >
         {[
           {
             label: 'Total Pekerjaan',
             value: statistics.total,
-            iconColor: 'bg-blue-50 text-blue-600',
+            tone: 'bg-blue-50 text-blue-600 ring-1 ring-blue-600/10',
+            sub: 'Seluruh proyek',
           },
           {
             label: 'Belum Mulai',
             value: statistics.belumMulai,
-            iconColor: 'bg-amber-50 text-amber-600',
+            tone: 'bg-amber-50 text-amber-600 ring-1 ring-amber-600/10',
+            sub: 'Menunggu jadwal',
           },
           {
             label: 'Sedang Berjalan',
             value: statistics.berjalan,
-            iconColor: 'bg-indigo-50 text-indigo-600',
+            tone: 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-600/10',
+            sub: 'Dikerjakan teknisi',
           },
           {
             label: 'Pekerjaan Selesai',
             value: statistics.selesai,
-            iconColor: 'bg-emerald-50 text-emerald-600',
+            tone: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/10',
+            sub: 'Telah rampung',
           },
         ].map((stat) => (
           <article
-            className="admin-stat-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.02]"
             key={stat.label}
+            className="flex items-center justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-                {isLoading ? (
-                  <div
-                    aria-label="Memuat statistik"
-                    className="mt-2 h-9 w-12 animate-pulse rounded-lg bg-slate-100"
-                  />
-                ) : (
-                  <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-                    {stat.value}
-                  </p>
-                )}
-              </div>
-              <span
-                className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.iconColor}`}
-              >
-                <WorkIcon className="h-6 w-6" name="work" />
-              </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                {stat.label}
+              </p>
+              <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                {isLoading ? '—' : stat.value}
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-400">{stat.sub}</p>
+            </div>
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${stat.tone}`}
+            >
+              <WorkIcon name="work" className="h-5 w-5" />
             </div>
           </article>
         ))}
-      </div>
+      </section>
 
-      <section className="admin-data-table overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.02]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div>
-            <h3 className="font-semibold text-slate-900">Daftar Pekerjaan</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {isLoading ? 'Memuat data pekerjaan...' : `${filteredJobs.length} data ditemukan`}
-            </p>
+      {/* Toolbar Pencarian & Filter Satu Baris */}
+      <section
+        aria-label="Pencarian dan Filter"
+        className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm"
+      >
+        <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between">
+          {/* Pencarian */}
+          <div className="relative flex-1 min-w-[220px]">
+            <WorkIcon
+              name="search"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+              placeholder="Cari nama pekerjaan, lokasi, pekerja..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50/60 py-2 pl-9 pr-8 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('')
+                  setPage(1)
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded"
+                title="Hapus pencarian"
+              >
+                <WorkIcon name="close" className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          <div className="grid gap-2 sm:flex">
-            <label className="relative block">
-              <span className="sr-only">Cari nama pekerjaan</span>
-              <WorkIcon
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                name="search"
-              />
-              <input
-                className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:w-56"
-                onChange={(event) => {
-                  setSearch(event.target.value)
-                  setPage(1)
-                }}
-                placeholder="Cari pekerjaan / pekerja..."
-                value={search}
-              />
-            </label>
 
-            <label className="relative block">
-              <span className="sr-only">Filter status</span>
+          {/* Filter Status, Metode & Reset */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Status */}
+            <div className="relative min-w-[130px] flex-1 sm:flex-initial">
               <select
-                className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:w-44"
-                onChange={(event) => {
-                  setStatusFilter(event.target.value)
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value)
                   setPage(1)
                 }}
-                value={statusFilter}
+                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50/60 py-2 pl-3 pr-8 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
               >
                 <option value="">Semua Status</option>
                 {STATUS_PEKERJAAN_OPTIONS.map((status) => (
@@ -1022,20 +1070,20 @@ function DataPekerjaan() {
                 ))}
               </select>
               <WorkIcon
-                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
                 name="chevron"
+                className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
               />
-            </label>
+            </div>
 
-            <label className="relative block">
-              <span className="sr-only">Filter metode penentuan</span>
+            {/* Filter Metode */}
+            <div className="relative min-w-[160px] flex-1 sm:flex-initial">
               <select
-                className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:w-48"
-                onChange={(event) => {
-                  setMethodFilter(event.target.value)
+                value={methodFilter}
+                onChange={(e) => {
+                  setMethodFilter(e.target.value)
                   setPage(1)
                 }}
-                value={methodFilter}
+                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50/60 py-2 pl-3 pr-8 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
               >
                 <option value="">Semua Metode</option>
                 <option value="langsung">Penetapan Langsung</option>
@@ -1044,257 +1092,349 @@ function DataPekerjaan() {
                 <option value="expired">Melewati Deadline</option>
               </select>
               <WorkIcon
-                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
                 name="chevron"
+                className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
               />
-            </label>
+            </div>
+
+            {/* Reset Filter Button */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
+                title="Reset semua filter"
+              >
+                <WorkIcon name="rotate-ccw" className="h-3.5 w-3.5" />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
         </div>
-
-        {isLoading ? (
-          <div className="space-y-3 p-5" role="status">
-            <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
-            <div className="h-12 animate-pulse rounded-lg bg-slate-50" />
-            <div className="h-12 animate-pulse rounded-lg bg-slate-50" />
-            <span className="sr-only">Memuat daftar pekerjaan</span>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1040px] text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-5 py-3.5" scope="col">
-                      No.
-                    </th>
-                    <th className="px-5 py-3.5" scope="col">
-                      <button
-                        className="inline-flex items-center gap-1.5 hover:text-slate-800"
-                        onClick={() =>
-                          setSortOrder((order) => (order === 'asc' ? 'desc' : 'asc'))
-                        }
-                        type="button"
-                      >
-                        Nama Pekerjaan
-                        <WorkIcon className="h-3.5 w-3.5" name="sort" />
-                      </button>
-                    </th>
-                    <th className="px-5 py-3.5" scope="col">
-                      Metode & Pekerja
-                    </th>
-                    <th className="px-5 py-3.5" scope="col">
-                      Lokasi
-                    </th>
-                    <th className="px-5 py-3.5" scope="col">
-                      Mulai
-                    </th>
-                    <th className="px-5 py-3.5" scope="col">
-                      Deadline
-                    </th>
-                    <th className="px-5 py-3.5" scope="col">
-                      Status
-                    </th>
-                    <th className="px-5 py-3.5 text-right" scope="col">
-                      Aksi
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {visibleJobs.map((job, index) => {
-                    const today = getJakartaToday()
-                    const isExpired =
-                      Boolean(job.target_selesai) &&
-                      job.target_selesai < today &&
-                      job.status !== STATUS_PEKERJAAN.SELESAI
-                    const isDueToday =
-                      Boolean(job.target_selesai) &&
-                      job.target_selesai === today &&
-                      job.status !== STATUS_PEKERJAAN.SELESAI
-
-                    return (
-                      <tr
-                        className="transition hover:bg-slate-50/80"
-                        key={job.id_pekerjaan}
-                      >
-                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">
-                          {(currentPage - 1) * PAGE_SIZE + index + 1}
-                        </td>
-                        <td className="max-w-64 px-5 py-4">
-                          <p className="truncate font-semibold text-slate-800">
-                            {job.nama_pekerjaan}
-                          </p>
-                          <p className="text-xs text-slate-400">ID: {job.id_pekerjaan}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          {job.metode_penentuan === 'langsung' ? (
-                            <div>
-                              <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-600/10">
-                                Penetapan Langsung
-                              </span>
-                              <p className="mt-1 text-xs font-medium text-slate-700 truncate max-w-48">
-                                {job.nama_karyawan_list ? `Pekerja: ${job.nama_karyawan_list}` : 'Belum ditetapkan'}
-                              </p>
-                            </div>
-                          ) : (
-                            <div>
-                              {job.nama_karyawan_list ? (
-                                <>
-                                  <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-600/10">
-                                    Diambil Mandiri
-                                  </span>
-                                  <p className="mt-1 text-xs font-medium text-slate-700 truncate max-w-48">
-                                    Oleh: {job.nama_karyawan_list}
-                                  </p>
-                                </>
-                              ) : isExpired ? (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-rose-600/10">
-                                  Terbuka (Expired)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/10">
-                                  Terbuka (Tersedia)
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="max-w-48 px-5 py-4">
-                          <span className="flex items-center gap-1.5 truncate text-slate-600">
-                            <WorkIcon
-                              className="h-4 w-4 shrink-0 text-slate-400"
-                              name="location"
-                            />
-                            {job.lokasi || '—'}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                          {formatDate(job.tanggal_mulai)}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4">
-                          <span className="text-slate-700 font-medium block">
-                            {formatDate(job.target_selesai)}
-                          </span>
-                          {isExpired && (
-                            <span className="mt-0.5 inline-block text-[11px] font-semibold text-rose-600">
-                              Lewat Deadline
-                            </span>
-                          )}
-                          {isDueToday && (
-                            <span className="mt-0.5 inline-block text-[11px] font-semibold text-amber-600">
-                              Tenggat Hari Ini
-                            </span>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4">
-                          <StatusBadge status={job.status} />
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4">
-                          <ActionButtons
-                            actions={[
-                              {
-                                type: 'view',
-                                label: `Lihat ${job.nama_pekerjaan}`,
-                                onClick: () => showJobDetail(job),
-                                disabled: loadingDetailId === job.id_pekerjaan,
-                              },
-                              {
-                                type: 'edit',
-                                label: `Edit ${job.nama_pekerjaan}`,
-                                onClick: () => editJob(job),
-                                disabled: loadingDetailId === job.id_pekerjaan,
-                                title:
-                                  loadingDetailId === job.id_pekerjaan
-                                    ? 'Memuat detail pekerjaan...'
-                                    : `Edit ${job.nama_pekerjaan}`,
-                              },
-                              {
-                                type: 'delete',
-                                label: `Hapus ${job.nama_pekerjaan}`,
-                                onClick: () => requestDeleteJob(job),
-                                title: `Hapus ${job.nama_pekerjaan}`,
-                              },
-                            ]}
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {visibleJobs.length === 0 && (
-                    <tr>
-                      <td className="px-5 py-14 text-center" colSpan="8">
-                        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                          <WorkIcon className="h-6 w-6" name="search" />
-                        </span>
-                        <p className="mt-3 font-semibold text-slate-700">
-                          {pekerjaan.length === 0
-                            ? 'Belum ada data pekerjaan'
-                            : 'Pekerjaan tidak ditemukan'}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {pekerjaan.length === 0
-                            ? 'Tambahkan pekerjaan pertama untuk mulai mengelola proyek.'
-                            : 'Ubah kata pencarian atau filter status dan metode.'}
-                        </p>
-                        {pekerjaan.length === 0 && (
-                          <button
-                            className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                            onClick={createJob}
-                            type="button"
-                          >
-                            Tambah Pekerjaan
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <p className="text-sm text-slate-500">
-                Menampilkan{' '}
-                <span className="font-medium text-slate-700">
-                  {filteredJobs.length === 0
-                    ? 0
-                    : (currentPage - 1) * PAGE_SIZE + 1}
-                  –{Math.min(currentPage * PAGE_SIZE, filteredJobs.length)}
-                </span>{' '}
-                dari {filteredJobs.length} pekerjaan
-              </p>
-              <div className="flex items-center justify-between gap-2 sm:justify-end">
-                <button
-                  aria-label="Halaman sebelumnya"
-                  className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage(currentPage - 1)}
-                  type="button"
-                >
-                  <WorkIcon className="h-4 w-4" name="previous" />
-                </button>
-                <span className="px-2 text-sm text-slate-600">
-                  Halaman {currentPage} dari {totalPages}
-                </span>
-                <button
-                  aria-label="Halaman berikutnya"
-                  className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage(currentPage + 1)}
-                  type="button"
-                >
-                  <WorkIcon className="h-4 w-4" name="next" />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
       </section>
 
+      {/* Tabel Data Pekerjaan */}
+      <section
+        aria-label="Tabel Data Pekerjaan"
+        className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px] text-left text-sm">
+            <thead className="border-b border-slate-200/80 bg-slate-50/90 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-4 py-3.5 text-center w-14" scope="col">
+                  No.
+                </th>
+                <th className="px-4 py-3.5" scope="col">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSortOrder((order) =>
+                        order === 'asc' ? 'desc' : 'asc',
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 hover:text-slate-900 transition font-bold"
+                  >
+                    <span>Nama Pekerjaan</span>
+                    <WorkIcon name="sort" className="h-3.5 w-3.5 text-slate-400" />
+                  </button>
+                </th>
+                <th className="px-4 py-3.5" scope="col">
+                  Metode & Pekerja
+                </th>
+                <th className="px-4 py-3.5" scope="col">
+                  Lokasi
+                </th>
+                <th className="px-4 py-3.5" scope="col">
+                  Jadwal Mulai
+                </th>
+                <th className="px-4 py-3.5" scope="col">
+                  Target Selesai
+                </th>
+                <th className="px-4 py-3.5 text-center" scope="col">
+                  Status
+                </th>
+                <th className="px-4 py-3.5 text-right w-36" scope="col">
+                  Aksi
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan="8"
+                    className="px-4 py-12 text-center text-sm text-slate-500"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <svg
+                        className="h-6 w-6 animate-spin text-blue-600"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v8H4z"
+                        />
+                      </svg>
+                      <p className="font-medium text-slate-600">
+                        Memuat data pekerjaan...
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : visibleJobs.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="px-4 py-12 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                      <WorkIcon name="search" className="h-6 w-6" />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-slate-800">
+                      Data pekerjaan tidak ditemukan
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {hasActiveFilters
+                        ? 'Coba sesuaikan pencarian atau atur ulang filter Anda.'
+                        : 'Belum ada data pekerjaan yang terdaftar.'}
+                    </p>
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        onClick={resetFilters}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        <WorkIcon name="rotate-ccw" className="h-3.5 w-3.5" />
+                        Reset Filter
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                visibleJobs.map((job, index) => {
+                  const today = getJakartaToday()
+                  const isExpired =
+                    Boolean(job.target_selesai) &&
+                    job.target_selesai < today &&
+                    job.status !== STATUS_PEKERJAAN.SELESAI
+                  const isDueToday =
+                    Boolean(job.target_selesai) &&
+                    job.target_selesai === today &&
+                    job.status !== STATUS_PEKERJAAN.SELESAI
+
+                  return (
+                    <tr
+                      key={job.id_pekerjaan}
+                      className="transition-colors hover:bg-slate-50/80"
+                    >
+                      {/* No */}
+                      <td className="whitespace-nowrap px-4 py-3 text-center text-xs font-medium text-slate-400">
+                        {(currentPage - 1) * PAGE_SIZE + index + 1}
+                      </td>
+
+                      {/* Nama Pekerjaan & ID */}
+                      <td className="px-4 py-3 max-w-64">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            #{job.id_pekerjaan}
+                          </span>
+                          <p className="truncate font-semibold text-slate-900">
+                            {job.nama_pekerjaan}
+                          </p>
+                        </div>
+                        {job.deskripsi && (
+                          <p className="mt-0.5 text-xs text-slate-400 truncate max-w-xs">
+                            {job.deskripsi}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Metode & Pekerja */}
+                      <td className="px-4 py-3">
+                        {job.metode_penentuan === 'langsung' ? (
+                          <div>
+                            <span className="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-600/10">
+                              Penetapan Langsung
+                            </span>
+                            <p className="mt-1 text-xs text-slate-600 font-medium truncate max-w-44">
+                              {job.nama_karyawan_list
+                                ? job.nama_karyawan_list
+                                : 'Belum ditetapkan'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            {job.nama_karyawan_list ? (
+                              <>
+                                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/10">
+                                  Diambil Mandiri
+                                </span>
+                                <p className="mt-1 text-xs text-slate-600 font-medium truncate max-w-44">
+                                  {job.nama_karyawan_list}
+                                </p>
+                              </>
+                            ) : isExpired ? (
+                              <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/10">
+                                Terbuka (Expired)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
+                                Terbuka (Tersedia)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Lokasi */}
+                      <td className="px-4 py-3 max-w-44">
+                        <span className="flex items-center gap-1.5 truncate text-slate-600 text-xs">
+                          <WorkIcon
+                            name="location"
+                            className="h-3.5 w-3.5 shrink-0 text-slate-400"
+                          />
+                          <span className="truncate">{job.lokasi || '—'}</span>
+                        </span>
+                      </td>
+
+                      {/* Mulai */}
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
+                        {formatDate(job.tanggal_mulai)}
+                      </td>
+
+                      {/* Target Selesai (Deadline) */}
+                      <td className="whitespace-nowrap px-4 py-3 text-xs">
+                        <span className="font-semibold text-slate-800 block">
+                          {formatDate(job.target_selesai)}
+                        </span>
+                        {isExpired && (
+                          <span className="mt-0.5 inline-block text-[10px] font-bold text-rose-600">
+                            Lewat Deadline
+                          </span>
+                        )}
+                        {isDueToday && (
+                          <span className="mt-0.5 inline-block text-[10px] font-bold text-amber-600">
+                            Tenggat Hari Ini
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="whitespace-nowrap px-4 py-3 text-center">
+                        <StatusBadge status={job.status} />
+                      </td>
+
+                      {/* Aksi */}
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {/* Detail */}
+                          <button
+                            type="button"
+                            onClick={() => showJobDetail(job)}
+                            disabled={loadingDetailId === job.id_pekerjaan}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition shadow-2xs disabled:opacity-50"
+                            title={`Lihat detail ${job.nama_pekerjaan}`}
+                            aria-label={`Lihat detail ${job.nama_pekerjaan}`}
+                          >
+                            <WorkIcon name="eye" className="h-4 w-4" />
+                          </button>
+
+                          {/* Edit */}
+                          <button
+                            type="button"
+                            onClick={() => editJob(job)}
+                            disabled={loadingDetailId === job.id_pekerjaan}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition shadow-2xs disabled:opacity-50"
+                            title={`Edit proyek ${job.nama_pekerjaan}`}
+                            aria-label={`Edit proyek ${job.nama_pekerjaan}`}
+                          >
+                            <WorkIcon name="edit" className="h-4 w-4" />
+                          </button>
+
+                          {/* Hapus */}
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete(job)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition shadow-2xs"
+                            title={`Hapus proyek ${job.nama_pekerjaan}`}
+                            aria-label={`Hapus proyek ${job.nama_pekerjaan}`}
+                          >
+                            <WorkIcon name="trash" className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer & Paginasi */}
+        <div className="flex flex-col gap-3 border-t border-slate-200/80 bg-slate-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <p className="text-xs text-slate-500">
+            Menampilkan{' '}
+            <span className="font-semibold text-slate-800">
+              {filteredJobs.length === 0
+                ? 0
+                : (currentPage - 1) * PAGE_SIZE + 1}
+              –{Math.min(currentPage * PAGE_SIZE, filteredJobs.length)}
+            </span>{' '}
+            dari{' '}
+            <span className="font-semibold text-slate-800">
+              {filteredJobs.length}
+            </span>{' '}
+            pekerjaan
+          </p>
+
+          <div className="flex items-center justify-between gap-1.5 sm:justify-end">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Halaman sebelumnya"
+              title="Halaman sebelumnya"
+            >
+              <WorkIcon name="previous" className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Sebelumnya</span>
+            </button>
+
+            <span className="px-2 text-xs font-medium text-slate-600">
+              Hal. {currentPage} dari {totalPages}
+            </span>
+
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(currentPage + 1)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Halaman berikutnya"
+              title="Halaman berikutnya"
+            >
+              <span className="hidden sm:inline">Berikutnya</span>
+              <WorkIcon name="next" className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Modal Tambah / Edit / Detail */}
       {modal && (
         <WorkModal
+          job={modal.job}
           employees={employees}
           isSaving={isSaving}
-          job={modal.job}
           mode={modal.mode}
           onClose={() => {
             if (!isSaving) setModal(null)
@@ -1302,11 +1442,13 @@ function DataPekerjaan() {
           onSave={handleSaveJob}
         />
       )}
+
+      {/* Dialog Konfirmasi Hapus */}
       {pendingDelete && (
         <DeleteConfirmationDialog
-          description="Anda yakin ingin menghapus data pekerjaan ini?"
+          description="Anda yakin ingin menghapus data pekerjaan ini? Penugasan yang terkait dengan pekerjaan ini juga akan dibatalkan."
           isProcessing={isSaving}
-          itemName={pendingDelete.nama_pekerjaan}
+          itemName={`${pendingDelete.nama_pekerjaan} (#${pendingDelete.id_pekerjaan})`}
           onCancel={() => setPendingDelete(null)}
           onConfirm={() => handleDeleteJob(pendingDelete)}
         />
