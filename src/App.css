@@ -266,10 +266,10 @@
 .logout-button:disabled { cursor: wait; opacity: .65; }
 .logout-error { margin: 7px 8px 0; color: #9b3535; font-size: 11px; line-height: 1.4; }
 
-.workspace { min-height: 100vh; margin-left: 252px; }
-.topbar { display: flex; height: 65px; align-items: center; justify-content: space-between; padding: 0 42px; border-bottom: 1px solid #e9edf3; color: #8390a1; background: #fff; font-size: 12px; }
-.topbar-role { padding: 6px 10px; border-radius: 20px; color: #416a9d; background: #eef4fa; font-size: 11px; font-weight: 700; }
-.page-content { max-width: 1120px; margin: 0 auto; padding: 44px 42px; }
+.workspace { min-height: 100vh; margin-left: 252px; background: #f8fafc; }
+.topbar { display: flex; height: 60px; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #e9edf3; color: #8390a1; background: #fff; font-size: 12px; }
+.topbar-role { padding: 5px 12px; border-radius: 20px; color: #416a9d; background: #eef4fa; font-size: 11px; font-weight: 700; }
+.page-content { max-width: 1440px; margin: 0 auto; padding: 24px 32px; width: 100%; box-sizing: border-box; }
 .page-title { margin: 0; color: #1e2c42; font-size: clamp(27px, 3vw, 35px); font-weight: 750; letter-spacing: -.045em; }
 .page-intro { margin-top: 10px; color: #8a96a6; font-size: 14px; }
 

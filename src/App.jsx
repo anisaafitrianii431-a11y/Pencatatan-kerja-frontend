@@ -557,11 +557,7 @@ function AppRoutes() {
             <Route path="/admin" element={<AdminPage />} />
             <Route
               path="/admin/pengeluaran"
-              element={
-                <div className="p-2 sm:p-4">
-                  <PengeluaranAdminPage currentUser={mappedUser} />
-                </div>
-              }
+              element={<PengeluaranAdminPage currentUser={mappedUser} />}
             />
             <Route path="/admin/lokasi" element={<LokasiKerjaPage />} />
           </Route>
@@ -569,11 +565,7 @@ function AppRoutes() {
             <Route path="/karyawan" element={<KaryawanPage />} />
             <Route
               path="/karyawan/pengeluaran"
-              element={
-                <div className="p-2 sm:p-4">
-                  <PengeluaranKaryawanPage currentUser={mappedUser} />
-                </div>
-              }
+              element={<PengeluaranKaryawanPage currentUser={mappedUser} />}
             />
             <Route path="/karyawan/absensi" element={<AbsensiPage />} />
           </Route>

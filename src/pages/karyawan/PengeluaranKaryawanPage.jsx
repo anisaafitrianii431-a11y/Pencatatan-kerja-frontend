@@ -335,54 +335,54 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600">
-              <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-100">
+            <table className="w-full text-left text-xs text-slate-600 border-collapse">
+              <thead className="bg-slate-50/80 text-slate-400 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-100">
                 <tr>
-                  <th className="py-3 px-4">Tanggal</th>
-                  <th className="py-3 px-4">Proyek</th>
-                  <th className="py-3 px-4">Keterangan</th>
-                  <th className="py-3 px-4">Sumber Dana</th>
-                  <th className="py-3 px-4 text-right">Nominal</th>
-                  <th className="py-3 px-4 text-center">Bukti Nota</th>
-                  <th className="py-3 px-4">Status Audit</th>
-                  <th className="py-3 px-4">Status Penggantian</th>
-                  <th className="py-3 px-4 text-center">Aksi</th>
+                  <th className="py-3 px-3">Tanggal</th>
+                  <th className="py-3 px-3">Proyek</th>
+                  <th className="py-3 px-3">Keterangan</th>
+                  <th className="py-3 px-3">Sumber Dana</th>
+                  <th className="py-3 px-3 text-right">Nominal</th>
+                  <th className="py-3 px-3 text-center">Bukti Nota</th>
+                  <th className="py-3 px-3">Status Audit</th>
+                  <th className="py-3 px-3">Status Penggantian</th>
+                  <th className="py-3 px-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {pengeluaranList.map((p) => {
                   return (
-                    <tr key={p.id_pengeluaran} className="hover:bg-slate-50/70 transition">
-                      <td className="py-3 px-4 font-bold text-slate-800 whitespace-nowrap">
+                    <tr key={p.id_pengeluaran} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
                         {p.tanggal}
                       </td>
-                      <td className="py-3 px-4 font-semibold text-slate-700 max-w-[180px] truncate" title={p.nama_pekerjaan}>
+                      <td className="py-3 px-3 font-semibold text-slate-800 max-w-[160px] truncate" title={p.nama_pekerjaan}>
                         {p.nama_pekerjaan}
                       </td>
-                      <td className="py-3 px-4 max-w-[200px]">
-                        <div className="truncate text-slate-800 font-medium" title={p.keterangan}>
+                      <td className="py-3 px-3 max-w-[180px]">
+                        <div className="truncate text-slate-700 font-medium" title={p.keterangan}>
                           {p.keterangan}
                         </div>
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-3 whitespace-nowrap">
                         {p.jenis_dana === 'pribadi' ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                             Dana Pribadi (Reimburs)
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                             Dana Kantor
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-800 whitespace-nowrap">
+                      <td className="py-3 px-3 text-right font-bold text-slate-800 whitespace-nowrap">
                         {formatRupiah(p.nominal)}
                       </td>
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         {p.foto_kwitansi ? (
                           <button
                             onClick={() => setPreviewImage(getImageUrl(p.foto_kwitansi))}
-                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition"
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold transition"
                           >
                             <Eye className="w-3.5 h-3.5 text-blue-600" />
                             <span>Lihat Nota</span>
@@ -391,33 +391,33 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
                           <span className="text-slate-300 italic text-[11px]">Tanpa Foto</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-3 whitespace-nowrap">
                         {p.status_verifikasi === 'disetujui' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 flex items-center space-x-1 w-fit">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center space-x-1 w-fit">
                             <CheckCircle2 className="w-3 h-3" />
                             <span>Disetujui</span>
                           </span>
                         )}
                         {p.status_verifikasi === 'menunggu' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 flex items-center space-x-1 w-fit">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 flex items-center space-x-1 w-fit">
                             <span>Menunggu</span>
                           </span>
                         )}
                         {p.status_verifikasi === 'ditolak' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-700 flex items-center space-x-1 w-fit">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center space-x-1 w-fit">
                             <XCircle className="w-3 h-3" />
                             <span>Ditolak</span>
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-3 whitespace-nowrap">
                         {p.jenis_dana === 'pribadi' ? (
                           p.status_ganti === 'sudah' ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-300">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               ✓ Sudah Diganti
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-300">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               Belum Diganti
                             </span>
                           )
@@ -425,17 +425,17 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
                           <span className="text-slate-400 text-[11px]">-</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-center">
+                      <td className="py-3 px-3 whitespace-nowrap text-center">
                         {p.status_verifikasi === 'disetujui' || p.status_ganti === 'sudah' ? (
                           <span 
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-400 text-[11px] font-medium cursor-not-allowed border border-slate-200"
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-400 text-[11px] font-medium cursor-not-allowed border border-slate-200"
                             title="Terkunci: Pengeluaran yang sudah disetujui / diganti tidak dapat diubah atau dihapus untuk mencegah kecurangan."
                           >
                             <Lock className="w-3 h-3 text-slate-400" />
                             <span>Terkunci</span>
                           </span>
                         ) : (
-                          <div className="inline-flex items-center space-x-1">
+                          <div className="inline-flex items-center space-x-1.5">
                             <button
                               onClick={() => handleOpenEditModal(p)}
                               title="Edit Catatan Pengeluaran"
