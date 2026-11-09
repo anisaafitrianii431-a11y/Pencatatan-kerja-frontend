@@ -421,29 +421,31 @@ export default function PengeluaranAdminPage({ currentUser }) {
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-100">
                     <tr>
-                      <th className="py-3 px-4">Pekerja & Tanggal</th>
-                      <th className="py-3 px-4">Pekerjaan</th>
-                      <th className="py-3 px-4">Keterangan</th>
-                      <th className="py-3 px-4">Sumber Dana</th>
-                      <th className="py-3 px-4 text-right">Nominal</th>
-                      <th className="py-3 px-4 text-center">Bukti Nota</th>
-                      <th className="py-3 px-4">Verifikasi</th>
-                      <th className="py-3 px-4">Status Ganti</th>
-                      <th className="py-3 px-4 text-center">Aksi Verifikasi</th>
+                      <th className="py-3 px-3">Pekerja & Tanggal</th>
+                      <th className="py-3 px-3">Pekerjaan</th>
+                      <th className="py-3 px-3">Keterangan</th>
+                      <th className="py-3 px-3">Sumber Dana</th>
+                      <th className="py-3 px-3 text-right">Nominal</th>
+                      <th className="py-3 px-3 text-center">Bukti Nota</th>
+                      <th className="py-3 px-3">Verifikasi</th>
+                      <th className="py-3 px-3">Status Ganti</th>
+                      <th className="py-3 px-3 text-center sticky right-0 bg-slate-50 z-20 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.08)] border-l border-slate-200 min-w-[140px]">
+                        Aksi Verifikasi
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredExpenses.map((p) => {
                       return (
-                        <tr key={p.id_pengeluaran} className="hover:bg-slate-50/70 transition">
-                          <td className="py-3 px-4 whitespace-nowrap">
+                        <tr key={p.id_pengeluaran} className="hover:bg-slate-50/70 transition group">
+                          <td className="py-3 px-3 whitespace-nowrap">
                             <div className="font-semibold text-slate-800">{p.nama_karyawan}</div>
                             <div className="text-[10px] text-slate-400">{p.tanggal}</div>
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800 min-w-[160px] max-w-[240px] leading-snug">
+                          <td className="py-3 px-3 font-medium text-slate-800 min-w-[150px] max-w-[220px] leading-snug">
                             {p.nama_pekerjaan}
                           </td>
-                          <td className="py-3 px-4 min-w-[140px] max-w-[220px]">
+                          <td className="py-3 px-3 min-w-[130px] max-w-[200px]">
                             <button
                               type="button"
                               onClick={() => setSelectedExpense(p)}
@@ -453,7 +455,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
                               {p.keterangan || <span className="text-slate-400 italic">Tanpa keterangan</span>}
                             </button>
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
+                          <td className="py-3 px-3 whitespace-nowrap">
                             {p.jenis_dana === 'pribadi' ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
                                 Dana Pribadi
@@ -464,10 +466,10 @@ export default function PengeluaranAdminPage({ currentUser }) {
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-right font-bold text-slate-800 whitespace-nowrap">
+                          <td className="py-3 px-3 text-right font-bold text-slate-800 whitespace-nowrap">
                             {formatRupiah(p.nominal)}
                           </td>
-                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
                             {p.foto_kwitansi ? (
                               <button
                                 onClick={() => setSelectedExpense(p)}
@@ -484,11 +486,11 @@ export default function PengeluaranAdminPage({ currentUser }) {
                                 title="Pekerja tidak melampirkan foto. Klik untuk cek detail pengeluaran."
                               >
                                 <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                                <span>Tanpa Foto (Cek Detail)</span>
+                                <span>Tanpa Foto</span>
                               </button>
                             )}
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
+                          <td className="py-3 px-3 whitespace-nowrap">
                             {p.status_verifikasi === 'disetujui' && (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 flex items-center space-x-1 w-fit">
                                 <CheckCircle2 className="w-3 h-3" />
@@ -507,7 +509,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
+                          <td className="py-3 px-3 whitespace-nowrap">
                             {p.jenis_dana === 'pribadi' ? (
                               <button
                                 onClick={() => handleToggleGanti(p.id_pengeluaran, p.status_ganti)}
@@ -523,7 +525,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
                               <span className="text-slate-400 text-[11px]">-</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap text-center">
+                          <td className="py-3 px-3 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] border-l border-slate-200">
                             <div className="inline-flex items-center space-x-1">
                               <button
                                 onClick={() => setSelectedExpense(p)}
@@ -556,8 +558,8 @@ export default function PengeluaranAdminPage({ currentUser }) {
                               </button>
                               <button
                                 onClick={() => handleDelete(p)}
-                                title="Hapus Catatan Pengeluaran"
-                                className="p-1.5 rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition shadow-xs"
+                                title="Hapus Catatan Pengeluaran (Permanen)"
+                                className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition shadow-xs"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

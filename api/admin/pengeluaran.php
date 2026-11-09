@@ -114,6 +114,16 @@ if ($method === 'GET') {
         $stmt = $pdo->prepare("UPDATE pengeluaran SET status_ganti = ? WHERE id_pengeluaran = ?");
         $stmt->execute([$status, $id]);
         jsonResponse(true, "Status penggantian dana diperbarui oleh Admin");
+
+    // 3. HAPUS PENGELUARAN OLEH ADMIN (VIA POST ACTION)
+    } elseif ($action === 'delete') {
+        $id = intval($_GET['id_pengeluaran'] ?? $body['id_pengeluaran'] ?? 0);
+        if ($id <= 0) {
+            jsonResponse(false, "ID pengeluaran tidak valid", null, 400);
+        }
+        $stmt = $pdo->prepare("DELETE FROM pengeluaran WHERE id_pengeluaran = ?");
+        $stmt->execute([$id]);
+        jsonResponse(true, "Catatan pengeluaran berhasil dihapus oleh Admin");
     } else {
         jsonResponse(false, "Aksi pengeluaran admin tidak didukung", null, 400);
     }

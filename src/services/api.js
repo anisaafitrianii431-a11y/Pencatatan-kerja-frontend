@@ -994,15 +994,23 @@ export const PengeluaranService = {
   async delete(id_pengeluaran) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?id_pengeluaran=${id_pengeluaran}`, {
-        method: 'DELETE'
-      });
-      if (resData && resData.success) return resData;
-      if (resData && !resData.success) throw new Error(resData.message);
+      try {
+        const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?id_pengeluaran=${id_pengeluaran}`, {
+          method: 'DELETE'
+        });
+        if (resData && resData.success) return resData;
+      } catch {
+        // Fallback POST action=delete if DELETE method is blocked by proxy/firewall
+        const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=delete&id_pengeluaran=${id_pengeluaran}`, {
+          method: 'POST'
+        });
+        if (resData && resData.success) return resData;
+        if (resData && !resData.success) throw new Error(resData.message);
+      }
     }
 
     const db = getLocalData();
-    db.pengeluaran = db.pengeluaran.filter(p => p.id_pengeluaran !== Number(id_pengeluaran));
+    db.pengeluaran = db.pengeluaran.filter(p => Number(p.id_pengeluaran) !== Number(id_pengeluaran));
     saveLocalData(db);
     return { success: true, message: 'Catatan pengeluaran berhasil dihapus' };
   },
