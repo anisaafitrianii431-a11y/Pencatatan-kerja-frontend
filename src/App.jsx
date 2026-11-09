@@ -20,6 +20,10 @@ import DashboardAdmin from './pages/admin/DashboardAdmin.jsx'
 import PekerjaLayout from './layouts/PekerjaLayout.jsx'
 import DashboardPekerja from './pages/pekerja/DashboardPekerja.jsx'
 
+// Fitur Pengembang 2: Rekap Absensi Admin & Pekerja
+import RekapAbsensiAdmin from './pages/admin/RekapAbsensiAdmin.jsx'
+import RekapAbsensiPekerja from './pages/pekerja/RekapAbsensiPekerja.jsx'
+
 // Fitur Pengembang 2: Manajemen Karyawan, Pekerjaan, Penugasan & Profil
 import DataKaryawan from './pages/admin/DataKaryawan.jsx'
 import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
@@ -591,6 +595,8 @@ function AdminLayoutWrapper() {
     activeItem = 'Data Pekerjaan'
   } else if (path.startsWith('/admin/penugasan')) {
     activeItem = 'Penugasan'
+  } else if (path.startsWith('/admin/rekap-absensi')) {
+    activeItem = 'Rekap Absensi'
   } else if (path.startsWith('/admin/pengguna')) {
     activeItem = 'Manajemen Pengguna'
   } else if (path.startsWith('/admin/pengeluaran')) {
@@ -608,6 +614,7 @@ function AdminLayoutWrapper() {
     else if (item === 'Data Karyawan') navigate('/admin/karyawan')
     else if (item === 'Data Pekerjaan') navigate('/admin/pekerjaan')
     else if (item === 'Penugasan') navigate('/admin/penugasan')
+    else if (item === 'Rekap Absensi') navigate('/admin/rekap-absensi')
     else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
     else if (item === 'Pengeluaran & Kwitansi') navigate('/admin/pengeluaran')
     else if (item === 'Lokasi Kerja') navigate('/admin/lokasi')
@@ -680,6 +687,8 @@ function PekerjaLayoutWrapper({ mappedUser }) {
     activeItem = 'Pekerjaan Saya'
   } else if (path.startsWith('/karyawan/riwayat-pengajuan')) {
     activeItem = 'Riwayat Pengajuan'
+  } else if (path.startsWith('/karyawan/rekap-absensi')) {
+    activeItem = 'Rekap Absensi'
   } else if (path.startsWith('/karyawan/pengeluaran')) {
     activeItem = 'Pengeluaran Saya'
   } else if (path.startsWith('/karyawan/absensi')) {
@@ -695,6 +704,7 @@ function PekerjaLayoutWrapper({ mappedUser }) {
     else if (item === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
     else if (item === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
     else if (item === 'Riwayat Pengajuan') navigate('/karyawan/riwayat-pengajuan')
+    else if (item === 'Rekap Absensi') navigate('/karyawan/rekap-absensi')
     else if (item === 'Pengeluaran Saya') navigate('/karyawan/pengeluaran')
     else if (item === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
     else if (item === 'Profil Saya') navigate('/karyawan/profil')
@@ -756,6 +766,7 @@ function AppRoutes() {
             <Route path="/admin/karyawan" element={<DataKaryawan />} />
             <Route path="/admin/pekerjaan" element={<DataPekerjaan />} />
             <Route path="/admin/penugasan" element={<Penugasan />} />
+            <Route path="/admin/rekap-absensi" element={<RekapAbsensiAdmin />} />
             <Route path="/admin/pengguna" element={<AdminPage />} />
             <Route
               path="/admin/pengeluaran"
@@ -788,6 +799,15 @@ function AppRoutes() {
             <Route
               path="/karyawan/riwayat-pengajuan"
               element={<RiwayatPengajuanPage />}
+            />
+            <Route
+              path="/karyawan/rekap-absensi"
+              element={
+                <RekapAbsensiPekerja
+                  workerId={mappedUser?.id_karyawan}
+                  workerName={mappedUser?.nama}
+                />
+              }
             />
             <Route
               path="/karyawan/profil"
