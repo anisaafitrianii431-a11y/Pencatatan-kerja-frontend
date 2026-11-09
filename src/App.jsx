@@ -1,214 +1,601 @@
-import React from 'react';
-import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { AbsensiProvider } from './hooks/useAbsensi.jsx';
-import AbsensiPage from './pages/pekerja_absen/AbsensiPage';
-import LokasiKerjaPage from './pages/admin-absen/LokasiKerjaPage';
-import AdminDashboard from './pages/admin-absen/AdminDashboard';
-import WorkerDashboard from './pages/pekerja_absen/WorkerDashboard';
+import { useState } from 'react'
+import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { AuthProvider } from './auth/AuthContext.jsx'
+import { useAuth } from './auth/useAuth.js'
+import { AuthProvider as LegacyAuthProvider } from './contexts/AuthContext.jsx'
+import { AbsensiProvider } from './hooks/useAbsensi.jsx'
 
 // Fitur Pengeluaran & Kwitansi
-import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage';
-import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage';
+import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage'
+import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage'
 
-import './index.css';
-import './App.css';
+// Fitur Absensi & Lokasi Kerja
+import LokasiKerjaPage from './pages/admin-absen/LokasiKerjaPage'
+import AbsensiPage from './pages/pekerja_absen/AbsensiPage'
 
-const todayLabel = new Intl.DateTimeFormat('id-ID', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-}).format(new Date());
+import './index.css'
+import './App.css'
 
-function AppShell() {
-  const { currentUser } = useAuth();
-
-  if (currentUser.role === 'admin') return <AdminLayout />;
-  if (currentUser.role === 'pekerja') return <PekerjaLayout />;
-
-  return null;
+function roleHome(role) {
+  return role === 'admin' ? '/admin' : '/karyawan'
 }
 
-function AdminLayout() {
-  const { currentUser, pilihRole, users } = useAuth();
-  const mappedUser = {
-    ...currentUser,
-    peran: 'admin',
-    nama: currentUser.nama || 'Administrator'
-  };
+function LoadingScreen({ message = 'Memuat aplikasi...' }) {
+  return (
+    <main className="loading-screen" aria-live="polite">
+      <span className="spinner" aria-hidden="true" />
+      <p>{message}</p>
+    </main>
+  )
+}
+
+function ProtectedRoute({ roles }) {
+  const { user, loading, authError, refreshUser } = useAuth()
+  const location = useLocation()
+
+  if (loading) return <LoadingScreen message="Memeriksa sesi..." />
+  if (authError) {
+    return (
+      <main className="loading-screen">
+        <div className="notice notice-error" role="alert">{authError}</div>
+        <button className="button button-primary" type="button" onClick={refreshUser}>
+          Coba lagi
+        </button>
+      </main>
+    )
+  }
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />
+  if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />
+  return <Outlet />
+}
+
+function LoginPage() {
+  const { user, signIn } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  if (user) return <Navigate to={roleHome(user.role)} replace />
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const authenticatedUser = await signIn({ email: email.trim(), password })
+      const requestedPath = location.state?.from?.pathname
+      navigate(requestedPath || roleHome(authenticatedUser.role), { replace: true })
+    } catch (loginError) {
+      setError(loginError.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
-    <div className="admin-layout">
-      <AppTopbar
-        role="admin"
-        nama={currentUser.nama}
-        currentUserId={currentUser.id_user}
-        users={users}
-        onSelectRole={pilihRole}
-      />
-      <div className="admin-body">
-        <AppSidebar role="admin" navLinks={[
-          { to: '/admin', label: '▤  Riwayat Sesi' },
-          { to: '/admin/lokasi', label: '📍 Lokasi Kerja' },
-          { to: '/admin/pengeluaran', label: '🧾 Pengeluaran & Kwitansi' },
-        ]} />
-        <div className="admin-workspace">
-          <main className="admin-content">
-            <Routes>
-              <Route path="/" element={<Navigate to="/admin" replace />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/lokasi" element={<LokasiKerjaPage />} />
-              <Route path="/admin/pengeluaran" element={<div className="p-4 sm:p-6"><PengeluaranAdminPage currentUser={mappedUser} /></div>} />
-              <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
-            </Routes>
-          </main>
+    <main className="login-shell">
+      <section className="login-brand">
+        <div className="brand-mark" aria-hidden="true">PK</div>
+        <p className="eyebrow">PENCATATAN KERJA</p>
+        <h1>Kerja tercatat,<br />lebih terarah.</h1>
+        <p className="brand-description">
+          Masuk untuk mengakses ruang kerja sesuai peran dan tanggung jawab Anda.
+        </p>
+        <div className="brand-decoration" aria-hidden="true">
+          <span /><span /><span />
         </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-function PekerjaLayout() {
-  const { currentUser, pilihRole, users } = useAuth();
-  const mappedUser = {
-    ...currentUser,
-    peran: 'karyawan',
-    nama: currentUser.karyawan?.nama ?? currentUser.nama,
-    id_karyawan: currentUser.id_karyawan || currentUser.karyawan?.id_karyawan || 1
-  };
+      <section className="login-panel">
+        <div className="login-form-wrap">
+          <p className="eyebrow">SELAMAT DATANG</p>
+          <h2>Masuk ke akun</h2>
+          <p className="muted">Gunakan akun yang terdaftar untuk melanjutkan.</p>
 
-  return (
-    <div className="worker-layout">
-      <AppTopbar
-        role="pekerja"
-        nama={currentUser.karyawan?.nama ?? currentUser.nama}
-        currentUserId={currentUser.id_user}
-        users={users}
-        onSelectRole={pilihRole}
-      />
-      <div className="worker-body">
-        <AppSidebar role="pekerja" navLinks={[
-          { to: '/pekerja', label: '▦  Dashboard' },
-          { to: '/pekerja/absensi', label: '◷  Absensi Saya' },
-          { to: '/pekerja/pengeluaran', label: '🧾 Pengeluaran Saya' },
-        ]} />
-        <main className="worker-content">
-          <Routes>
-            <Route path="/" element={<Navigate to="/pekerja" replace />} />
-            <Route path="/pekerja" element={<WorkerDashboard />} />
-            <Route path="/pekerja/absensi" element={<AbsensiPage />} />
-            <Route path="/pekerja/pengeluaran" element={<div className="p-4 sm:p-6"><PengeluaranKaryawanPage currentUser={mappedUser} /></div>} />
-            <Route path="/pekerja/riwayat" element={<Navigate to="/pekerja" replace />} />
-            <Route path="*" element={<Navigate to="/pekerja/absensi" replace />} />
-          </Routes>
-        </main>
-      </div>
-    </div>
-  );
-}
+          <form className="login-form" onSubmit={handleSubmit}>
+            {error && <div className="notice notice-error" role="alert">{error}</div>}
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Masukkan email"
+              required
+            />
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Masukkan password"
+              required
+            />
+            <button className="button button-primary login-submit" type="submit" disabled={submitting}>
+              {submitting ? 'Memproses...' : 'Masuk'}
+              {!submitting && <span aria-hidden="true">→</span>}
+            </button>
+          </form>
 
-function AppSidebar({ role, navLinks }) {
-  const isAdmin = role === 'admin';
-  return (
-    <aside className={`app-sidebar ${isAdmin ? 'admin-sidebar' : 'worker-sidebar'}`}>
-      <span className="sidebar-section-label">Menu Utama</span>
-      <nav className="sidebar-nav" aria-label="Navigasi halaman">
-        {navLinks.map((link) => (
-          <SideNavLink key={link.to} to={link.to}>
-            {link.label}
-          </SideNavLink>
-        ))}
-      </nav>
-    </aside>
-  );
-}
+          <p className="login-footnote">Akses diberikan sesuai peran akun Anda.</p>
 
-function AppTopbar({ role, nama, currentUserId, users, onSelectRole }) {
-  const navigate = useNavigate();
-  const isAdmin = role === 'admin';
-  const pekerjaUsers = users.filter((user) => user.role === 'pekerja');
-  const switchRole = (nextRole, userId) => {
-    onSelectRole(nextRole, userId);
-    navigate(nextRole === 'admin' ? '/admin' : '/pekerja');
-  };
-
-  return (
-    <header className={`admin-topbar app-topbar ${isAdmin ? 'admin-app-topbar' : 'worker-app-topbar'}`}>
-      <div className="admin-topbar-title">
-        <span className="sidebar-brand-mark">PK</span>
-        <div>
-          <strong>Sistem Pencatatan Kerja</strong>
-          <span>{isAdmin ? 'Panel Administrasi' : 'Area Pekerja'}</span>
+          <div className="auth-switch">
+            Belum punya akun? <Link to="/register">Daftar sebagai Karyawan</Link>
+          </div>
         </div>
-      </div>
+      </section>
+    </main>
+  )
+}
 
-      <div className="admin-topbar-actions">
-        <div className="role-switch" aria-label="Pindah peran">
-          <button
-            type="button"
-            className={isAdmin ? 'role-switch-button active' : 'role-switch-button'}
-            aria-pressed={isAdmin}
-            onClick={() => switchRole('admin')}
-          >
-            Admin
-          </button>
-          <button
-            type="button"
-            className={!isAdmin ? 'role-switch-button active' : 'role-switch-button'}
-            aria-pressed={!isAdmin}
-            onClick={() => switchRole('pekerja', isAdmin ? undefined : currentUserId)}
-          >
-            Pekerja
-          </button>
+function RegisterPage() {
+  const { user, signUp } = useAuth()
+  const navigate = useNavigate()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [jabatan, setJabatan] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  if (user) return <Navigate to={roleHome(user.role)} replace />
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
+
+    if (password.length < 6) {
+      setError('Password minimal harus 6 karakter.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Konfirmasi password tidak cocok dengan password.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const newUser = await signUp({
+        name: name.trim(),
+        email: email.trim(),
+        jabatan: jabatan.trim(),
+        password,
+      })
+      navigate(roleHome(newUser.role), { replace: true })
+    } catch (regError) {
+      setError(regError.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-brand">
+        <div className="brand-mark" aria-hidden="true">PK</div>
+        <p className="eyebrow">PENDAFTARAN KARYAWAN</p>
+        <h1>Mulai catat kerja,<br />lebih terarah.</h1>
+        <p className="brand-description">
+          Daftarkan akun karyawan Anda untuk mulai mencatat absensi, jam kerja proyek, dan pengeluaran operasional.
+        </p>
+        <div className="brand-decoration" aria-hidden="true">
+          <span /><span /><span />
         </div>
-        {!isAdmin && (
-          <label className="topbar-worker-select-label">
-            <span className="sr-only">Pilih pekerja</span>
-            <select
-              className="topbar-worker-select"
-              value={currentUserId}
-              onChange={(event) => switchRole('pekerja', Number(event.target.value))}
+      </section>
+
+      <section className="login-panel">
+        <div className="login-form-wrap">
+          <p className="eyebrow">GABUNG SEKARANG</p>
+          <h2>Daftar Akun Karyawan</h2>
+          <p className="muted">Isi data diri Anda untuk membuat akun baru.</p>
+
+          <form className="login-form" onSubmit={handleSubmit}>
+            {error && <div className="notice notice-error" role="alert">{error}</div>}
+            
+            <label htmlFor="reg-name">Nama Lengkap</label>
+            <input
+              id="reg-name"
+              name="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Contoh: Budi Santoso"
+              required
+            />
+
+            <label htmlFor="reg-email">Email</label>
+            <input
+              id="reg-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Contoh: budi@absensi.com"
+              required
+            />
+
+            <label htmlFor="reg-jabatan">Jabatan / Posisi</label>
+            <input
+              id="reg-jabatan"
+              name="jabatan"
+              type="text"
+              value={jabatan}
+              onChange={(e) => setJabatan(e.target.value)}
+              placeholder="Contoh: Teknisi Jaringan / Staff Lapangan"
+              required
+            />
+
+            <label htmlFor="reg-password">Password (min. 6 karakter)</label>
+            <input
+              id="reg-password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Masukkan password baru"
+              required
+            />
+
+            <label htmlFor="reg-confirm-password">Konfirmasi Password</label>
+            <input
+              id="reg-confirm-password"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Ulangi password"
+              required
+            />
+
+            <button className="button button-primary login-submit" type="submit" disabled={submitting}>
+              {submitting ? 'Mendaftarkan...' : 'Daftar Karyawan'}
+              {!submitting && <span aria-hidden="true">→</span>}
+            </button>
+          </form>
+
+          <div className="auth-switch">
+            Sudah punya akun? <Link to="/login">Masuk ke akun</Link>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function AppLayout() {
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+  const [logoutError, setLogoutError] = useState('')
+  const [loggingOut, setLoggingOut] = useState(false)
+  const links = [
+    { to: '/dashboard', label: 'Ringkasan', icon: '⌂' },
+    ...(user.role === 'admin'
+      ? [
+          { to: '/admin', label: 'Manajemen pengguna', icon: '👥' },
+          { to: '/admin/pengeluaran', label: 'Pengeluaran & Kwitansi', icon: '🧾' },
+          { to: '/admin/lokasi', label: 'Lokasi Kerja', icon: '📍' },
+        ]
+      : [
+          { to: '/karyawan/pengeluaran', label: 'Pengeluaran Saya', icon: '🧾' },
+          { to: '/karyawan/absensi', label: 'Presensi & Jam Kerja', icon: '⏱️' },
+          { to: '/karyawan', label: 'Pencatatan kerja', icon: '▤' },
+        ]),
+  ]
+
+  async function handleLogout() {
+    setLogoutError('')
+    setLoggingOut(true)
+    try {
+      await signOut()
+      navigate('/login', { replace: true })
+    } catch (error) {
+      setLogoutError(error.message)
+    } finally {
+      setLoggingOut(false)
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <Link className="sidebar-brand" to="/dashboard">
+          <span className="brand-mark brand-mark-small">PK</span>
+          <span><strong>RuangKerja</strong><small>Pencatatan kerja</small></span>
+        </Link>
+
+        <p className="nav-heading">MENU UTAMA</p>
+        <nav className="side-nav" aria-label="Navigasi utama">
+          {links.map((link) => (
+            <NavLink
+              className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+              key={link.to}
+              to={link.to}
             >
-              {pekerjaUsers.map((user) => (
-                <option key={user.id_user} value={user.id_user}>{user.nama}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        {isAdmin && <span className="admin-today">{todayLabel}</span>}
-        <span className="admin-user">
-          <span className="admin-avatar">{nama?.charAt(0)?.toUpperCase() ?? (isAdmin ? 'A' : 'P')}</span>
-          <span>
-            <strong>{nama}</strong>
-            <small>{isAdmin ? 'Administrator' : 'Pekerja'}</small>
-          </span>
-        </span>
+              <span className="nav-icon" aria-hidden="true">{link.icon}</span>
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div className="user-chip">
+            <span className="avatar">{(user.name || 'P').slice(0, 1).toUpperCase()}</span>
+            <span className="user-meta">
+              <strong>{user.name}</strong>
+              <small>{user.role === 'admin' ? 'Administrator' : 'Karyawan'}</small>
+            </span>
+          </div>
+          <button className="logout-button" type="button" onClick={handleLogout} disabled={loggingOut}>
+            <span aria-hidden="true">↪</span>
+            {loggingOut ? 'Keluar...' : 'Keluar'}
+          </button>
+          {logoutError && <p className="logout-error" role="alert">{logoutError}</p>}
+        </div>
+      </aside>
+
+      <div className="workspace">
+        <header className="topbar">
+          <span>Portal internal</span>
+          <span className="topbar-role">{user.role === 'admin' ? 'Administrator' : 'Karyawan'}</span>
+        </header>
+        <div className="page-content"><Outlet /></div>
       </div>
-    </header>
-  );
+    </div>
+  )
 }
 
-function SideNavLink({ to, children }) {
+function DashboardPage() {
+  const { user } = useAuth()
+  const title = user.role === 'admin' ? 'Ruang kendali administrator' : 'Ruang kerja Anda'
+  const destination = roleHome(user.role)
+  const actionLabel = user.role === 'admin' ? 'Buka manajemen pengguna' : 'Buka pencatatan kerja'
+
   return (
-    <NavLink
-      to={to}
-      end={to === '/admin' || to === '/pekerja'}
-      className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-    >
-      {children}
-    </NavLink>
-  );
+    <section>
+      <p className="eyebrow">RINGKASAN</p>
+      <h1 className="page-title">{title}</h1>
+      <p className="page-intro">Halo, {user.name}. Anda masuk sebagai {user.role === 'admin' ? 'Administrator' : 'Karyawan'}.</p>
+
+      <div className="welcome-card">
+        <div className="welcome-copy">
+          <span className="welcome-tag">AKUN AKTIF</span>
+          <h2>Selamat datang, {user.name}</h2>
+          <p>
+            {user.role === 'admin'
+              ? 'Anda dapat mengakses fitur administrasi, mengelola akses pengguna, dan memverifikasi nota pengeluaran operasional.'
+              : 'Anda dapat mencatat absensi jam kerja harian dan mengelola reimbursement nota belanja pengeluaran proyek.'}
+          </p>
+          <Link className="button button-primary" to={destination}>{actionLabel}<span aria-hidden="true">→</span></Link>
+        </div>
+        <div className="welcome-art" aria-hidden="true">
+          <div className="art-sheet"><span /><span /><span /><i>✓</i></div>
+          <div className="art-sparkle">✦</div>
+        </div>
+      </div>
+
+      <div className="info-card">
+        <span className="info-icon" aria-hidden="true">i</span>
+        <div>
+          <h3>Akses berdasarkan peran</h3>
+          <p>Menu yang tersedia menyesuaikan peran akun. Hubungi administrator jika akses Anda perlu diperbarui.</p>
+        </div>
+      </div>
+    </section>
+  )
 }
 
-export default function App() {
+function KaryawanPage() {
+  const { user } = useAuth()
   return (
-    <BrowserRouter>
-      <AuthProvider>
+    <section>
+      <p className="eyebrow">RUANG KARYAWAN</p>
+      <h1 className="page-title">Pencatatan kerja</h1>
+      <p className="page-intro">
+        Halo, <strong>{user.name}</strong> ({user.jabatan || 'Karyawan'}). Halaman ini disiapkan untuk ruang kerja pencatatan kerja.
+      </p>
+      <div className="empty-state">
+        <span className="empty-icon" aria-hidden="true">▤</span>
+        <h2>Siap untuk pencatatan kerja</h2>
+        <p>Gunakan menu sidebar untuk mengakses <strong>Pengeluaran Saya</strong> (klaim nota) dan <strong>Presensi & Jam Kerja</strong>.</p>
+      </div>
+    </section>
+  )
+}
+
+function AdminPage() {
+  const { user } = useAuth()
+  const [usersList, setUsersList] = useState(() => {
+    try {
+      const reg = JSON.parse(localStorage.getItem('ruangkerja_registered_users')) || []
+      const defaultUsers = [
+        { id: 1, email: 'admin@gmail.com', name: 'Administrator', role: 'admin', jabatan: 'System Admin', aktif: 1 },
+        { id: 2, email: 'admin@jamkerja.com', name: 'Super Admin', role: 'admin', jabatan: 'Project Manager', aktif: 1 },
+        { id: 3, email: 'budi@jamkerja.com', name: 'Budi Santoso', role: 'karyawan', jabatan: 'Teknisi Jaringan Senior', aktif: 1 },
+        { id: 4, email: 'siti@jamkerja.com', name: 'Siti Rahma', role: 'karyawan', jabatan: 'Sistem Analis', aktif: 1 },
+        { id: 5, email: 'karyawan@gmail.com', name: 'Karyawan Demo', role: 'karyawan', jabatan: 'Staff Lapangan', aktif: 1 },
+      ]
+      const merged = [...defaultUsers]
+      reg.forEach((r) => {
+        if (!merged.some((m) => m.email.toLowerCase() === r.email.toLowerCase())) {
+          merged.push({
+            id: r.id || Date.now(),
+            email: r.email,
+            name: r.name || r.nama || r.email.split('@')[0],
+            role: r.role || 'karyawan',
+            jabatan: r.jabatan || 'Karyawan',
+            aktif: 1,
+          })
+        }
+      })
+      return merged
+    } catch {
+      return []
+    }
+  })
+
+  function toggleAktif(id) {
+    const updated = usersList.map((u) => (u.id === id ? { ...u, aktif: u.aktif ? 0 : 1 } : u))
+    setUsersList(updated)
+  }
+
+  const adminCount = usersList.filter((u) => u.role === 'admin').length
+  const karyawanCount = usersList.filter((u) => u.role === 'karyawan').length
+  const totalCount = usersList.length
+
+  return (
+    <section>
+      <p className="eyebrow">ADMINISTRASI SISTEM</p>
+      <h1 className="page-title">Manajemen Pengguna</h1>
+      <p className="page-intro">
+        Kelola akun pengguna, peran akun, dan kontrol izin akses aktif/nonaktif.
+      </p>
+
+      {/* Ringkasan Statistik Pengguna */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <span className="stat-label">Total Akun Terdaftar</span>
+          <div className="stat-value">{totalCount}</div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Administrator</span>
+          <div className="stat-value" style={{ color: '#2a6cb8' }}>{adminCount}</div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Karyawan Terdaftar</span>
+          <div className="stat-value" style={{ color: '#1e7a46' }}>{karyawanCount}</div>
+        </div>
+      </div>
+
+      {/* Tabel Pengguna */}
+      <div className="data-card">
+        <div className="data-header">
+          <h3>Daftar Pengguna Sistem</h3>
+          <span className="badge badge-info">{totalCount} Pengguna</span>
+        </div>
+
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Nama Lengkap</th>
+                <th>Email</th>
+                <th>Jabatan / Posisi</th>
+                <th>Peran Akun</th>
+                <th>Status Akun</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usersList.map((u) => (
+                <tr key={u.id}>
+                  <td><strong>{u.name}</strong></td>
+                  <td>{u.email}</td>
+                  <td>{u.jabatan || '-'}</td>
+                  <td>
+                    <span className={`badge ${u.role === 'admin' ? 'badge-info' : 'badge-warning'}`}>
+                      {u.role === 'admin' ? '👑 Administrator' : '👤 Karyawan'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`badge ${u.aktif ? 'badge-success' : 'badge-danger'}`}>
+                      {u.aktif ? '● Aktif' : '○ Nonaktif'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className={`button button-sm ${u.aktif ? 'button-secondary' : 'button-primary'}`}
+                      style={{ padding: '4px 10px', fontSize: '11px', minHeight: '28px' }}
+                      type="button"
+                      onClick={() => toggleAktif(u.id)}
+                    >
+                      {u.aktif ? 'Nonaktifkan' : 'Aktifkan'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function AppRoutes() {
+  const { user } = useAuth()
+  const mappedUser = user
+    ? {
+        ...user,
+        id_karyawan: user.employeeId || user.id || 1,
+        id_user: user.id || 1,
+        nama: user.name || 'Pengguna',
+        peran: user.role,
+      }
+    : null
+
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Navigate to={user ? roleHome(user.role) : '/dashboard'} replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route element={<ProtectedRoute roles={['admin']} />}>
+            <Route path="/admin" element={<AdminPage />} />
+            <Route
+              path="/admin/pengeluaran"
+              element={
+                <div className="p-2 sm:p-4">
+                  <PengeluaranAdminPage currentUser={mappedUser} />
+                </div>
+              }
+            />
+            <Route path="/admin/lokasi" element={<LokasiKerjaPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['karyawan']} />}>
+            <Route path="/karyawan" element={<KaryawanPage />} />
+            <Route
+              path="/karyawan/pengeluaran"
+              element={
+                <div className="p-2 sm:p-4">
+                  <PengeluaranKaryawanPage currentUser={mappedUser} />
+                </div>
+              }
+            />
+            <Route path="/karyawan/absensi" element={<AbsensiPage />} />
+          </Route>
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+    </Routes>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <LegacyAuthProvider>
         <AbsensiProvider>
-          <AppShell />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
         </AbsensiProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  );
+      </LegacyAuthProvider>
+    </AuthProvider>
+  )
 }
+
+export default App
