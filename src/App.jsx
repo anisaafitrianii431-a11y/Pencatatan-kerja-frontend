@@ -648,6 +648,7 @@ function DashboardPekerjaPage({ mappedUser }) {
         else navigate(target)
       }}
       workerId={mappedUser?.id_karyawan}
+      workerName={mappedUser?.nama}
     />
   )
 }
@@ -726,7 +727,16 @@ function AppRoutes() {
   const mappedUser = user
     ? {
         ...user,
-        id_karyawan: user.employeeId || user.id || 1,
+        id_karyawan:
+          Number.isInteger(Number(user.employeeId)) &&
+          Number(user.employeeId) > 0 &&
+          Number(user.employeeId) < 100000
+            ? Number(user.employeeId)
+            : Number.isInteger(Number(user.id)) &&
+              Number(user.id) > 0 &&
+              Number(user.id) < 100000
+              ? Number(user.id)
+              : 1,
         id_user: user.id || 1,
         nama: user.name || 'Pengguna',
         peran: user.role,
@@ -768,7 +778,12 @@ function AppRoutes() {
             />
             <Route
               path="/karyawan/pekerjaan-saya"
-              element={<PekerjaanSaya workerId={mappedUser?.id_karyawan} />}
+              element={
+                <PekerjaanSaya
+                  workerId={mappedUser?.id_karyawan}
+                  workerName={mappedUser?.nama}
+                />
+              }
             />
             <Route
               path="/karyawan/riwayat-pengajuan"

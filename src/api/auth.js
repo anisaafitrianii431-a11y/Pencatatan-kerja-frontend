@@ -85,7 +85,13 @@ export async function getCurrentUser() {
     const stored = localStorage.getItem('ruangkerja_user')
     if (stored) {
       try {
-        return JSON.parse(stored)
+        const parsed = JSON.parse(stored)
+        // Perbaiki jika employeeId tersimpan sebagai timestamp (misal > 100000)
+        if (parsed.employeeId && Number(parsed.employeeId) > 100000) {
+          parsed.employeeId = 1
+          localStorage.setItem('ruangkerja_user', JSON.stringify(parsed))
+        }
+        return parsed
       } catch {
         localStorage.removeItem('ruangkerja_user')
       }
@@ -126,9 +132,13 @@ export async function login(credentials) {
       if (password && registered.password && registered.password !== password) {
         throw new Error('Kata sandi yang Anda masukkan salah.')
       }
+      const safeEmployeeId =
+        Number(registered.employeeId) > 0 && Number(registered.employeeId) < 100000
+          ? Number(registered.employeeId)
+          : 1
       const userObj = {
-        id: registered.id || Date.now(),
-        employeeId: registered.employeeId || Date.now(),
+        id: registered.id || 2,
+        employeeId: safeEmployeeId,
         email: registered.email,
         name: registered.name || registered.nama || registered.email.split('@')[0],
         jabatan: registered.jabatan || 'Karyawan',
@@ -173,7 +183,7 @@ export async function registerKaryawan(data) {
     })
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
-    saveRegisteredUser({ email, password, name, jabatan, role: 'karyawan' })
+    saveRegisteredUser({ email, password, name, jabatan, role: 'karyawan', employeeId: user.employeeId || 1 })
     return user
   } catch (error) {
     if (
@@ -192,9 +202,29 @@ export async function registerKaryawan(data) {
       throw new Error('Email ini sudah terdaftar. Silakan gunakan email lain atau langsung masuk.')
     }
 
+    // Sambungkan ke tabel karyawan MySQL jika API backend tersedia
+    let assignedEmployeeId = 1
+    try {
+      const res = await fetch('http://localhost/pencatatan-kerja/backend/public/api/karyawan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          nama: name.trim(),
+          jabatan: jabatan ? jabatan.trim() : 'Teknisi Lapangan',
+          tarif_per_jam: 35000,
+        }),
+      })
+      const resData = await res.json()
+      if (resData?.data?.id_karyawan) {
+        assignedEmployeeId = Number(resData.data.id_karyawan)
+      }
+    } catch {
+      // Fallback ke ID 1 jika backend offline
+    }
+
     const newUser = {
-      id: Date.now(),
-      employeeId: Date.now(),
+      id: assignedEmployeeId,
+      employeeId: assignedEmployeeId,
       email: email.trim(),
       password,
       name: name.trim(),

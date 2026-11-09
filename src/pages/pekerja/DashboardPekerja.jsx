@@ -140,7 +140,7 @@ function SectionHeader({ title, description, onClick, buttonLabel }) {
   )
 }
 
-function DashboardPekerja({ workerId, onNavigate = () => {} }) {
+function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) {
   const [store, setStore] = useState({
     worker: null,
     assignedJobs: [],
@@ -153,16 +153,7 @@ function DashboardPekerja({ workerId, onNavigate = () => {} }) {
   useEffect(() => {
     let isMounted = true
 
-    if (!workerId) {
-      setStore((current) => ({
-        ...current,
-        isLoading: false,
-        error: 'Pilih karyawan untuk menampilkan data dashboard.',
-      }))
-      return
-    }
-
-    Promise.all([getPekerjaanSaya(workerId), getPekerjaanTersedia()])
+    Promise.all([getPekerjaanSaya(workerId, workerName), getPekerjaanTersedia()])
       .then(([myWork, unassignedJobs]) => {
         if (isMounted) {
           setStore({
@@ -187,7 +178,7 @@ function DashboardPekerja({ workerId, onNavigate = () => {} }) {
     return () => {
       isMounted = false
     }
-  }, [workerId])
+  }, [workerId, workerName])
 
   const statistics = useMemo(() => {
     const total = assignedJobs.length

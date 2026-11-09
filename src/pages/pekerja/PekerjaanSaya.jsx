@@ -318,7 +318,7 @@ function WorkCard({ job, assignment, onOpen }) {
   )
 }
 
-function PekerjaanSaya({ workerId }) {
+function PekerjaanSaya({ workerId, workerName = '' }) {
   const [store, setStore] = useState({
     worker: null,
     assignedJobs: [],
@@ -335,7 +335,7 @@ function PekerjaanSaya({ workerId }) {
   useEffect(() => {
     let isMounted = true
     const loadAssignments = () => {
-      getPekerjaanSaya(workerId)
+      getPekerjaanSaya(workerId, workerName)
         .then((data) => {
           if (isMounted) {
             setStore({ ...data, isLoading: false, error: '' })
@@ -361,7 +361,7 @@ function PekerjaanSaya({ workerId }) {
       window.clearInterval(refreshTimer)
       window.removeEventListener('focus', loadAssignments)
     }
-  }, [workerId])
+  }, [workerId, workerName])
 
   const validJobs = useMemo(
     () => assignedJobs.filter(({ job }) => job),
