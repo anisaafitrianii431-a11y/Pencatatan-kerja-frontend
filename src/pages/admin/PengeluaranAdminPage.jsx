@@ -323,14 +323,14 @@ export default function PengeluaranAdminPage({ currentUser }) {
                             <div className="font-semibold text-slate-800">{p.nama_karyawan}</div>
                             <div className="text-[10px] text-slate-400">{p.tanggal}</div>
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-700 max-w-[180px] truncate" title={p.nama_pekerjaan}>
+                          <td className="py-3 px-4 font-medium text-slate-800 min-w-[160px] max-w-[240px] leading-snug">
                             {p.nama_pekerjaan}
                           </td>
-                          <td className="py-3 px-4 max-w-[200px]">
+                          <td className="py-3 px-4 min-w-[140px] max-w-[220px]">
                             <button
                               type="button"
                               onClick={() => setSelectedExpense(p)}
-                              className="text-left w-full truncate text-slate-800 font-medium hover:text-blue-600 transition"
+                              className="text-left w-full text-slate-800 font-medium hover:text-blue-600 transition leading-snug"
                               title={`${p.keterangan || '-'} (Klik untuk rincian lengkap)`}
                             >
                               {p.keterangan || <span className="text-slate-400 italic">Tanpa keterangan</span>}

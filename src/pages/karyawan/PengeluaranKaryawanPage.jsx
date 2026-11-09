@@ -356,13 +356,13 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
                       <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
                         {p.tanggal}
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-800 max-w-[160px] truncate" title={p.nama_pekerjaan}>
+                      <td className="py-3 px-3 font-semibold text-slate-800 min-w-[160px] max-w-[240px] leading-snug">
                         {p.nama_pekerjaan}
                       </td>
-                      <td className="py-3 px-3 max-w-[180px]">
-                        <div className="truncate text-slate-700 font-medium" title={p.keterangan}>
+                      <td className="py-3 px-3 min-w-[140px] max-w-[220px] leading-snug">
+                        <span className="text-slate-700 font-medium">
                           {p.keterangan}
-                        </div>
+                        </span>
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         {p.jenis_dana === 'pribadi' ? (
