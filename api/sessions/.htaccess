@@ -1,0 +1,4 @@
+# Lindungi file sesi PHP agar tidak dapat diakses langsung via browser
+Require all denied
+Deny from all
+

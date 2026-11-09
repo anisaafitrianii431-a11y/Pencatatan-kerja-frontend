@@ -1,0 +1,268 @@
+<?php
+// ==========================================================
+// BACKEND KHUSUS KARYAWAN: CATAT PENGELUARAN & UPLOAD KWITANSI
+// ==========================================================
+require_once __DIR__ . '/../config/database.php';
+
+// Otorisasi: Wajib Login
+$currentUser = requireLogin();
+$method = $_SERVER['REQUEST_METHOD'];
+$body = getRequestBody();
+$kId = intval($currentUser['id_karyawan'] ?? 0);
+
+if (!empty($_POST)) {
+    $body = array_merge($body, $_POST);
+}
+
+// Tangani upload file bukti faktur kwitansi + kompresi server otomatis
+$uploadedFilePath = null;
+if (isset($_FILES['foto_kwitansi']) && $_FILES['foto_kwitansi']['error'] === UPLOAD_ERR_OK) {
+    $file = $_FILES['foto_kwitansi'];
+    $maxSize = 15 * 1024 * 1024; // 15 MB
+
+    if ($file['size'] > $maxSize) {
+        jsonResponse(false, "Ukuran file bukti faktur melebihi batas maksimal 15 MB.", null, 400);
+    }
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    $allowedMimes = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/webp' => 'webp'
+    ];
+
+    if (!array_key_exists($mimeType, $allowedMimes)) {
+        jsonResponse(false, "Format file tidak valid ($mimeType). Hanya format JPG, PNG, atau WEBP yang diperbolehkan.", null, 400);
+    }
+
+    $uploadDir = __DIR__ . '/../uploads/';
+    if (!is_dir($uploadDir)) {
+        @mkdir($uploadDir, 0755, true);
+    }
+
+    $filename = 'kwitansi_' . bin2hex(random_bytes(16)) . '.jpg';
+    $targetPath = $uploadDir . $filename;
+
+    $saved = false;
+    if (extension_loaded('gd')) {
+        $image = null;
+        switch ($mimeType) {
+            case 'image/jpeg':
+                $image = @imagecreatefromjpeg($file['tmp_name']);
+                break;
+            case 'image/png':
+                $image = @imagecreatefrompng($file['tmp_name']);
+                break;
+            case 'image/webp':
+                $image = @imagecreatefromwebp($file['tmp_name']);
+                break;
+            default:
+                $image = @imagecreatefromstring(file_get_contents($file['tmp_name']));
+                break;
+        }
+
+        if ($image) {
+            $origWidth = imagesx($image);
+            $origHeight = imagesy($image);
+            $maxWidth = 1600;
+            $maxHeight = 1600;
+
+            $newWidth = $origWidth;
+            $newHeight = $origHeight;
+
+            if ($origWidth > $maxWidth || $origHeight > $maxHeight) {
+                if ($origWidth / $origHeight > $maxWidth / $maxHeight) {
+                    $newHeight = (int) round(($origHeight * $maxWidth) / $origWidth);
+                    $newWidth = $maxWidth;
+                } else {
+                    $newWidth = (int) round(($origWidth * $maxHeight) / $origHeight);
+                    $newHeight = $maxHeight;
+                }
+            }
+
+            $newImage = imagecreatetruecolor($newWidth, $newHeight);
+            $white = imagecolorallocate($newImage, 255, 255, 255);
+            imagefilledrectangle($newImage, 0, 0, $newWidth, $newHeight, $white);
+            imagecopyresampled($newImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+
+            $saved = imagejpeg($newImage, $targetPath, 80);
+
+            imagedestroy($image);
+            imagedestroy($newImage);
+            @unlink($file['tmp_name']);
+        }
+    }
+
+    if (!$saved) {
+        $saved = move_uploaded_file($file['tmp_name'], $targetPath);
+    }
+
+    if ($saved) {
+        $uploadedFilePath = 'uploads/' . $filename;
+        $body['foto_kwitansi'] = $uploadedFilePath;
+    } else {
+        jsonResponse(false, "Gagal mengunggah dan mengompresi file bukti faktur ke server.", null, 500);
+    }
+}
+
+if ($method === 'GET') {
+    // K-06: Pekerja hanya melihat pengeluaran pada proyek yang ditugaskan & dicatat dirinya
+    $id_pekerjaan = isset($_GET['id_pekerjaan']) ? intval($_GET['id_pekerjaan']) : 0;
+    $jenis_dana = $_GET['jenis_dana'] ?? '';
+
+    $where = ["pg.id_karyawan = ?"];
+    $params = [$kId];
+
+    if ($id_pekerjaan > 0) {
+        $where[] = "pg.id_pekerjaan = ?";
+        $params[] = $id_pekerjaan;
+    }
+    if (!empty($jenis_dana) && in_array($jenis_dana, ['pribadi', 'kantor'])) {
+        $where[] = "pg.jenis_dana = ?";
+        $params[] = $jenis_dana;
+    }
+
+    $whereClause = "WHERE " . implode(" AND ", $where);
+
+    $sql = "
+        SELECT pg.*,
+               k.nama AS nama_karyawan,
+               p.nama_pekerjaan
+        FROM pengeluaran pg
+        JOIN karyawan k ON pg.id_karyawan = k.id_karyawan
+        JOIN pekerjaan p ON pg.id_pekerjaan = p.id_pekerjaan
+        $whereClause
+        ORDER BY pg.tanggal DESC, pg.id_pengeluaran DESC
+    ";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $data = $stmt->fetchAll();
+
+    jsonResponse(true, "Daftar pengeluaran saya berhasil dimuat (Karyawan)", $data);
+
+} elseif ($method === 'POST') {
+    $action = $_GET['action'] ?? $body['action'] ?? '';
+    $id_pengeluaran = intval($_GET['id_pengeluaran'] ?? $body['id_pengeluaran'] ?? 0);
+
+    // ==========================================
+    // 1. UPDATE PENGELUARAN (EDIT)
+    // ==========================================
+    if ($action === 'update' || $id_pengeluaran > 0) {
+        $id_pekerjaan = intval($body['id_pekerjaan'] ?? 0);
+        $tanggal = !empty($body['tanggal']) ? $body['tanggal'] : date('Y-m-d');
+        $nominal = floatval($body['nominal'] ?? 0);
+        $jenis_dana = $body['jenis_dana'] ?? 'pribadi';
+        $keterangan = htmlspecialchars(trim($body['keterangan'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+        if ($id_pengeluaran <= 0 || $nominal <= 0 || $id_pekerjaan <= 0) {
+            jsonResponse(false, "Pekerjaan, Nominal, dan ID Pengeluaran wajib valid", null, 400);
+        }
+
+        // Cek data lama
+        $stmtCheck = $pdo->prepare("SELECT * FROM pengeluaran WHERE id_pengeluaran = ?");
+        $stmtCheck->execute([$id_pengeluaran]);
+        $existing = $stmtCheck->fetch();
+
+        if (!$existing) {
+            jsonResponse(false, "Data pengeluaran tidak ditemukan", null, 404);
+        }
+
+        if (intval($existing['id_karyawan']) !== $kId) {
+            jsonResponse(false, "Anda tidak memiliki izin mengedit pengeluaran milik pekerja lain.", null, 403);
+        }
+
+        if ($existing['status_verifikasi'] === 'disetujui' || $existing['status_ganti'] === 'sudah') {
+            jsonResponse(false, "Pengeluaran yang telah disetujui atau sudah diganti tidak dapat diubah lagi untuk mencegah risiko kecurangan.", null, 400);
+        }
+
+        // Jika ada foto baru gunakan foto baru, jika tidak gunakan foto lama
+        $foto_kwitansi = !empty($uploadedFilePath) ? $uploadedFilePath : $existing['foto_kwitansi'];
+
+        $stmt = $pdo->prepare("
+            UPDATE pengeluaran 
+            SET id_pekerjaan = ?, tanggal = ?, nominal = ?, jenis_dana = ?, keterangan = ?, foto_kwitansi = ?, status_verifikasi = 'menunggu'
+            WHERE id_pengeluaran = ? AND id_karyawan = ?
+        ");
+        $stmt->execute([$id_pekerjaan, $tanggal, $nominal, $jenis_dana, $keterangan, $foto_kwitansi, $id_pengeluaran, $kId]);
+
+        jsonResponse(true, "Catatan pengeluaran berhasil diperbarui dan diajukan ulang ke admin!", [
+            "id_pengeluaran" => $id_pengeluaran,
+            "foto_kwitansi" => $foto_kwitansi
+        ]);
+    }
+
+    // ==========================================
+    // 2. CREATE PENGELUARAN (BARU)
+    // ==========================================
+    $id_pekerjaan = intval($body['id_pekerjaan'] ?? 0);
+    $tanggal = !empty($body['tanggal']) ? $body['tanggal'] : date('Y-m-d');
+    $nominal = floatval($body['nominal'] ?? 0);
+    $jenis_dana = $body['jenis_dana'] ?? 'pribadi';
+    $keterangan = htmlspecialchars(trim($body['keterangan'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $foto_kwitansi = trim($body['foto_kwitansi'] ?? '');
+
+    if ($id_pekerjaan <= 0 || $nominal <= 0) {
+        jsonResponse(false, "Pekerjaan dan Nominal pengeluaran wajib valid", null, 400);
+    }
+
+    if (!in_array($jenis_dana, ['kantor', 'pribadi'])) {
+        jsonResponse(false, "Jenis dana harus 'kantor' atau 'pribadi'", null, 400);
+    }
+
+    // F-04: Cek status pekerjaan tidak boleh 'selesai'
+    $stmtJob = $pdo->prepare("SELECT status FROM pekerjaan WHERE id_pekerjaan = ?");
+    $stmtJob->execute([$id_pekerjaan]);
+    $job = $stmtJob->fetch();
+    if (!$job) {
+        jsonResponse(false, "Pekerjaan tidak ditemukan", null, 404);
+    }
+    if ($job['status'] === 'selesai') {
+        jsonResponse(false, "Pekerjaan ini sudah selesai. Tidak dapat menambah catatan pengeluaran.", null, 400);
+    }
+
+    // F-04: Validasi bahwa pekerja ditugaskan pada pekerjaan ini
+    $stmtPenugasan = $pdo->prepare("SELECT COUNT(*) FROM penugasan WHERE id_pekerjaan = ? AND id_karyawan = ?");
+    $stmtPenugasan->execute([$id_pekerjaan, $kId]);
+    if ($stmtPenugasan->fetchColumn() == 0) {
+        jsonResponse(false, "Anda tidak ditugaskan pada pekerjaan ini, sehingga tidak dapat mencatat pengeluaran.", null, 403);
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO pengeluaran (id_pekerjaan, id_karyawan, tanggal, nominal, jenis_dana, keterangan, foto_kwitansi, status_verifikasi, status_ganti)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'menunggu', 'belum')
+    ");
+    $stmt->execute([$id_pekerjaan, $kId, $tanggal, $nominal, $jenis_dana, $keterangan, $foto_kwitansi]);
+
+    jsonResponse(true, "Pengeluaran berhasil dicatat!", [
+        "id_pengeluaran" => $pdo->lastInsertId(),
+        "foto_kwitansi" => $foto_kwitansi
+    ], 201);
+
+} elseif ($method === 'DELETE') {
+    $id = intval($_GET['id_pengeluaran'] ?? $body['id_pengeluaran'] ?? 0);
+    $stmtCheck = $pdo->prepare("SELECT id_karyawan, status_verifikasi, status_ganti FROM pengeluaran WHERE id_pengeluaran = ?");
+    $stmtCheck->execute([$id]);
+    $item = $stmtCheck->fetch();
+
+    if (!$item) {
+        jsonResponse(false, "Data pengeluaran tidak ditemukan", null, 404);
+    }
+
+    if (intval($item['id_karyawan']) !== $kId) {
+        jsonResponse(false, "Anda tidak memiliki izin menghapus pengeluaran milik pekerja lain.", null, 403);
+    }
+
+    if ($item['status_verifikasi'] === 'disetujui' || $item['status_ganti'] === 'sudah') {
+        jsonResponse(false, "Pengeluaran yang telah disetujui atau sudah diganti tidak dapat dihapus oleh pekerja untuk mencegah risiko kecurangan.", null, 403);
+    }
+
+    $stmt = $pdo->prepare("DELETE FROM pengeluaran WHERE id_pengeluaran = ?");
+    $stmt->execute([$id]);
+    jsonResponse(true, "Catatan pengeluaran berhasil dihapus!");
+} else {
+    jsonResponse(false, "Metode HTTP tidak didukung", null, 405);
+}
+

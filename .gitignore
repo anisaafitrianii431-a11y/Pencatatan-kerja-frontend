@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend uploads and sessions
+api/sessions/sess_*
+api/uploads/*.jpg
+!api/sessions/.htaccess
+!api/uploads/.htaccess
+

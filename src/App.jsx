@@ -1,122 +1,89 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import Sidebar from './components/Sidebar';
+import LoginPage from './pages/auth/LoginPage';
+import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage';
+import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage';
+import { AuthService, checkBackendStatus, safeFetchJson } from './services/api';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => AuthService.getCurrentUser());
+  const [activeTab, setActiveTab] = useState('pengeluaran');
+  const [isBackendLive, setIsBackendLive] = useState(false);
+  const [loadingSession, setLoadingSession] = useState(true);
 
+  useEffect(() => {
+    // Sinkronkan status koneksi backend dan sesi login pengguna
+    checkBackendStatus().then(async (status) => {
+      setIsBackendLive(status);
+      if (status) {
+        try {
+          const { ok, data } = await safeFetchJson('/api/auth.php?action=me');
+          if (ok && data && data.success && data.data) {
+            setCurrentUser(data.data);
+            AuthService.setCurrentUser(data.data);
+          }
+        } catch (err) {
+          console.warn('Gagal memverifikasi sesi login:', err);
+        }
+      }
+      setLoadingSession(false);
+    });
+  }, []);
+
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    AuthService.setCurrentUser(user);
+    setActiveTab('pengeluaran');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AuthService.logout();
+    } catch (err) {
+      console.warn('Gagal logout backend:', err);
+    }
+    setCurrentUser(null);
+  };
+
+  // 1. Jika pengguna BELUM LOGIN, tampilkan Halaman Login Resmi
+  if (!currentUser) {
+    return (
+      <LoginPage 
+        onLoginSuccess={handleLoginSuccess} 
+        isBackendLive={isBackendLive} 
+      />
+    );
+  }
+
+  const isAdmin = currentUser.peran === 'admin';
+
+  // 2. Jika SUDAH LOGIN, tampilkan layout Main Fitur (Sidebar dengan menu Pengeluaran)
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-col lg:flex-row font-sans">
+      {/* Sidebar Navigasi Utama */}
+      <Sidebar 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        isBackendLive={isBackendLive}
+      />
 
-      <div className="ticks"></div>
+      {/* Area Konten Utama Halaman Pengeluaran */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+          {isAdmin ? (
+            <PengeluaranAdminPage currentUser={currentUser} />
+          ) : (
+            <PengeluaranKaryawanPage currentUser={currentUser} />
+          )}
+        </main>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        {/* Footer */}
+        <footer className="bg-white border-t border-slate-200 py-3.5 px-6 text-center text-xs text-slate-400">
+          © 2026 Sistem Pencatatan Pengeluaran Proyek & Reimbursement — CV Putra Anugrah Mandiri
+        </footer>
+      </div>
+    </div>
+  );
 }
-
-export default App
