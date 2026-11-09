@@ -4,6 +4,17 @@ import { AuthProvider } from './auth/AuthContext.jsx'
 import { useAuth } from './auth/useAuth.js'
 import { AuthProvider as LegacyAuthProvider } from './contexts/AuthContext.jsx'
 import { AbsensiProvider } from './hooks/useAbsensi.jsx'
+import DashboardHome from './components/DashboardHome.jsx'
+import DetailJamAdminPage from './pages/admin-gaji/DetailJamAdminPage.jsx'
+import GajiAdminPage from './pages/admin-gaji/GajiAdminPage.jsx'
+import JamKerjaAdminPage from './pages/admin-gaji/JamKerjaAdminPage.jsx'
+import KontribusiAdminPage from './pages/admin-gaji/KontribusiAdminPage.jsx'
+import VerifikasiAdminPage from './pages/admin-gaji/VerifikasiAdminPage.jsx'
+import VerifikasiAbsensiAdminPage from './pages/admin-gaji/VerifikasiAbsensiAdminPage.jsx'
+import VerifikasiPengeluaranAdminPage from './pages/admin-gaji/VerifikasiPengeluaranAdminPage.jsx'
+import GajiKaryawanPage from './pages/karyawan-gaji/GajiKaryawanPage.jsx'
+import PresensiKaryawanGajiPage from './pages/karyawan-gaji/PresensiKaryawanPage.jsx'
+import ProyekKaryawanPage from './pages/karyawan-gaji/ProyekKaryawanPage.jsx'
 
 // Fitur Pengeluaran & Kwitansi
 import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage'
@@ -16,8 +27,16 @@ import AbsensiPage from './pages/pekerja_absen/AbsensiPage'
 import './index.css'
 import './App.css'
 
-function roleHome(role) {
-  return role === 'admin' ? '/admin' : '/karyawan'
+function roleHome() {
+  return '/dashboard'
+}
+
+function roleLabel(role) {
+  return role === 'admin' ? 'Admin' : 'Pekerja'
+}
+
+function isWorkerRole(role) {
+  return role === 'karyawan' || role === 'pekerja'
 }
 
 function LoadingScreen({ message = 'Memuat aplikasi...' }) {
@@ -128,7 +147,7 @@ function LoginPage() {
           <p className="login-footnote">Akses diberikan sesuai peran akun Anda.</p>
 
           <div className="auth-switch">
-            Belum punya akun? <Link to="/register">Daftar sebagai Karyawan</Link>
+            Belum punya akun? <Link to="/register">Daftar sebagai Pekerja</Link>
           </div>
         </div>
       </section>
@@ -185,7 +204,7 @@ function RegisterPage() {
         <p className="eyebrow">PENDAFTARAN KARYAWAN</p>
         <h1>Mulai catat kerja,<br />lebih terarah.</h1>
         <p className="brand-description">
-          Daftarkan akun karyawan Anda untuk mulai mencatat absensi, jam kerja proyek, dan pengeluaran operasional.
+          Daftarkan akun pekerja Anda untuk mulai mencatat absensi, jam kerja proyek, dan pengeluaran operasional.
         </p>
         <div className="brand-decoration" aria-hidden="true">
           <span /><span /><span />
@@ -195,7 +214,7 @@ function RegisterPage() {
       <section className="login-panel">
         <div className="login-form-wrap">
           <p className="eyebrow">GABUNG SEKARANG</p>
-          <h2>Daftar Akun Karyawan</h2>
+          <h2>Daftar Akun Pekerja</h2>
           <p className="muted">Isi data diri Anda untuk membuat akun baru.</p>
 
           <form className="login-form" onSubmit={handleSubmit}>
@@ -260,7 +279,7 @@ function RegisterPage() {
             />
 
             <button className="button button-primary login-submit" type="submit" disabled={submitting}>
-              {submitting ? 'Mendaftarkan...' : 'Daftar Karyawan'}
+              {submitting ? 'Mendaftarkan...' : 'Daftar Pekerja'}
               {!submitting && <span aria-hidden="true">→</span>}
             </button>
           </form>
@@ -279,17 +298,25 @@ function AppLayout() {
   const navigate = useNavigate()
   const [logoutError, setLogoutError] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
+  const [switchingAccount, setSwitchingAccount] = useState(false)
   const links = [
-    { to: '/dashboard', label: 'Ringkasan', icon: '⌂' },
+    { to: '/dashboard', label: 'Dashboard', icon: '▦' },
     ...(user.role === 'admin'
       ? [
-          { to: '/admin', label: 'Manajemen pengguna', icon: '👥' },
+          { to: '/admin/approval-absensi', label: 'Approval Presensi', icon: '◷' },
+          { to: '/admin/approval-pengeluaran', label: 'Approval Reimburse & Nota', icon: '▧' },
+          { to: '/admin/gaji', label: 'Penggajian Karyawan', icon: '▱' },
+          { to: '/admin/kontribusi', label: 'Kontribusi Proyek', icon: '▱' },
+          { to: '/admin/jam-kerja', label: 'Rekap Jam Kerja Tim', icon: '♧' },
+          { to: '/admin', label: 'Manajemen Pengguna', icon: '👥' },
           { to: '/admin/pengeluaran', label: 'Pengeluaran & Kwitansi', icon: '🧾' },
           { to: '/admin/lokasi', label: 'Lokasi Kerja', icon: '📍' },
         ]
       : [
+          { to: '/karyawan/presensi', label: 'Presensi & Jam Kerja', icon: '◷' },
+          { to: '/karyawan/gaji', label: 'Slip Gaji Pribadi', icon: '▱' },
+          { to: '/karyawan/proyek', label: 'Progres Proyek', icon: '▱' },
           { to: '/karyawan/pengeluaran', label: 'Pengeluaran Saya', icon: '🧾' },
-          { to: '/karyawan/absensi', label: 'Presensi & Jam Kerja', icon: '⏱️' },
           { to: '/karyawan', label: 'Pencatatan kerja', icon: '▤' },
         ]),
   ]
@@ -304,6 +331,19 @@ function AppLayout() {
       setLogoutError(error.message)
     } finally {
       setLoggingOut(false)
+    }
+  }
+
+  async function handleSwitchAccount() {
+    setLogoutError('')
+    setSwitchingAccount(true)
+    try {
+      await signOut()
+      navigate('/login', { replace: true })
+    } catch (error) {
+      setLogoutError(error.message)
+    } finally {
+      setSwitchingAccount(false)
     }
   }
 
@@ -334,7 +374,7 @@ function AppLayout() {
             <span className="avatar">{(user.name || 'P').slice(0, 1).toUpperCase()}</span>
             <span className="user-meta">
               <strong>{user.name}</strong>
-              <small>{user.role === 'admin' ? 'Administrator' : 'Karyawan'}</small>
+              <small>{roleLabel(user.role)}</small>
             </span>
           </div>
           <button className="logout-button" type="button" onClick={handleLogout} disabled={loggingOut}>
@@ -348,7 +388,17 @@ function AppLayout() {
       <div className="workspace">
         <header className="topbar">
           <span>Portal internal</span>
-          <span className="topbar-role">{user.role === 'admin' ? 'Administrator' : 'Karyawan'}</span>
+          <div className="topbar-actions">
+            <span className="topbar-role">{roleLabel(user.role)}</span>
+            <button
+              className="account-switch-button"
+              type="button"
+              onClick={handleSwitchAccount}
+              disabled={switchingAccount}
+            >
+              {switchingAccount ? 'Memproses...' : 'Ganti akun'}
+            </button>
+          </div>
         </header>
         <div className="page-content"><Outlet /></div>
       </div>
@@ -358,52 +408,27 @@ function AppLayout() {
 
 function DashboardPage() {
   const { user } = useAuth()
-  const title = user.role === 'admin' ? 'Ruang kendali administrator' : 'Ruang kerja Anda'
-  const destination = roleHome(user.role)
-  const actionLabel = user.role === 'admin' ? 'Buka manajemen pengguna' : 'Buka pencatatan kerja'
+  const navigate = useNavigate()
+  const currentUser = {
+    ...user,
+    id_karyawan: user.employeeId || user.id || 1,
+    id_user: user.id || 1,
+    nama: user.name || 'Pengguna',
+    peran: user.role,
+    tarif_per_jam: user.tarif_per_jam || 50000,
+  }
 
-  return (
-    <section>
-      <p className="eyebrow">RINGKASAN</p>
-      <h1 className="page-title">{title}</h1>
-      <p className="page-intro">Halo, {user.name}. Anda masuk sebagai {user.role === 'admin' ? 'Administrator' : 'Karyawan'}.</p>
-
-      <div className="welcome-card">
-        <div className="welcome-copy">
-          <span className="welcome-tag">AKUN AKTIF</span>
-          <h2>Selamat datang, {user.name}</h2>
-          <p>
-            {user.role === 'admin'
-              ? 'Anda dapat mengakses fitur administrasi, mengelola akses pengguna, dan memverifikasi nota pengeluaran operasional.'
-              : 'Anda dapat mencatat absensi jam kerja harian dan mengelola reimbursement nota belanja pengeluaran proyek.'}
-          </p>
-          <Link className="button button-primary" to={destination}>{actionLabel}<span aria-hidden="true">→</span></Link>
-        </div>
-        <div className="welcome-art" aria-hidden="true">
-          <div className="art-sheet"><span /><span /><span /><i>✓</i></div>
-          <div className="art-sparkle">✦</div>
-        </div>
-      </div>
-
-      <div className="info-card">
-        <span className="info-icon" aria-hidden="true">i</span>
-        <div>
-          <h3>Akses berdasarkan peran</h3>
-          <p>Menu yang tersedia menyesuaikan peran akun. Hubungi administrator jika akses Anda perlu diperbarui.</p>
-        </div>
-      </div>
-    </section>
-  )
+  return <DashboardHome currentUser={currentUser} onNavigate={(path) => navigate(`/${path}`)} />
 }
 
 function KaryawanPage() {
   const { user } = useAuth()
   return (
     <section>
-      <p className="eyebrow">RUANG KARYAWAN</p>
+      <p className="eyebrow">RUANG PEKERJA</p>
       <h1 className="page-title">Pencatatan kerja</h1>
       <p className="page-intro">
-        Halo, <strong>{user.name}</strong> ({user.jabatan || 'Karyawan'}). Halaman ini disiapkan untuk ruang kerja pencatatan kerja.
+        Halo, <strong>{user.name}</strong> ({user.jabatan || 'Pekerja'}). Halaman ini disiapkan untuk ruang kerja pencatatan kerja.
       </p>
       <div className="empty-state">
         <span className="empty-icon" aria-hidden="true">▤</span>
@@ -451,7 +476,7 @@ function AdminPage() {
   }
 
   const adminCount = usersList.filter((u) => u.role === 'admin').length
-  const karyawanCount = usersList.filter((u) => u.role === 'karyawan').length
+  const karyawanCount = usersList.filter((u) => isWorkerRole(u.role)).length
   const totalCount = usersList.length
 
   return (
@@ -469,11 +494,11 @@ function AdminPage() {
           <div className="stat-value">{totalCount}</div>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Administrator</span>
+          <span className="stat-label">Admin Terdaftar</span>
           <div className="stat-value" style={{ color: '#2a6cb8' }}>{adminCount}</div>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Karyawan Terdaftar</span>
+          <span className="stat-label">Pekerja Terdaftar</span>
           <div className="stat-value" style={{ color: '#1e7a46' }}>{karyawanCount}</div>
         </div>
       </div>
@@ -505,7 +530,7 @@ function AdminPage() {
                   <td>{u.jabatan || '-'}</td>
                   <td>
                     <span className={`badge ${u.role === 'admin' ? 'badge-info' : 'badge-warning'}`}>
-                      {u.role === 'admin' ? '👑 Administrator' : '👤 Karyawan'}
+                      {u.role === 'admin' ? '👑 Admin' : '👤 Pekerja'}
                     </span>
                   </td>
                   <td>
@@ -535,6 +560,7 @@ function AdminPage() {
 
 function AppRoutes() {
   const { user } = useAuth()
+  const location = useLocation()
   const mappedUser = user
     ? {
         ...user,
@@ -556,6 +582,30 @@ function AppRoutes() {
           <Route element={<ProtectedRoute roles={['admin']} />}>
             <Route path="/admin" element={<AdminPage />} />
             <Route
+              path="/admin/approval-absensi"
+              element={<VerifikasiAbsensiAdminPage currentUser={mappedUser} />}
+            />
+            <Route
+              path="/admin/verifikasi"
+              element={<VerifikasiAdminPage currentUser={mappedUser} />}
+            />
+            <Route
+              path="/admin/approval-pengeluaran"
+              element={<VerifikasiPengeluaranAdminPage currentUser={mappedUser} />}
+            />
+            <Route path="/admin/gaji" element={<GajiAdminPage currentUser={mappedUser} />} />
+            <Route path="/admin/kontribusi" element={<KontribusiAdminPage currentUser={mappedUser} />} />
+            <Route path="/admin/jam-kerja" element={<JamKerjaAdminPage currentUser={mappedUser} />} />
+            <Route
+              path="/admin/detail-jam"
+              element={
+                <DetailJamAdminPage
+                  currentUser={mappedUser}
+                  query={Object.fromEntries(new URLSearchParams(location.search))}
+                />
+              }
+            />
+            <Route
               path="/admin/pengeluaran"
               element={<PengeluaranAdminPage currentUser={mappedUser} />}
             />
@@ -563,6 +613,9 @@ function AppRoutes() {
           </Route>
           <Route element={<ProtectedRoute roles={['karyawan']} />}>
             <Route path="/karyawan" element={<KaryawanPage />} />
+            <Route path="/karyawan/presensi" element={<PresensiKaryawanGajiPage currentUser={mappedUser} />} />
+            <Route path="/karyawan/gaji" element={<GajiKaryawanPage currentUser={mappedUser} />} />
+            <Route path="/karyawan/proyek" element={<ProyekKaryawanPage currentUser={mappedUser} />} />
             <Route
               path="/karyawan/pengeluaran"
               element={<PengeluaranKaryawanPage currentUser={mappedUser} />}

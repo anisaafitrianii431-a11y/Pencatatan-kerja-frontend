@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
 
 # Editor directories and files
 .vscode/*
@@ -28,4 +29,3 @@ api/sessions/sess_*
 api/uploads/*.jpg
 !api/sessions/.htaccess
 !api/uploads/.htaccess
-

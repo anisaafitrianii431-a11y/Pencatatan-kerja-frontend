@@ -36,10 +36,11 @@ function readUser(result) {
     throw new Error('Respons autentikasi dari server tidak valid.')
   }
 
-  const role = String(user.peran || user.role || '').trim().toLowerCase()
-  if (role !== 'admin' && role !== 'karyawan') {
+  const rawRole = String(user.peran || user.role || '').trim().toLowerCase()
+  if (!['admin', 'karyawan', 'pekerja'].includes(rawRole)) {
     throw new Error('Peran akun tidak dikenali. Hubungi administrator.')
   }
+  const role = rawRole === 'admin' ? 'admin' : 'karyawan'
   if ('aktif' in user && ![true, 1, '1'].includes(user.aktif)) {
     throw new Error('Akun Anda tidak aktif. Hubungi administrator.')
   }
@@ -49,6 +50,8 @@ function readUser(result) {
     employeeId: user.id_karyawan ?? null,
     email: user.email || '',
     name: user.name || user.nama || user.email || 'Pengguna',
+    jabatan: user.jabatan || '',
+    tarif_per_jam: Number(user.tarif_per_jam) || 0,
     role,
   }
 }
@@ -93,7 +96,7 @@ export async function getCurrentUser() {
     const stored = localStorage.getItem('ruangkerja_user')
     if (stored) {
       try {
-        const u = JSON.parse(stored)
+        const u = readUser(JSON.parse(stored))
         localStorage.setItem('jam_kerja_auth', JSON.stringify({
           id_user: u.id || (u.role === 'admin' ? 1 : 2),
           id_karyawan: u.employeeId || null,
@@ -155,7 +158,7 @@ export async function login(credentials) {
         employeeId: registered.employeeId || Date.now(),
         email: registered.email,
         name: registered.name || registered.nama || registered.email.split('@')[0],
-        jabatan: registered.jabatan || 'Karyawan',
+        jabatan: registered.jabatan || 'Pekerja',
         role: registered.role || 'karyawan',
       }
       localStorage.setItem('ruangkerja_user', JSON.stringify(userObj))
@@ -243,7 +246,7 @@ export async function registerKaryawan(data) {
       email: email.trim(),
       password,
       name: name.trim(),
-      jabatan: jabatan ? jabatan.trim() : 'Karyawan',
+      jabatan: jabatan ? jabatan.trim() : 'Pekerja',
       role: 'karyawan',
     }
 

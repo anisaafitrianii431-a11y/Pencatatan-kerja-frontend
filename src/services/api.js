@@ -4,6 +4,12 @@
 
 const API_BASE = '/api';
 
+export function getFileUrl(path) {
+  if (!path) return '';
+  if (/^(https?:|data:|blob:)/i.test(path)) return path;
+  return `${API_BASE}/${String(path).replace(/^\/+/, '')}`;
+}
+
 // Seed data awal identik dengan database.sql
 const INITIAL_DATA = {
   karyawan: [
@@ -727,7 +733,11 @@ export const AbsensiService = {
   async getAll(filter = {}) {
     const live = await checkBackendStatus();
     if (live) {
-      const params = new URLSearchParams(filter).toString();
+      const params = new URLSearchParams({
+        ...filter,
+        status_verifikasi: filter.status_verifikasi || filter.status || ''
+      });
+      params.delete('status');
       const { data } = await safeFetchJson(`${API_BASE}/absensi.php?${params}`);
       if (data && data.success) return data.data;
     }
@@ -738,6 +748,7 @@ export const AbsensiService = {
         if (filter.id_karyawan && a.id_karyawan !== Number(filter.id_karyawan)) return false;
         if (filter.id_pekerjaan && a.id_pekerjaan !== Number(filter.id_pekerjaan)) return false;
         if (filter.tanggal && a.tanggal !== filter.tanggal) return false;
+        if ((filter.status_verifikasi || filter.status) && a.status_verifikasi !== (filter.status_verifikasi || filter.status)) return false;
         return true;
       })
       .map(a => {
@@ -1245,6 +1256,61 @@ export const GajiService = {
       });
   },
 
+  async getDetail({ id_karyawan, periode, id_gaji } = {}) {
+    const params = new URLSearchParams({ action: 'detail' });
+    if (id_karyawan) params.set('id_karyawan', id_karyawan);
+    if (periode) params.set('periode', periode);
+    if (id_gaji) params.set('id_gaji', id_gaji);
+
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      if (data?.success) return data.data;
+      if (data?.message) throw new Error(data.message);
+    }
+
+    const [absensi, pengeluaran] = await Promise.all([
+      AbsensiService.getAll({ id_karyawan }),
+      PengeluaranService.getAll({ id_karyawan })
+    ]);
+
+    return {
+      absensi: absensi.filter((item) =>
+        item.status_verifikasi === 'disetujui' && (!periode || item.tanggal?.startsWith(periode))
+      ),
+      pengeluaran: pengeluaran.filter((item) =>
+        item.status_verifikasi === 'disetujui' && (!periode || item.tanggal?.startsWith(periode))
+      )
+    };
+  },
+
+  async updatePenyesuaian(id_gaji, bonus, potongan, catatan_penyesuaian = '') {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=penyesuaian`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_gaji, bonus, potongan, catatan_penyesuaian })
+      });
+      if (data?.success) return data;
+      if (data?.message) throw new Error(data.message);
+    }
+
+    const db = getLocalData();
+    const gaji = db.gaji.find((item) => Number(item.id_gaji) === Number(id_gaji));
+    if (!gaji) throw new Error('Data gaji tidak ditemukan.');
+
+    gaji.bonus = Number(bonus) || 0;
+    gaji.potongan = Number(potongan) || 0;
+    gaji.catatan_penyesuaian = catatan_penyesuaian;
+    gaji.total_dibayar = Math.max(
+      0,
+      Number(gaji.total_upah || 0) + Number(gaji.total_ganti || 0) + gaji.bonus - gaji.potongan
+    );
+    saveLocalData(db);
+    return { success: true, message: 'Penyesuaian gaji berhasil disimpan.' };
+  },
+
   async hitungGaji(periode) {
     const live = await checkBackendStatus();
     if (live) {
@@ -1310,13 +1376,13 @@ export const GajiService = {
     return { success: true, message: `Perhitungan gaji periode ${periode} berhasil untuk ${count} pekerja!` };
   },
 
-  async bayar(id_gaji) {
+  async bayar(id_gaji, paymentData = {}) {
     const live = await checkBackendStatus();
     if (live) {
       const { data: resData } = await safeFetchJson(`${API_BASE}/gaji.php?action=bayar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_gaji })
+        body: JSON.stringify({ id_gaji, ...paymentData })
       });
       if (resData && resData.success) return resData;
       if (resData && !resData.success && resData.message) {
@@ -1329,6 +1395,9 @@ export const GajiService = {
     if (idx !== -1) {
       db.gaji[idx].status_bayar = 'sudah';
       db.gaji[idx].tanggal_bayar = new Date().toISOString();
+      db.gaji[idx].metode_bayar = paymentData.metode_bayar || 'transfer';
+      db.gaji[idx].catatan_bayar = paymentData.catatan_bayar || '';
+      db.gaji[idx].bukti_bayar = paymentData.foto_bukti || '';
 
       // Update pengeluaran pribadi yang disetujui menjadi status_ganti = sudah
       const g = db.gaji[idx];
