@@ -70,14 +70,22 @@ function saveRegisteredUser(user) {
 
 export async function getCurrentUser() {
   try {
-    const result = await request('/auth/me')
+    const result = await request('/auth.php?action=me')
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: user.id || (user.role === 'admin' ? 1 : 2),
+      id_karyawan: user.employeeId || null,
+      peran: user.role,
+      email: user.email,
+      nama: user.name,
+    }))
     return user
   } catch (error) {
     // Sesi ditolak oleh server (belum login)
     if (error.status === 401) {
       localStorage.removeItem('ruangkerja_user')
+      localStorage.removeItem('jam_kerja_auth')
       return null
     }
 
@@ -85,9 +93,18 @@ export async function getCurrentUser() {
     const stored = localStorage.getItem('ruangkerja_user')
     if (stored) {
       try {
-        return JSON.parse(stored)
+        const u = JSON.parse(stored)
+        localStorage.setItem('jam_kerja_auth', JSON.stringify({
+          id_user: u.id || (u.role === 'admin' ? 1 : 2),
+          id_karyawan: u.employeeId || null,
+          peran: u.role,
+          email: u.email,
+          nama: u.name,
+        }))
+        return u
       } catch {
         localStorage.removeItem('ruangkerja_user')
+        localStorage.removeItem('jam_kerja_auth')
       }
     }
 
@@ -98,12 +115,19 @@ export async function getCurrentUser() {
 
 export async function login(credentials) {
   try {
-    const result = await request('/auth/login', {
+    const result = await request('/auth.php?action=login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     })
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: user.id || (user.role === 'admin' ? 1 : 2),
+      id_karyawan: user.employeeId || null,
+      peran: user.role,
+      email: user.email,
+      nama: user.name,
+    }))
     return user
   } catch (error) {
     // Jika backend merespons error kredensial spesifik (401 salah password, 403 akun nonaktif, dll)
@@ -135,6 +159,13 @@ export async function login(credentials) {
         role: registered.role || 'karyawan',
       }
       localStorage.setItem('ruangkerja_user', JSON.stringify(userObj))
+      localStorage.setItem('jam_kerja_auth', JSON.stringify({
+        id_user: userObj.id,
+        id_karyawan: userObj.employeeId,
+        peran: userObj.role,
+        email: userObj.email,
+        nama: userObj.name,
+      }))
       return userObj
     }
 
@@ -154,6 +185,13 @@ export async function login(credentials) {
     }
 
     localStorage.setItem('ruangkerja_user', JSON.stringify(demoUser))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: demoUser.id,
+      id_karyawan: demoUser.employeeId,
+      peran: demoUser.role,
+      email: demoUser.email,
+      nama: demoUser.name,
+    }))
     return demoUser
   }
 }
@@ -161,7 +199,7 @@ export async function login(credentials) {
 export async function registerKaryawan(data) {
   const { name, email, jabatan, password } = data
   try {
-    const result = await request('/auth/register', {
+    const result = await request('/auth.php?action=register', {
       method: 'POST',
       body: JSON.stringify({
         nama: name,
@@ -173,6 +211,13 @@ export async function registerKaryawan(data) {
     })
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: user.id || 2,
+      id_karyawan: user.employeeId || null,
+      peran: user.role,
+      email: user.email,
+      nama: user.name,
+    }))
     saveRegisteredUser({ email, password, name, jabatan, role: 'karyawan' })
     return user
   } catch (error) {
@@ -218,10 +263,11 @@ export async function registerKaryawan(data) {
 
 export async function logout() {
   try {
-    await request('/auth/logout', { method: 'POST' })
+    await request('/auth.php?action=logout', { method: 'POST' })
   } catch {
     // Abaikan error saat offline
   } finally {
     localStorage.removeItem('ruangkerja_user')
+    localStorage.removeItem('jam_kerja_auth')
   }
 }

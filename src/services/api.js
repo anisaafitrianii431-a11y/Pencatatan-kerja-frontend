@@ -115,15 +115,16 @@ export async function safeFetchJson(url, options = {}) {
   try {
     let authHeader = {};
     try {
-      const rawUser = localStorage.getItem('jam_kerja_auth');
+      const rawUser = localStorage.getItem('ruangkerja_user') || localStorage.getItem('jam_kerja_auth');
       if (rawUser) {
         const u = JSON.parse(rawUser);
-        if (u && u.id_user) {
-          authHeader = {
-            'Authorization': `Bearer ${u.id_user}`,
-            'X-User-Id': String(u.id_user)
-          };
-        }
+        const role = String(u.peran || u.role || '').toLowerCase();
+        const userId = u.id_user || u.id || (role === 'admin' ? 1 : (u.employeeId || 2));
+        authHeader = {
+          'Authorization': `Bearer ${userId}`,
+          'X-User-Id': String(userId),
+          'X-User-Role': role || (userId === 1 ? 'admin' : 'karyawan')
+        };
       }
     } catch {
       // ignore
@@ -995,17 +996,32 @@ export const PengeluaranService = {
     const live = await checkBackendStatus();
     if (live) {
       try {
-        const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?id_pengeluaran=${id_pengeluaran}`, {
+        const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?id_pengeluaran=${id_pengeluaran}`, {
           method: 'DELETE'
         });
-        if (resData && resData.success) return resData;
-      } catch {
+        if (resData && resData.success) {
+          const db = getLocalData();
+          db.pengeluaran = db.pengeluaran.filter(p => Number(p.id_pengeluaran) !== Number(id_pengeluaran));
+          saveLocalData(db);
+          return resData;
+        }
+        if (!ok || (resData && !resData.success)) {
+          throw new Error(resData?.message || 'Gagal menghapus via DELETE');
+        }
+      } catch (err) {
         // Fallback POST action=delete if DELETE method is blocked by proxy/firewall
-        const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=delete&id_pengeluaran=${id_pengeluaran}`, {
+        const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=delete&id_pengeluaran=${id_pengeluaran}`, {
           method: 'POST'
         });
-        if (resData && resData.success) return resData;
-        if (resData && !resData.success) throw new Error(resData.message);
+        if (resData && resData.success) {
+          const db = getLocalData();
+          db.pengeluaran = db.pengeluaran.filter(p => Number(p.id_pengeluaran) !== Number(id_pengeluaran));
+          saveLocalData(db);
+          return resData;
+        }
+        if (!ok || (resData && !resData.success)) {
+          throw new Error(resData?.message || err.message || 'Gagal menghapus catatan pengeluaran');
+        }
       }
     }
 

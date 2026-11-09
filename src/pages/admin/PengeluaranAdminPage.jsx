@@ -133,6 +133,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
     if (window.confirm(confirmText)) {
       try {
         await PengeluaranService.delete(p.id_pengeluaran);
+        setPengeluaranList(prev => prev.filter(item => Number(item.id_pengeluaran) !== Number(p.id_pengeluaran)));
         setSuccessMsg(`Catatan pengeluaran "${p.keterangan || 'Pengeluaran'}" berhasil dihapus.`);
         loadData();
         if (selectedExpense && selectedExpense.id_pengeluaran === p.id_pengeluaran) {
