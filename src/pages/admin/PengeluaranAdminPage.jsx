@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Receipt, 
   CheckCircle2, 
@@ -123,6 +123,62 @@ export default function PengeluaranAdminPage({ currentUser }) {
     return item.status_verifikasi === filterStatus;
   });
 
+  // Rekapitulasi Biaya per Proyek (dihitung dinamis dari data pengeluaran yang telah disetujui & data pekerjaan)
+  const computedRekap = useMemo(() => {
+    const projectMap = {};
+
+    pekerjaanList.forEach(pj => {
+      projectMap[pj.id_pekerjaan] = {
+        id_pekerjaan: pj.id_pekerjaan,
+        nama_pekerjaan: pj.nama_pekerjaan,
+        lokasi: pj.lokasi || pj.titik_lokasi || pj.nama_lokasi || 'Lokasi Proyek',
+        uang_pribadi: 0,
+        uang_kantor: 0,
+        total_pengeluaran: 0,
+        total_nota: 0,
+      };
+    });
+
+    pengeluaranList
+      .filter(p => p.status_verifikasi === 'disetujui')
+      .forEach(p => {
+        const id = p.id_pekerjaan;
+        if (!projectMap[id]) {
+          projectMap[id] = {
+            id_pekerjaan: id,
+            nama_pekerjaan: p.nama_pekerjaan || `Proyek #${id}`,
+            lokasi: p.lokasi || 'Lokasi Proyek',
+            uang_pribadi: 0,
+            uang_kantor: 0,
+            total_pengeluaran: 0,
+            total_nota: 0,
+          };
+        }
+        const nominal = Number(p.nominal) || 0;
+        if (p.jenis_dana === 'pribadi') {
+          projectMap[id].uang_pribadi += nominal;
+        } else {
+          projectMap[id].uang_kantor += nominal;
+        }
+        projectMap[id].total_pengeluaran += nominal;
+        projectMap[id].total_nota += 1;
+      });
+
+    const daftar = Object.values(projectMap);
+    const totalPribadi = daftar.reduce((sum, d) => sum + d.uang_pribadi, 0);
+    const totalKantor = daftar.reduce((sum, d) => sum + d.uang_kantor, 0);
+    const grandTotal = totalPribadi + totalKantor;
+
+    return {
+      daftar,
+      summary: {
+        total_uang_pribadi: totalPribadi,
+        total_uang_kantor: totalKantor,
+        grand_total: grandTotal,
+      }
+    };
+  }, [pengeluaranList, pekerjaanList]);
+
   const totalMenunggu = pengeluaranList.filter(p => p.status_verifikasi === 'menunggu').length;
   const totalReimbursBelum = pengeluaranList.filter(p => p.jenis_dana === 'pribadi' && p.status_verifikasi === 'disetujui' && p.status_ganti === 'belum').reduce((a, c) => a + Number(c.nominal), 0);
 
@@ -168,7 +224,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Grand Total Biaya Disetujui</div>
           <div className="text-2xl font-extrabold text-slate-800 mt-1">
-            {formatRupiah(rekapData.summary?.grand_total || 0)}
+            {formatRupiah(computedRekap.summary.grand_total)}
           </div>
           <div className="text-xs text-slate-400 mt-1">Gabungan seluruh proyek</div>
         </div>
@@ -184,7 +240,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-blue-200 bg-blue-50/20 shadow-sm">
           <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Dana Kantor Digunakan</div>
           <div className="text-2xl font-extrabold text-blue-600 mt-1">
-            {formatRupiah(rekapData.summary?.total_uang_kantor || 0)}
+            {formatRupiah(computedRekap.summary.total_uang_kantor)}
           </div>
           <div className="text-xs text-blue-700 mt-1">Kas operasional kantor</div>
         </div>
@@ -217,7 +273,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>Rekapitulasi Biaya Per Proyek ({rekapData.daftar?.length || 0})</span>
+          <span>Rekapitulasi Biaya Per Proyek ({computedRekap.daftar.length})</span>
         </button>
       </div>
 
@@ -467,22 +523,22 @@ export default function PengeluaranAdminPage({ currentUser }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rekapData.daftar?.map((item) => (
+                {computedRekap.daftar.map((item) => (
                   <tr key={item.id_pekerjaan} className="hover:bg-slate-50/70 transition">
                     <td className="py-3 px-4 font-bold text-slate-800">{item.nama_pekerjaan}</td>
                     <td className="py-3 px-4 text-slate-600">{item.lokasi}</td>
-                    <td className="py-3 px-4 text-right font-medium text-amber-600">{formatRupiah(item.total_uang_pribadi)}</td>
-                    <td className="py-3 px-4 text-right font-medium text-blue-600">{formatRupiah(item.total_uang_kantor)}</td>
-                    <td className="py-3 px-4 text-right font-bold text-slate-800">{formatRupiah(item.grand_total)}</td>
+                    <td className="py-3 px-4 text-right font-medium text-amber-600">{formatRupiah(item.uang_pribadi)}</td>
+                    <td className="py-3 px-4 text-right font-medium text-blue-600">{formatRupiah(item.uang_kantor)}</td>
+                    <td className="py-3 px-4 text-right font-bold text-slate-800">{formatRupiah(item.total_pengeluaran)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs text-slate-800">
                 <tr>
                   <td colSpan={2} className="py-3.5 px-4 text-right uppercase tracking-wider">Grand Total Keseluruhan:</td>
-                  <td className="py-3.5 px-4 text-right text-amber-600">{formatRupiah(rekapData.summary?.total_uang_pribadi || 0)}</td>
-                  <td className="py-3.5 px-4 text-right text-blue-600">{formatRupiah(rekapData.summary?.total_uang_kantor || 0)}</td>
-                  <td className="py-3.5 px-4 text-right text-emerald-700 text-sm font-extrabold">{formatRupiah(rekapData.summary?.grand_total || 0)}</td>
+                  <td className="py-3.5 px-4 text-right text-amber-600">{formatRupiah(computedRekap.summary.total_uang_pribadi)}</td>
+                  <td className="py-3.5 px-4 text-right text-blue-600">{formatRupiah(computedRekap.summary.total_uang_kantor)}</td>
+                  <td className="py-3.5 px-4 text-right text-emerald-700 text-sm font-extrabold">{formatRupiah(computedRekap.summary.grand_total)}</td>
                 </tr>
               </tfoot>
             </table>
