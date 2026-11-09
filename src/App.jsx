@@ -14,6 +14,10 @@ import LokasiKerjaPage from './pages/admin-absen/LokasiKerjaPage'
 import AbsensiPage from './pages/pekerja_absen/AbsensiPage'
 
 
+// Fitur Pengembang 2: Layout & Dashboard Admin Asli
+import AdminLayout from './layouts/AdminLayout.jsx'
+import DashboardAdmin from './pages/admin/DashboardAdmin.jsx'
+
 // Fitur Pengembang 2: Manajemen Karyawan, Pekerjaan, Penugasan & Profil
 import DataKaryawan from './pages/admin/DataKaryawan.jsx'
 import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
@@ -555,6 +559,81 @@ function AdminPage() {
   )
 }
 
+function DashboardAdminPage() {
+  const navigate = useNavigate()
+  return (
+    <DashboardAdmin
+      onNavigate={(target) => {
+        if (target === 'Data Karyawan') navigate('/admin/karyawan')
+        else if (target === 'Data Pekerjaan') navigate('/admin/pekerjaan')
+        else if (target === 'Penugasan') navigate('/admin/penugasan')
+        else if (target === 'Dashboard') navigate('/admin')
+        else navigate(target)
+      }}
+    />
+  )
+}
+
+function AdminLayoutWrapper() {
+  const { user, signOut } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  let activeItem = 'Dashboard'
+  const path = location.pathname
+  if (path === '/admin' || path === '/admin/dashboard' || path === '/dashboard') {
+    activeItem = 'Dashboard'
+  } else if (path.startsWith('/admin/karyawan')) {
+    activeItem = 'Data Karyawan'
+  } else if (path.startsWith('/admin/pekerjaan')) {
+    activeItem = 'Data Pekerjaan'
+  } else if (path.startsWith('/admin/penugasan')) {
+    activeItem = 'Penugasan'
+  } else if (path.startsWith('/admin/pengguna')) {
+    activeItem = 'Manajemen Pengguna'
+  } else if (path.startsWith('/admin/pengeluaran')) {
+    activeItem = 'Pengeluaran & Kwitansi'
+  } else if (path.startsWith('/admin/lokasi')) {
+    activeItem = 'Lokasi Kerja'
+  } else if (path.startsWith('/admin/profil')) {
+    activeItem = 'Profil Administrator'
+  } else if (path.startsWith('/admin/pengaturan')) {
+    activeItem = 'Pengaturan'
+  }
+
+  function handleSelectMenuItem(item) {
+    if (item === 'Dashboard') navigate('/admin')
+    else if (item === 'Data Karyawan') navigate('/admin/karyawan')
+    else if (item === 'Data Pekerjaan') navigate('/admin/pekerjaan')
+    else if (item === 'Penugasan') navigate('/admin/penugasan')
+    else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
+    else if (item === 'Pengeluaran & Kwitansi') navigate('/admin/pengeluaran')
+    else if (item === 'Lokasi Kerja') navigate('/admin/lokasi')
+    else if (item === 'Profil Administrator') navigate('/admin/profil')
+    else if (item === 'Pengaturan') navigate('/admin/pengaturan')
+  }
+
+  async function handleLogout() {
+    try {
+      await signOut()
+      navigate('/login', { replace: true })
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
+  return (
+    <AdminLayout
+      activeItem={activeItem}
+      adminName={user?.name || 'Administrator'}
+      onLogout={handleLogout}
+      onSelectMenuItem={handleSelectMenuItem}
+    >
+      <Outlet />
+    </AdminLayout>
+  )
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   const mappedUser = user
@@ -572,22 +651,32 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to={user ? roleHome(user.role) : '/dashboard'} replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route element={<ProtectedRoute roles={['admin']} />}>
-            <Route path="/admin" element={<AdminPage />} />
+        {/* Rute khusus Admin: Menggunakan AdminLayout asli tanpa tabrakan AppLayout */}
+        <Route element={<ProtectedRoute roles={['admin']} />}>
+          <Route element={<AdminLayoutWrapper />}>
+            <Route path="/admin" element={<DashboardAdminPage />} />
+            <Route path="/admin/dashboard" element={<DashboardAdminPage />} />
             <Route path="/admin/karyawan" element={<DataKaryawan />} />
             <Route path="/admin/pekerjaan" element={<DataPekerjaan />} />
             <Route path="/admin/penugasan" element={<Penugasan />} />
-            <Route path="/admin/profil" element={<ProfilAdmin />} />
-            <Route path="/admin/pengaturan" element={<PengaturanAdmin />} />
+            <Route path="/admin/pengguna" element={<AdminPage />} />
             <Route
               path="/admin/pengeluaran"
               element={<PengeluaranAdminPage currentUser={mappedUser} />}
             />
             <Route path="/admin/lokasi" element={<LokasiKerjaPage />} />
+            <Route path="/admin/profil" element={<ProfilAdmin />} />
+            <Route path="/admin/pengaturan" element={<PengaturanAdmin />} />
           </Route>
+        </Route>
+
+        {/* Rute Pekerja & Shared: Menggunakan AppLayout */}
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Navigate to={user ? roleHome(user.role) : '/dashboard'} replace />} />
+          <Route
+            path="/dashboard"
+            element={user?.role === 'admin' ? <Navigate to="/admin" replace /> : <DashboardPage />}
+          />
           <Route element={<ProtectedRoute roles={['karyawan']} />}>
             <Route path="/karyawan" element={<KaryawanPage />} />
             <Route
@@ -635,7 +724,7 @@ function AppRoutes() {
           <Route path="/pekerja" element={<PekerjaLocalTest />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={user ? roleHome(user.role) : '/login'} replace />} />
     </Routes>
   )
 }

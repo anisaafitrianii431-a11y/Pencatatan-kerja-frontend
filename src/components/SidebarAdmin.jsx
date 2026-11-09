@@ -28,6 +28,26 @@ const iconContent = {
       <path d="M9 4.5h6M8.5 11h7M8.5 15h4M16 15l1.5 1.5L20 14" />
     </>
   ),
+  users: (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </>
+  ),
+  receipt: (
+    <>
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
+      <path d="M8 7h8M8 11h8M8 15h5" />
+    </>
+  ),
+  location: (
+    <>
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </>
+  ),
   menu: (
     <>
       <path d="M4 6h16M4 12h16M4 18h16" />
@@ -62,6 +82,9 @@ const menuItems = [
   { label: 'Data Karyawan', icon: 'employees' },
   { label: 'Data Pekerjaan', icon: 'jobs' },
   { label: 'Penugasan', icon: 'assignments' },
+  { label: 'Manajemen Pengguna', icon: 'users' },
+  { label: 'Pengeluaran & Kwitansi', icon: 'receipt' },
+  { label: 'Lokasi Kerja', icon: 'location' },
 ]
 
 function SidebarAdmin({
@@ -69,6 +92,7 @@ function SidebarAdmin({
   isMobileOpen = false,
   onSelectMenuItem = () => {},
   onClose = () => {},
+  adminName = 'Admin',
 }) {
   return (
     <>
@@ -123,7 +147,7 @@ function SidebarAdmin({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-6">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
           <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Menu Utama
           </p>
@@ -135,7 +159,7 @@ function SidebarAdmin({
                 aria-current={isActive ? 'page' : undefined}
                 className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
                   isActive
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
                 key={label}
@@ -150,9 +174,9 @@ function SidebarAdmin({
                   }`}
                   name={icon}
                 />
-                <span>{label}</span>
+                <span className="truncate">{label}</span>
                 {isActive && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-600" />
+                  <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
                 )}
               </button>
             )
@@ -160,15 +184,15 @@ function SidebarAdmin({
         </nav>
 
         <div className="shrink-0 border-t border-slate-800 p-4">
-          <div className="flex items-center gap-3 rounded-xl bg-slate-800 p-3">
+          <div className="flex items-center gap-3 rounded-xl bg-slate-800/80 p-3">
             <AdminAvatar
               className="h-10 w-10 text-xs"
-              name="Admin"
+              name={adminName}
               tone="brand"
             />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">
-                Admin
+                {adminName}
               </p>
               <p className="text-xs text-slate-400">Administrator</p>
             </div>

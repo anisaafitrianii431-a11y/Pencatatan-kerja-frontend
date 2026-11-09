@@ -10,7 +10,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost/Pencatatan-kerja-frontend/api',
+        target: 'http://localhost/pencatatan-kerja/frontend/api',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
