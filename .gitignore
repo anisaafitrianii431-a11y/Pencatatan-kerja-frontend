@@ -30,4 +30,3 @@ api/sessions/sess_*
 api/uploads/*.jpg
 !api/sessions/.htaccess
 !api/uploads/.htaccess
-

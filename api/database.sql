@@ -155,12 +155,12 @@ INSERT INTO karyawan (id_karyawan, nama, jabatan, tarif_per_jam) VALUES
 (4, 'Dewi Lestari', 'Quality Assurance', 45000.00);
 
 -- Data User
--- Password default: 'admin123' untuk admin, 'karyawan123' untuk karyawan (Bcrypt Hash)
+-- Password default: 'admin123' untuk admin, 'karyawan123' untuk karyawan (Bcrypt Hash Valid)
 INSERT INTO `user` (id_user, id_karyawan, email, kata_sandi, peran, aktif) VALUES
-(1, NULL, 'admin@jamkerja.com', '$2y$10$nDFT2W6oJI6tN9brCpFznedoN6oc9ubXAFBWS..HcLSrydZz.uf7i', 'admin', 1),
-(2, 1, 'budi@jamkerja.com', '$2y$10$XBWXILxNeur1MQTzxI1yfeHbXMjrb3dflPqO0jJUqF/dJfEAXmDDi', 'karyawan', 1),
-(3, 2, 'siti@jamkerja.com', '$2y$10$XBWXILxNeur1MQTzxI1yfeHbXMjrb3dflPqO0jJUqF/dJfEAXmDDi', 'karyawan', 1),
-(4, 3, 'agus@jamkerja.com', '$2y$10$XBWXILxNeur1MQTzxI1yfeHbXMjrb3dflPqO0jJUqF/dJfEAXmDDi', 'karyawan', 1);
+(1, NULL, 'admin@jamkerja.com', '$2y$10$oOlBu3IO.BzdC6rqP9abseWPdfL037gdj64jx8zI3PThAeB6u.4Ta', 'admin', 1),
+(2, 1, 'budi@jamkerja.com', '$2y$10$.A3HYmuGh6ivl3TsTCobJOixD0ldmP/nj.p2UEBelonYDM6e9YwmG', 'karyawan', 1),
+(3, 2, 'siti@jamkerja.com', '$2y$10$.A3HYmuGh6ivl3TsTCobJOixD0ldmP/nj.p2UEBelonYDM6e9YwmG', 'karyawan', 1),
+(4, 3, 'agus@jamkerja.com', '$2y$10$.A3HYmuGh6ivl3TsTCobJOixD0ldmP/nj.p2UEBelonYDM6e9YwmG', 'karyawan', 1);
 
 -- Data Pekerjaan
 INSERT INTO pekerjaan (id_pekerjaan, nama_pekerjaan, deskripsi, lokasi, titik_lokasi, tanggal_mulai, target_selesai, status) VALUES

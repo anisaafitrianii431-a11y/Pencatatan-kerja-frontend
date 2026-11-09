@@ -269,6 +269,10 @@
 .workspace { min-height: 100vh; margin-left: 252px; background: #f8fafc; }
 .topbar { display: flex; height: 60px; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #e9edf3; color: #8390a1; background: #fff; font-size: 12px; }
 .topbar-role { padding: 5px 12px; border-radius: 20px; color: #416a9d; background: #eef4fa; font-size: 11px; font-weight: 700; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.account-switch-button { padding: 7px 12px; border: 1px solid #dfe6ef; border-radius: 8px; color: #52657e; background: #fff; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.account-switch-button:hover:not(:disabled) { color: #a7194a; border-color: #e7b4c5; background: #fff7fa; }
+.account-switch-button:disabled { cursor: wait; opacity: .65; }
 .page-content { max-width: 1440px; margin: 0 auto; padding: 24px 32px; width: 100%; box-sizing: border-box; }
 .page-title { margin: 0; color: #1e2c42; font-size: clamp(27px, 3vw, 35px); font-weight: 750; letter-spacing: -.045em; }
 .page-intro { margin-top: 10px; color: #8a96a6; font-size: 14px; }

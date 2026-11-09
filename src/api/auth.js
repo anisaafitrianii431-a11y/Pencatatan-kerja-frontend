@@ -36,10 +36,11 @@ function readUser(result) {
     throw new Error('Respons autentikasi dari server tidak valid.')
   }
 
-  const role = String(user.peran || user.role || '').trim().toLowerCase()
-  if (role !== 'admin' && role !== 'karyawan') {
+  const rawRole = String(user.peran || user.role || '').trim().toLowerCase()
+  if (!['admin', 'karyawan', 'pekerja'].includes(rawRole)) {
     throw new Error('Peran akun tidak dikenali. Hubungi administrator.')
   }
+  const role = rawRole === 'admin' ? 'admin' : 'karyawan'
   if ('aktif' in user && ![true, 1, '1'].includes(user.aktif)) {
     throw new Error('Akun Anda tidak aktif. Hubungi administrator.')
   }
@@ -49,6 +50,8 @@ function readUser(result) {
     employeeId: user.id_karyawan ?? null,
     email: user.email || '',
     name: user.name || user.nama || user.email || 'Pengguna',
+    jabatan: user.jabatan || '',
+    tarif_per_jam: Number(user.tarif_per_jam) || 0,
     role,
   }
 }
@@ -70,14 +73,22 @@ function saveRegisteredUser(user) {
 
 export async function getCurrentUser() {
   try {
-    const result = await request('/auth/me')
+    const result = await request('/auth.php?action=me')
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: user.id || (user.role === 'admin' ? 1 : 2),
+      id_karyawan: user.employeeId || null,
+      peran: user.role,
+      email: user.email,
+      nama: user.name,
+    }))
     return user
   } catch (error) {
     // Sesi ditolak oleh server (belum login)
     if (error.status === 401) {
       localStorage.removeItem('ruangkerja_user')
+      localStorage.removeItem('jam_kerja_auth')
       return null
     }
 
@@ -91,9 +102,18 @@ export async function getCurrentUser() {
           parsed.employeeId = 1
           localStorage.setItem('ruangkerja_user', JSON.stringify(parsed))
         }
-        return parsed
+        const u = readUser({ ...parsed, id_karyawan: parsed.employeeId || parsed.id_karyawan })
+        localStorage.setItem('jam_kerja_auth', JSON.stringify({
+          id_user: u.id || (u.role === 'admin' ? 1 : 2),
+          id_karyawan: u.employeeId || null,
+          peran: u.role,
+          email: u.email,
+          nama: u.name,
+        }))
+        return u
       } catch {
         localStorage.removeItem('ruangkerja_user')
+        localStorage.removeItem('jam_kerja_auth')
       }
     }
 
@@ -104,12 +124,19 @@ export async function getCurrentUser() {
 
 export async function login(credentials) {
   try {
-    const result = await request('/auth/login', {
+    const result = await request('/auth.php?action=login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     })
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: user.id || (user.role === 'admin' ? 1 : 2),
+      id_karyawan: user.employeeId || null,
+      peran: user.role,
+      email: user.email,
+      nama: user.name,
+    }))
     return user
   } catch (error) {
     // Jika backend merespons error kredensial spesifik (401 salah password, 403 akun nonaktif, dll)
@@ -141,10 +168,17 @@ export async function login(credentials) {
         employeeId: safeEmployeeId,
         email: registered.email,
         name: registered.name || registered.nama || registered.email.split('@')[0],
-        jabatan: registered.jabatan || 'Karyawan',
+        jabatan: registered.jabatan || 'Pekerja',
         role: registered.role || 'karyawan',
       }
       localStorage.setItem('ruangkerja_user', JSON.stringify(userObj))
+      localStorage.setItem('jam_kerja_auth', JSON.stringify({
+        id_user: userObj.id,
+        id_karyawan: userObj.employeeId,
+        peran: userObj.role,
+        email: userObj.email,
+        nama: userObj.name,
+      }))
       return userObj
     }
 
@@ -164,6 +198,13 @@ export async function login(credentials) {
     }
 
     localStorage.setItem('ruangkerja_user', JSON.stringify(demoUser))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: demoUser.id,
+      id_karyawan: demoUser.employeeId,
+      peran: demoUser.role,
+      email: demoUser.email,
+      nama: demoUser.name,
+    }))
     return demoUser
   }
 }
@@ -171,7 +212,7 @@ export async function login(credentials) {
 export async function registerKaryawan(data) {
   const { name, email, jabatan, password } = data
   try {
-    const result = await request('/auth/register', {
+    const result = await request('/auth.php?action=register', {
       method: 'POST',
       body: JSON.stringify({
         nama: name,
@@ -183,6 +224,13 @@ export async function registerKaryawan(data) {
     })
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
+    localStorage.setItem('jam_kerja_auth', JSON.stringify({
+      id_user: user.id || 2,
+      id_karyawan: user.employeeId || null,
+      peran: user.role,
+      email: user.email,
+      nama: user.name,
+    }))
     saveRegisteredUser({ email, password, name, jabatan, role: 'karyawan', employeeId: user.employeeId || 1 })
     return user
   } catch (error) {
@@ -228,7 +276,7 @@ export async function registerKaryawan(data) {
       email: email.trim(),
       password,
       name: name.trim(),
-      jabatan: jabatan ? jabatan.trim() : 'Karyawan',
+      jabatan: jabatan ? jabatan.trim() : 'Pekerja',
       role: 'karyawan',
     }
 
@@ -248,10 +296,11 @@ export async function registerKaryawan(data) {
 
 export async function logout() {
   try {
-    await request('/auth/logout', { method: 'POST' })
+    await request('/auth.php?action=logout', { method: 'POST' })
   } catch {
     // Abaikan error saat offline
   } finally {
     localStorage.removeItem('ruangkerja_user')
+    localStorage.removeItem('jam_kerja_auth')
   }
 }
