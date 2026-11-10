@@ -1,11 +1,15 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './api.js'
 
 function normalizeEmployee(employee) {
+  if (!employee) return null
   return {
     ...employee,
     id_karyawan: Number(employee.id_karyawan),
+    nama: employee.nama || '',
     jabatan: employee.jabatan ?? '',
-    tarif_per_jam: Number(employee.tarif_per_jam),
+    tarif_per_jam: Number(employee.tarif_per_jam) || 0,
+    status: employee.status || (employee.aktif === 0 || employee.aktif === false ? 'nonaktif' : 'aktif'),
+    aktif: employee.aktif ?? (employee.status === 'nonaktif' ? 0 : 1),
   }
 }
 

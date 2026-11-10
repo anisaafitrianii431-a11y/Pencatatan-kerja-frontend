@@ -1427,39 +1427,63 @@ const API_BASE_URL = (
 ).replace(/\/+$/, '')
 
 async function request(path, method, body) {
-  const headers = { Accept: 'application/json' }
-  const options = { method, headers }
+  // Petakan rute REST ke script endpoint PHP backend yang sesuai
+  let url = path;
+  if (path === '/karyawan' || path.startsWith('/karyawan?')) {
+    url = '/pekerja.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
+  } else if (path.startsWith('/karyawan/')) {
+    const id = path.replace('/karyawan/', '');
+    url = `/pekerja.php?id_karyawan=${id}`;
+  } else if (path === '/pekerjaan' || path.startsWith('/pekerjaan?')) {
+    url = '/pekerjaan.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
+  } else if (path === '/pekerjaan/tersedia') {
+    url = '/pekerjaan.php?action=tersedia';
+  } else if (path.startsWith('/pekerjaan/')) {
+    const id = path.replace('/pekerjaan/', '');
+    url = `/pekerjaan.php?id_pekerjaan=${id}`;
+  } else if (path === '/penugasan' || path.startsWith('/penugasan?')) {
+    url = '/penugasan.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
+  } else if (path.startsWith('/penugasan/')) {
+    const id = path.replace('/penugasan/', '');
+    url = `/penugasan.php?id_penugasan=${id}`;
+  } else if (path === '/absensi' || path.startsWith('/absensi?')) {
+    url = '/absensi.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
+  } else if (path.startsWith('/absensi/')) {
+    const id = path.replace('/absensi/', '');
+    url = `/absensi.php?id_absensi=${id}`;
+  }
 
+  const options = { method };
   if (body !== undefined) {
-    headers['Content-Type'] = 'application/json'
-    options.body = JSON.stringify(body)
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(body);
   }
 
-  let response
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, options)
-  } catch {
-    throw new Error(
-      `API tidak dapat dihubungi. Periksa server backend di ${API_BASE_URL}.`,
-    )
+  const { ok, data: result } = await safeFetchJson(`${API_BASE}${url}`, options);
+  if (!ok || result?.success === false) {
+    // Fallback otomatis ke data lokal jika backend offline atau mengalami gangguan
+    const db = getLocalData();
+    if (path.startsWith('/karyawan')) {
+      return db.karyawan.map(k => ({
+        ...k,
+        id_karyawan: Number(k.id_karyawan),
+        nama: k.nama || '',
+        jabatan: k.jabatan || '',
+        tarif_per_jam: Number(k.tarif_per_jam) || 0,
+        status: k.status || 'aktif',
+        aktif: k.aktif ?? 1
+      }));
+    } else if (path.startsWith('/pekerjaan')) {
+      return db.pekerjaan;
+    } else if (path.startsWith('/penugasan')) {
+      return db.penugasan;
+    } else if (path.startsWith('/absensi')) {
+      return db.absensi;
+    }
+    throw new Error(result?.message || `Permintaan API gagal.`);
   }
 
-  let result
-  try {
-    result = await response.json()
-  } catch {
-    throw new Error(`Respons API tidak valid (HTTP ${response.status}).`)
-  }
-
-  if (!response.ok || result?.success !== true) {
-    const error = new Error(
-      result?.message || `Permintaan API gagal (HTTP ${response.status}).`,
-    )
-    error.status = response.status
-    throw error
-  }
-
-  return result.data
+  return result.data ?? result;
 }
 
 export function apiGet(path) {

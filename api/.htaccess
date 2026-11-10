@@ -1,0 +1,21 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /Pencatatan-kerja-frontend/api/
+
+    # Rewrite /karyawan ke pekerja.php
+    RewriteRule ^karyawan/?$ pekerja.php [L,QSA]
+    RewriteRule ^karyawan/([0-9]+)/?$ pekerja.php?id_karyawan=$1 [L,QSA]
+
+    # Rewrite /pekerjaan ke pekerjaan.php
+    RewriteRule ^pekerjaan/?$ pekerjaan.php [L,QSA]
+    RewriteRule ^pekerjaan/([0-9]+)/?$ pekerjaan.php?id_pekerjaan=$1 [L,QSA]
+    RewriteRule ^pekerjaan/tersedia/?$ pekerjaan.php?action=tersedia [L,QSA]
+
+    # Rewrite /penugasan ke penugasan.php
+    RewriteRule ^penugasan/?$ penugasan.php [L,QSA]
+    RewriteRule ^penugasan/([0-9]+)/?$ penugasan.php?id_penugasan=$1 [L,QSA]
+
+    # Rewrite /absensi ke absensi.php
+    RewriteRule ^absensi/?$ absensi.php [L,QSA]
+    RewriteRule ^absensi/([0-9]+)/?$ absensi.php?id_absensi=$1 [L,QSA]
+</IfModule>
