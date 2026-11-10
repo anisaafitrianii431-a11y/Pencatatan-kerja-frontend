@@ -59,6 +59,13 @@ const iconContent = {
   ),
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   close: <path d="m18 6-12 12M6 6l12 12" />,
+  logout: (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </>
+  ),
 }
 
 function Icon({ name, className = 'h-5 w-5' }) {
@@ -94,6 +101,7 @@ function SidebarPekerja({
   onToggleSidebar,
   onSelectMenuItem,
   onClose,
+  onLogout = () => {},
   workerName = 'Budi Santoso',
 }) {
   const [selectedItem, setSelectedItem] = useState('Dashboard')
@@ -228,7 +236,7 @@ function SidebarPekerja({
           })}
         </nav>
 
-        <div className="shrink-0 border-t border-slate-800 p-4">
+        <div className="shrink-0 border-t border-slate-800 p-4 space-y-2.5">
           <button
             className="flex w-full items-center gap-3 rounded-xl bg-slate-800/80 p-3 text-left transition hover:bg-slate-700/80 focus-visible:outline-2 focus-visible:outline-emerald-500"
             onClick={() => selectMenuItem('Profil Saya')}
@@ -244,6 +252,15 @@ function SidebarPekerja({
               </p>
               <p className="text-xs text-slate-400">Pekerja</p>
             </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-400 transition hover:bg-rose-600 hover:text-white hover:border-transparent cursor-pointer shadow-xs"
+          >
+            <Icon className="h-4 w-4" name="logout" />
+            <span>Keluar (Log Out)</span>
           </button>
         </div>
       </aside>

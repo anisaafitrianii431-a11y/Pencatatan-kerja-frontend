@@ -19,3 +19,4 @@
     RewriteRule ^absensi/?$ absensi.php [L,QSA]
     RewriteRule ^absensi/([0-9]+)/?$ absensi.php?id_absensi=$1 [L,QSA]
 </IfModule>
+

@@ -25,6 +25,7 @@ function AdminLayout({
         isMobileOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         onSelectMenuItem={handleSelectMenuItem}
+        onLogout={onLogout}
       />
 
       <div className="min-h-screen min-w-0 lg:ml-72">

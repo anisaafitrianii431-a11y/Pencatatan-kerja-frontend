@@ -29,6 +29,7 @@ function PekerjaLayout({
         onClose={() => setIsSidebarOpen(false)}
         onSelectMenuItem={handleSelectMenuItem}
         onToggleSidebar={toggleSidebar}
+        onLogout={onLogout}
         workerName={workerName}
       />
 
