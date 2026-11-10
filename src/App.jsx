@@ -51,8 +51,8 @@ import PengaturanPekerja from './pages/pekerja/PengaturanPekerja.jsx'
 import './index.css'
 import './App.css'
 
-function roleHome() {
-  return '/dashboard'
+function roleHome(role) {
+  return role === 'admin' ? '/admin' : '/karyawan'
 }
 
 function roleLabel(role) {
@@ -88,7 +88,7 @@ function ProtectedRoute({ roles }) {
     )
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />
-  if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />
+  if (roles && !roles.includes(user.role)) return <Navigate to={roleHome(user.role)} replace />
   return <Outlet />
 }
 

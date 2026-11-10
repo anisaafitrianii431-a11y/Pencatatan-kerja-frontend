@@ -253,7 +253,7 @@ export async function registerKaryawan(data) {
     // Sambungkan ke tabel karyawan MySQL jika API backend tersedia
     let assignedEmployeeId = 1
     try {
-      const res = await fetch('http://localhost/pencatatan-kerja/backend/public/api/karyawan', {
+      const res = await fetch(`${API_BASE_URL}/pekerja.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
