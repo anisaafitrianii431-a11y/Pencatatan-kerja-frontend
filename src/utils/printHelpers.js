@@ -1,16 +1,16 @@
 /**
  * printHelpers.js
  * Utilitas dan konstanta format cetak dokumen resmi (PDF & Print A4)
- * PT. WIDYA KARYA TEKNIK MANDIRI
+ * PAM-TECHNO (CV. Putra Anugrah Mandiri)
  */
 
 export const COMPANY_INFO = {
-  name: 'PT. WIDYA KARYA TEKNIK MANDIRI',
-  brand: 'WIDYA KARYA TEKNIK',
+  name: 'PAM-TECHNO (CV. PUTRA ANUGRAH MANDIRI)',
+  brand: 'PAM-TECHNO',
   tagline: 'General Contractor, Mechanical & Electrical Engineering, IT Infrastructure',
-  address: 'Jl. Ring Road Barat No. 88, Sleman, D.I. Yogyakarta 55291',
-  contact: 'Telp: (0274) 554-899 | Email: finance@widyakarya.co.id | Web: www.widyakarya.co.id',
-  city: 'Yogyakarta',
+  address: '',
+  contact: '',
+  city: '',
 };
 
 /**
@@ -81,6 +81,5 @@ export function formatTanggalCetak(date = new Date()) {
 export function generateNoDokumen(prefix, periode, id) {
   const cleanPeriode = (periode || '2026-11').replace('-', '');
   const cleanId = String(id || '01').padStart(3, '0');
-  return `WKM/${prefix}/${cleanPeriode}/${cleanId}`;
+  return `PAM/${prefix}/${cleanPeriode}/${cleanId}`;
 }
-

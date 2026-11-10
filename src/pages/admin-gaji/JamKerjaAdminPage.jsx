@@ -202,7 +202,7 @@ export default function JamKerjaAdminPage({ currentUser }) {
       {/* Pengesahan Rekapitulasi Jam Kerja Tim (Print Only) */}
       <div className="print-only">
         <PrintSignatures 
-          namaKaryawan="Pimpinan PT. Widya Karya Teknik Mandiri"
+          namaKaryawan="Pimpinan PAM-TECHNO (CV. Putra Anugrah Mandiri)"
           jabatanKaryawan="Direktur Operasional"
           type="3-col"
         />

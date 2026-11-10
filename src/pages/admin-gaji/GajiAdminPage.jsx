@@ -859,7 +859,7 @@ export default function GajiAdminPage({ currentUser }) {
       {/* Pengesahan Rekapitulasi Penggajian Bulanan (Khusus Cetak Rekap) */}
       <div className="print-only">
         <PrintSignatures 
-          namaKaryawan="Pimpinan PT. Widya Karya Teknik Mandiri"
+          namaKaryawan="Pimpinan PAM-TECHNO (CV. Putra Anugrah Mandiri)"
           jabatanKaryawan="Direktur Operasional & Keuangan"
           type="3-col"
         />

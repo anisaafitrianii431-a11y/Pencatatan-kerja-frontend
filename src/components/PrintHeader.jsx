@@ -13,6 +13,7 @@ export default function PrintHeader({
   tanggalCetak = ''
 }) {
   const tgl = tanggalCetak || formatTanggalCetak();
+  const companyDetails = [COMPANY_INFO.address, COMPANY_INFO.contact].filter(Boolean).join(' | ');
 
   return (
     <div className="print-header-kop mb-5 print-avoid-break">
@@ -20,7 +21,7 @@ export default function PrintHeader({
       <div className="flex items-start justify-between pb-3">
         <div className="flex items-center space-x-3.5">
           <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-lg tracking-wider border-2 border-slate-700 shadow-sm print:border-slate-800">
-            WKM
+            PAM
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight uppercase">
@@ -29,9 +30,11 @@ export default function PrintHeader({
             <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium tracking-wide">
               {COMPANY_INFO.tagline}
             </p>
-            <p className="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">
-              {COMPANY_INFO.address} • {COMPANY_INFO.contact}
-            </p>
+            {companyDetails && (
+              <p className="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">
+                {companyDetails}
+              </p>
+            )}
           </div>
         </div>
 
@@ -71,4 +74,3 @@ export default function PrintHeader({
     </div>
   );
 }
-

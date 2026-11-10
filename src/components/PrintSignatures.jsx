@@ -11,7 +11,7 @@ export default function PrintSignatures({
   type = '3-col', // '3-col' atau '2-col'
   tanggal = ''
 }) {
-  const tglFormatted = tanggal || `${COMPANY_INFO.city}, ${formatTanggalCetak()}`;
+  const tglFormatted = tanggal || [COMPANY_INFO.city, formatTanggalCetak()].filter(Boolean).join(', ');
 
   if (type === '2-col') {
     return (
@@ -55,7 +55,7 @@ export default function PrintSignatures({
         </div>
 
         <div className="text-[9px] text-slate-400 text-center italic mt-5">
-          * Dokumen slip gaji ini merupakan bukti sah pembayaran hak kerja yang diterbitkan secara resmi oleh sistem komputerisasi PT. Widya Karya Teknik Mandiri.
+          * Dokumen slip gaji ini merupakan bukti sah pembayaran hak kerja yang diterbitkan secara resmi oleh sistem komputerisasi PAM-TECHNO (CV. Putra Anugrah Mandiri).
         </div>
       </div>
     );
@@ -118,9 +118,8 @@ export default function PrintSignatures({
       </div>
 
       <div className="text-[9px] text-slate-400 text-center italic mt-5">
-        * Dokumen ini sah dan diterbitkan secara resmi oleh Sistem Penggajian & Rekapitulasi Operasional PT. Widya Karya Teknik Mandiri.
+        * Dokumen ini sah dan diterbitkan secara resmi oleh Sistem Penggajian & Rekapitulasi Operasional PAM-TECHNO (CV. Putra Anugrah Mandiri).
       </div>
     </div>
   );
 }
-
