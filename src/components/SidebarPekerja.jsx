@@ -45,6 +45,13 @@ const iconContent = {
       <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
     </>
   ),
+  payroll: (
+    <>
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M6 12h.01M18 12h.01" />
+    </>
+  ),
   profile: (
     <>
       <circle cx="12" cy="8" r="4" />
@@ -91,6 +98,7 @@ const mainMenuItems = [
   { label: 'Pekerjaan Saya', icon: 'mine' },
   { label: 'Riwayat Pengajuan', icon: 'history' },
   { label: 'Rekap Absensi', icon: 'recap' },
+  { label: 'Gaji Saya', icon: 'payroll' },
   { label: 'Pengeluaran Saya', icon: 'receipt' },
   { label: 'Presensi & Jam Kerja', icon: 'attendance' },
 ]

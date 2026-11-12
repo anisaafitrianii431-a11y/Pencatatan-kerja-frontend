@@ -109,6 +109,52 @@ if (isset($_FILES['foto_kwitansi']) && $_FILES['foto_kwitansi']['error'] === UPL
 }
 
 if ($method === 'GET') {
+    $action = $_GET['action'] ?? '';
+
+    // ==========================================
+    // DANA KANTOR TERSEDIA UNTUK PEKERJA
+    // ==========================================
+    if ($action === 'dana_tersedia') {
+        $stmt = $pdo->query("
+            SELECT d.*, 
+                   k.nama AS nama_penanggung_jawab,
+                   k.kode_karyawan AS kode_pj,
+                   k.jabatan AS jabatan_pj
+            FROM dana_kantor d
+            JOIN karyawan k ON d.id_penanggung_jawab = k.id_karyawan
+            ORDER BY d.tanggal DESC, d.id_dana DESC
+        ");
+        $allDana = $stmt->fetchAll();
+        $result = [];
+        foreach ($allDana as $d) {
+            $idDana = (int)$d['id_dana'];
+            $idPj = (int)$d['id_penanggung_jawab'];
+
+            $qUsed = $pdo->prepare("
+                SELECT IFNULL(SUM(nominal), 0) FROM pengeluaran 
+                WHERE jenis_dana = 'kantor' AND status_verifikasi = 'disetujui' AND (id_dana = ? OR (id_dana IS NULL AND id_penanggung_jawab = ?))
+            ");
+            $qUsed->execute([$idDana, $idPj]);
+            $used = floatval($qUsed->fetchColumn());
+
+            $qReturned = $pdo->prepare("
+                SELECT IFNULL(SUM(nominal), 0) FROM pengembalian_dana 
+                WHERE status_verifikasi = 'disetujui' AND id_dana = ?
+            ");
+            $qReturned->execute([$idDana]);
+            $returned = floatval($qReturned->fetchColumn());
+
+            $sisa = max(0, floatval($d['nominal']) - $used - $returned);
+            $result[] = array_merge($d, [
+                'nominal'    => floatval($d['nominal']),
+                'terpakai'   => $used,
+                'dikembalikan'=> $returned,
+                'sisa_dana'  => $sisa
+            ]);
+        }
+        jsonResponse(true, "Daftar dana kantor tersedia", $result);
+    }
+
     // K-06: Pekerja hanya melihat pengeluaran pada proyek yang ditugaskan & dicatat dirinya
     $id_pekerjaan = isset($_GET['id_pekerjaan']) ? intval($_GET['id_pekerjaan']) : 0;
     $jenis_dana = $_GET['jenis_dana'] ?? '';
@@ -130,10 +176,15 @@ if ($method === 'GET') {
     $sql = "
         SELECT pg.*,
                k.nama AS nama_karyawan,
-               p.nama_pekerjaan
+               p.nama_pekerjaan,
+               pj.nama AS nama_penanggung_jawab,
+               pj.kode_karyawan AS kode_pj,
+               d.sumber_dana
         FROM pengeluaran pg
         JOIN karyawan k ON pg.id_karyawan = k.id_karyawan
         JOIN pekerjaan p ON pg.id_pekerjaan = p.id_pekerjaan
+        LEFT JOIN karyawan pj ON pg.id_penanggung_jawab = pj.id_karyawan
+        LEFT JOIN dana_kantor d ON pg.id_dana = d.id_dana
         $whereClause
         ORDER BY pg.tanggal DESC, pg.id_pengeluaran DESC
     ";
@@ -195,14 +246,61 @@ if ($method === 'GET') {
     }
 
     // ==========================================
-    // 2. CREATE PENGELUARAN (BARU)
+    // 2. FORM PENGEMBALIAN DANA OLEH PEKERJA
+    // ==========================================
+    if ($action === 'pengembalian') {
+        $id_dana = !empty($body['id_dana']) ? intval($body['id_dana']) : null;
+        $id_penanggung_jawab = intval($body['id_penanggung_jawab'] ?? 0);
+        $tanggal = !empty($body['tanggal']) ? $body['tanggal'] : date('Y-m-d');
+        $nominal = floatval($body['nominal'] ?? 0);
+        $penerima = trim($body['penerima_pengembalian'] ?? 'Administrator');
+        $keterangan = htmlspecialchars(trim($body['keterangan'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $bukti = trim($body['bukti_pengembalian'] ?? '');
+
+        if (!empty($uploadedFilePath)) {
+            $bukti = $uploadedFilePath;
+        }
+
+        if ($nominal <= 0) {
+            jsonResponse(false, "Nominal pengembalian dana harus lebih dari 0", null, 400);
+        }
+
+        if ($id_dana && !$id_penanggung_jawab) {
+            $stmtD = $pdo->prepare("SELECT id_penanggung_jawab FROM dana_kantor WHERE id_dana = ?");
+            $stmtD->execute([$id_dana]);
+            $id_penanggung_jawab = intval($stmtD->fetchColumn() ?: $kId);
+        }
+        if (!$id_penanggung_jawab) {
+            $id_penanggung_jawab = $kId;
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO pengembalian_dana (id_dana, id_karyawan, id_penanggung_jawab, tanggal, nominal, penerima_pengembalian, keterangan, bukti_pengembalian, status_verifikasi)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'menunggu')
+        ");
+        $stmt->execute([$id_dana, $kId, $id_penanggung_jawab, $tanggal, $nominal, $penerima, $keterangan, $bukti]);
+
+        jsonResponse(true, "Pengembalian dana berhasil diajukan dan menunggu verifikasi Admin!", [
+            'id_pengembalian' => $pdo->lastInsertId()
+        ], 201);
+    }
+
+    // ==========================================
+    // 3. CREATE PENGELUARAN (BARU)
     // ==========================================
     $id_pekerjaan = intval($body['id_pekerjaan'] ?? 0);
     $tanggal = !empty($body['tanggal']) ? $body['tanggal'] : date('Y-m-d');
     $nominal = floatval($body['nominal'] ?? 0);
+    $kategori = trim($body['kategori'] ?? 'operasional');
     $jenis_dana = $body['jenis_dana'] ?? 'pribadi';
+    $id_dana = !empty($body['id_dana']) ? intval($body['id_dana']) : null;
+    $id_penanggung_jawab = !empty($body['id_penanggung_jawab']) ? intval($body['id_penanggung_jawab']) : null;
     $keterangan = htmlspecialchars(trim($body['keterangan'] ?? ''), ENT_QUOTES, 'UTF-8');
     $foto_kwitansi = trim($body['foto_kwitansi'] ?? '');
+
+    if (!empty($uploadedFilePath)) {
+        $foto_kwitansi = $uploadedFilePath;
+    }
 
     if ($id_pekerjaan <= 0 || $nominal <= 0) {
         jsonResponse(false, "Pekerjaan dan Nominal pengeluaran wajib valid", null, 400);
@@ -210,6 +308,22 @@ if ($method === 'GET') {
 
     if (!in_array($jenis_dana, ['kantor', 'pribadi'])) {
         jsonResponse(false, "Jenis dana harus 'kantor' atau 'pribadi'", null, 400);
+    }
+
+    // Jika dana kantor, validasi relasi dana kantor & penanggung jawab
+    if ($jenis_dana === 'kantor') {
+        if ($id_dana && !$id_penanggung_jawab) {
+            $stmtD = $pdo->prepare("SELECT id_penanggung_jawab FROM dana_kantor WHERE id_dana = ?");
+            $stmtD->execute([$id_dana]);
+            $id_penanggung_jawab = intval($stmtD->fetchColumn() ?: 0);
+        }
+        if (!$id_penanggung_jawab) {
+            // default penanggung jawab adalah karyawan itu sendiri
+            $id_penanggung_jawab = $kId;
+        }
+    } else {
+        $id_dana = null;
+        $id_penanggung_jawab = null;
     }
 
     // F-04: Cek status pekerjaan tidak boleh 'selesai'
@@ -231,10 +345,10 @@ if ($method === 'GET') {
     }
 
     $stmt = $pdo->prepare("
-        INSERT INTO pengeluaran (id_pekerjaan, id_karyawan, tanggal, nominal, jenis_dana, keterangan, foto_kwitansi, status_verifikasi, status_ganti)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'menunggu', 'belum')
+        INSERT INTO pengeluaran (id_pekerjaan, id_karyawan, tanggal, nominal, kategori, jenis_dana, id_dana, id_penanggung_jawab, keterangan, foto_kwitansi, status_verifikasi, status_ganti)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'menunggu', 'belum')
     ");
-    $stmt->execute([$id_pekerjaan, $kId, $tanggal, $nominal, $jenis_dana, $keterangan, $foto_kwitansi]);
+    $stmt->execute([$id_pekerjaan, $kId, $tanggal, $nominal, $kategori, $jenis_dana, $id_dana, $id_penanggung_jawab, $keterangan, $foto_kwitansi]);
 
     jsonResponse(true, "Pengeluaran berhasil dicatat!", [
         "id_pengeluaran" => $pdo->lastInsertId(),

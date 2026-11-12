@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { STATUS_PEKERJAAN_OPTIONS } from '../../data/pekerjaan.js'
 import { getKaryawan } from '../../services/karyawanApi.js'
 import { getPekerjaan } from '../../services/pekerjaanApi.js'
@@ -247,6 +248,11 @@ function AssignmentDetailModal({ assignment, employee, job, onClose }) {
 }
 
 function Penugasan() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialJobFilter = searchParams.get('pekerjaan') || ''
+  const initialEmpFilter = searchParams.get('karyawan') || ''
+
   const [store, setStore] = useState({
     assignments: [],
     employees: [],
@@ -264,13 +270,22 @@ function Penugasan() {
 
   // Filters & Pagination
   const [search, setSearch] = useState('')
-  const [employeeFilter, setEmployeeFilter] = useState('')
-  const [jobFilter, setJobFilter] = useState('')
+  const [employeeFilter, setEmployeeFilter] = useState(initialEmpFilter)
+  const [jobFilter, setJobFilter] = useState(initialJobFilter)
   const [methodFilter, setMethodFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [deadlineFilter, setDeadlineFilter] = useState('')
   const [page, setPage] = useState(1)
   const isMounted = useRef(false)
+
+  useEffect(() => {
+    if (searchParams.get('pekerjaan')) {
+      setJobFilter(searchParams.get('pekerjaan'))
+    }
+    if (searchParams.get('karyawan')) {
+      setEmployeeFilter(searchParams.get('karyawan'))
+    }
+  }, [searchParams])
 
   async function loadData() {
     try {
@@ -437,6 +452,7 @@ function Penugasan() {
     setStore((current) => ({ ...current, isSaving: true, error: '' }))
     try {
       await deletePenugasan(assignment.id_penugasan)
+      window.dispatchEvent(new CustomEvent('penugasan_updated'))
       showToast('Penugasan berhasil dibatalkan.')
       setPendingCancel(null)
       await loadData()
@@ -553,7 +569,7 @@ function Penugasan() {
         </div>
       )}
 
-      {/* 4 Kartu Statistik Monitoring */}
+      {/* 4 Kartu Statistik Monitoring (Interaktif & Bisa Diklik) */}
       <section
         aria-label="Statistik Monitoring"
         className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4"
@@ -562,48 +578,75 @@ function Penugasan() {
           {
             label: 'Total Penugasan Aktif',
             value: statistics.total,
+            methodKey: '',
             tone: 'bg-blue-50 text-blue-600 ring-1 ring-blue-600/10',
-            sub: 'Relasi kerja tercatat',
+            activeClass: 'border-2 border-blue-600 bg-blue-50/40 ring-2 ring-blue-600/20',
+            sub: 'Relasi kerja tercatat • Klik semua',
           },
           {
             label: 'Ditetapkan Admin',
             value: statistics.adminAssigned,
+            methodKey: 'admin',
             tone: 'bg-sky-50 text-sky-600 ring-1 ring-sky-600/10',
-            sub: 'Penetapan langsung',
+            activeClass: 'border-2 border-sky-600 bg-sky-50/40 ring-2 ring-sky-600/20',
+            sub: 'Penetapan langsung • Klik filter',
           },
           {
             label: 'Diambil Mandiri',
             value: statistics.mandiriAssigned,
+            methodKey: 'mandiri',
             tone: 'bg-purple-50 text-purple-600 ring-1 ring-purple-600/10',
-            sub: 'Dari pekerjaan terbuka',
+            activeClass: 'border-2 border-purple-600 bg-purple-50/40 ring-2 ring-purple-600/20',
+            sub: 'Pekerjaan terbuka • Klik filter',
           },
           {
             label: 'Total Pekerja Terlibat',
             value: statistics.uniqueWorkers,
+            methodKey: 'all_workers',
             tone: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/10',
-            sub: 'Teknisi aktif',
+            activeClass: 'border-2 border-emerald-600 bg-emerald-50/40 ring-2 ring-emerald-600/20',
+            sub: 'Teknisi aktif di proyek',
           },
-        ].map((stat) => (
-          <article
-            key={stat.label}
-            className="flex items-center justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm"
-          >
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                {stat.label}
-              </p>
-              <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-                {isLoading ? '—' : stat.value}
-              </p>
-              <p className="mt-0.5 text-[11px] text-slate-400">{stat.sub}</p>
-            </div>
-            <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${stat.tone}`}
+        ].map((stat) => {
+          const isActive = stat.methodKey === '' ? methodFilter === '' : methodFilter === stat.methodKey
+
+          return (
+            <button
+              key={stat.label}
+              type="button"
+              onClick={() => {
+                if (stat.methodKey === 'all_workers') {
+                  resetFilters()
+                } else {
+                  setMethodFilter((curr) => (stat.methodKey === '' ? '' : curr === stat.methodKey ? '' : stat.methodKey))
+                  setPage(1)
+                }
+              }}
+              className={`flex items-center justify-between rounded-xl p-4 text-left transition shadow-xs cursor-pointer ${
+                isActive && stat.methodKey !== 'all_workers'
+                  ? stat.activeClass
+                  : 'border border-slate-200/90 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+              }`}
             >
-              <Icon name="assignments" className="h-5 w-5" />
-            </div>
-          </article>
-        ))}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  {stat.label}
+                </p>
+                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                  {isLoading ? '—' : stat.value}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-400">{stat.sub}</p>
+              </div>
+              <div
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition ${
+                  isActive && stat.methodKey !== 'all_workers' ? 'bg-slate-900 text-white shadow-xs' : stat.tone
+                }`}
+              >
+                <Icon name="assignments" className="h-5 w-5" />
+              </div>
+            </button>
+          )
+        })}
       </section>
 
       {/* Toolbar Pencarian & Filter */}
@@ -850,9 +893,18 @@ function Penugasan() {
                             className="h-8 w-8 text-xs font-bold shadow-sm"
                           />
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(
+                                  `/admin/karyawan?highlight=${assignment.id_karyawan}`,
+                                )
+                              }
+                              className="text-left text-sm font-semibold text-slate-900 hover:text-blue-600 transition cursor-pointer"
+                              title="Buka data karyawan"
+                            >
                               {assignment.nama_karyawan || employee?.nama}
-                            </p>
+                            </button>
                             <p className="text-[11px] text-slate-500">
                               {assignment.jabatan || employee?.jabatan || 'Teknisi'}
                             </p>
@@ -862,9 +914,18 @@ function Penugasan() {
 
                       {/* Pekerjaan Terkait */}
                       <td className="px-4 py-3 max-w-64">
-                        <p className="truncate text-sm font-semibold text-slate-900">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              `/admin/pekerjaan?highlight=${assignment.id_pekerjaan}`,
+                            )
+                          }
+                          className="truncate text-left text-sm font-semibold text-slate-900 hover:text-blue-600 transition cursor-pointer max-w-full block"
+                          title="Buka detail proyek"
+                        >
                           {assignment.nama_pekerjaan || job?.nama_pekerjaan}
-                        </p>
+                        </button>
                         <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
                           <Icon name="location" className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                           <span className="truncate">

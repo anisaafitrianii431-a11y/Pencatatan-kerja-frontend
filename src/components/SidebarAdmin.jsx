@@ -54,6 +54,13 @@ const iconContent = {
       <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
     </>
   ),
+  payroll: (
+    <>
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M6 12h.01M18 12h.01" />
+    </>
+  ),
   menu: (
     <>
       <path d="M4 6h16M4 12h16M4 18h16" />
@@ -96,9 +103,10 @@ const menuItems = [
   { label: 'Data Pekerjaan', icon: 'jobs' },
   { label: 'Penugasan', icon: 'assignments' },
   { label: 'Rekap Absensi', icon: 'recap' },
-  { label: 'Manajemen Pengguna', icon: 'users' },
+  { label: 'Gaji', icon: 'payroll' },
   { label: 'Pengeluaran & Kwitansi', icon: 'receipt' },
   { label: 'Lokasi Kerja', icon: 'location' },
+  { label: 'Manajemen Pengguna', icon: 'users' },
 ]
 
 function SidebarAdmin({

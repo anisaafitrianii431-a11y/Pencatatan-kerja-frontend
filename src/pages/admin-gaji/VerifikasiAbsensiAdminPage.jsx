@@ -38,6 +38,16 @@ export default function VerifikasiAbsensiAdminPage({ currentUser }) {
 
   useEffect(() => {
     loadData();
+
+    function handleSyncEvent() {
+      loadData();
+    }
+    window.addEventListener('storage', handleSyncEvent);
+    window.addEventListener('absensi_updated', handleSyncEvent);
+    return () => {
+      window.removeEventListener('storage', handleSyncEvent);
+      window.removeEventListener('absensi_updated', handleSyncEvent);
+    };
   }, [filterStatus]);
 
   // Aksi Verifikasi Absensi

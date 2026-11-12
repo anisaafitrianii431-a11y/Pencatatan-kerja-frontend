@@ -15,6 +15,14 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
 }
 
+function formatJamMenit(totalMinutes) {
+  const safe = Math.round(Number(totalMinutes) || 0)
+  if (safe <= 0) return '0j 0m'
+  const jam = Math.floor(safe / 60)
+  const menit = safe % 60
+  return `${jam}j ${menit}m`
+}
+
 function Icon({ name, className = 'h-5 w-5' }) {
   const paths = {
     briefcase: (
@@ -75,7 +83,7 @@ function Icon({ name, className = 'h-5 w-5' }) {
 function StatusBadge({ status }) {
   if (status === 'disetujui') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         Disetujui
       </span>
@@ -83,16 +91,16 @@ function StatusBadge({ status }) {
   }
   if (status === 'ditolak') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-rose-600/20">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-rose-600/20">
         <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
         Ditolak
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-600/20">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-600/20">
       <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-      Menunggu
+      Menunggu Verifikasi
     </span>
   )
 }
@@ -156,6 +164,17 @@ export default function RekapAbsensiPekerja({ workerId = 1, workerName = 'Budi S
 
   useEffect(() => {
     loadWorkerData()
+
+    function handleSyncEvent() {
+      loadWorkerData()
+    }
+
+    window.addEventListener('storage', handleSyncEvent)
+    window.addEventListener('absensi_updated', handleSyncEvent)
+    return () => {
+      window.removeEventListener('storage', handleSyncEvent)
+      window.removeEventListener('absensi_updated', handleSyncEvent)
+    }
   }, [normalizedWorkerId])
 
   // A. Penugasan milik worker yang login
@@ -181,14 +200,14 @@ export default function RekapAbsensiPekerja({ workerId = 1, workerName = 'Budi S
     const approvedSessions = mySessions.filter(
       (a) => a.status_verifikasi === 'disetujui' && a.jam_pulang !== null,
     )
-    const totalMenitDisetujui = approvedSessions.reduce((acc, curr) => acc + (curr.durasi_menit || 0), 0)
-    const jamDisetujui = Math.floor(totalMenitDisetujui / 60)
-    const sisaMenitDisetujui = totalMenitDisetujui % 60
+    const totalMenitDisetujui = Math.round(
+      approvedSessions.reduce((acc, curr) => acc + (Number(curr.durasi_menit) || 0), 0)
+    )
 
     // Jam keseluruhan (termasuk yang menunggu)
-    const totalMenitSemua = mySessions.reduce((acc, curr) => acc + (curr.durasi_menit || 0), 0)
-    const jamSemua = Math.floor(totalMenitSemua / 60)
-    const sisaMenitSemua = totalMenitSemua % 60
+    const totalMenitSemua = Math.round(
+      mySessions.reduce((acc, curr) => acc + (Number(curr.durasi_menit) || 0), 0)
+    )
 
     const waitingSessions = mySessions.filter((a) => a.status_verifikasi === 'menunggu')
 
@@ -198,17 +217,16 @@ export default function RekapAbsensiPekerja({ workerId = 1, workerName = 'Budi S
       const job = jobs.find((j) => j.id_pekerjaan === session.id_pekerjaan)
       const jobName = job?.nama_pekerjaan || session.nama_pekerjaan || 'Proyek Lapangan'
       const currentMenit = contributionMap.get(jobName) || 0
-      contributionMap.set(jobName, currentMenit + (session.durasi_menit || 0))
+      contributionMap.set(jobName, Math.round(currentMenit + (Number(session.durasi_menit) || 0)))
     }
 
-    const contributions = Array.from(contributionMap.entries()).map(([jobName, menit]) => {
+    const contributions = Array.from(contributionMap.entries()).map(([jobName, rawMenit]) => {
+      const menit = Math.round(Number(rawMenit) || 0)
       const percentage = totalMenitDisetujui > 0 ? Math.round((menit / totalMenitDisetujui) * 100) : 0
-      const j = Math.floor(menit / 60)
-      const m = menit % 60
       return {
         jobName,
         menit,
-        label: `${j}j ${m}m`,
+        label: formatJamMenit(menit),
         percentage,
       }
     })
@@ -217,8 +235,8 @@ export default function RekapAbsensiPekerja({ workerId = 1, workerName = 'Budi S
       mySessions,
       approvedSessions,
       totalMenitDisetujui,
-      labelDisetujui: `${jamDisetujui}j ${sisaMenitDisetujui}m`,
-      labelSemua: `${jamSemua}j ${sisaMenitSemua}m`,
+      labelDisetujui: formatJamMenit(totalMenitDisetujui),
+      labelSemua: formatJamMenit(totalMenitSemua),
       totalSesi: mySessions.length,
       totalMenunggu: waitingSessions.length,
       contributions,
@@ -510,7 +528,7 @@ export default function RekapAbsensiPekerja({ workerId = 1, workerName = 'Budi S
                               {session.jam_masuk?.slice(0, 5)} – {session.jam_pulang?.slice(0, 5) || 'Aktif'}
                             </p>
                             <p className="font-bold text-emerald-600 text-[11px]">
-                              {session.durasi_format || `${session.durasi_jam || 0} jam`}
+                              {session.durasi_format || formatJamMenit(Number(session.durasi_menit) || (Number(session.durasi_jam) * 60))}
                             </p>
                           </div>
                         </div>
@@ -631,7 +649,7 @@ export default function RekapAbsensiPekerja({ workerId = 1, workerName = 'Budi S
                               {item.jam_pulang ? item.jam_pulang.slice(0, 5) : '—'}
                             </td>
                             <td className="px-4 py-3 font-bold text-emerald-600">
-                              {item.durasi_format || `${item.durasi_jam || 0} jam`}
+                              {item.durasi_format || formatJamMenit(Number(item.durasi_menit) || (Number(item.durasi_jam) * 60))}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <StatusBadge status="disetujui" />

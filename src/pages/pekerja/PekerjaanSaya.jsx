@@ -149,7 +149,7 @@ function AssignmentBadge({ type }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-600/15">
         <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-        Diambil Mandiri
+        Diambil Sendiri
       </span>
     )
   }
@@ -157,7 +157,7 @@ function AssignmentBadge({ type }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-600/15">
       <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-      Ditetapkan Admin
+      Dipilih Admin
     </span>
   )
 }
@@ -280,14 +280,20 @@ function WorkCard({ job, assignment, onOpen }) {
 
       <h2 className="mt-4 text-lg font-semibold leading-6 text-slate-900">{job.nama_pekerjaan}</h2>
 
-      {deadlineBadge && (
-        <div className="mt-2.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        {Number(job.total_pekerja_aktif || job.total_pekerja || 1) > 1 && (
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            👥 {job.total_pekerja_aktif || job.total_pekerja} Anggota Tim
+          </span>
+        )}
+
+        {deadlineBadge && (
           <span className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs ${deadlineBadge.className}`}>
             <Icon className="h-3.5 w-3.5 shrink-0" name="calendar" />
             {deadlineBadge.label}
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       <p className="mt-3 line-clamp-2 min-h-12 text-sm leading-6 text-slate-500">
         {job.deskripsi || 'Belum ada deskripsi pekerjaan.'}

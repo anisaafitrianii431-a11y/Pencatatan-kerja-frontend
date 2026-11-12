@@ -1352,3 +1352,91 @@ body {
     height: 2.5rem;
   }
 }
+
+/* ==========================================================================
+   OFFICIAL CORPORATE REPORT PRINT STYLES (A4 DOCUMENT)
+   ========================================================================== */
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+
+  /* Sembunyikan elemen navigasi dan kontrol layar */
+  aside,
+  nav,
+  header,
+  .no-print,
+  button,
+  input,
+  select,
+  .screen-only,
+  .admin-theme > div > div:first-child, /* Navbar Admin */
+  .fixed,
+  .sticky {
+    display: none !important;
+  }
+
+  /* Reset layout halaman ke kertas putih bersih */
+  html,
+  body,
+  #root,
+  .admin-theme,
+  .min-h-screen,
+  main {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .lg\:ml-72 {
+    margin-left: 0 !important;
+  }
+
+  /* Tampilkan kontainer cetak resmi */
+  .print-only {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Hindari pemotongan tabel atau tanda tangan di tengah halaman */
+  .print-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Penyesuaian tipografi cetak */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10pt !important;
+  }
+
+  th, td {
+    padding: 4pt 6pt !important;
+    border-color: #94a3b8 !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+

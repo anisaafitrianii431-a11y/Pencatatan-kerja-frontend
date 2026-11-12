@@ -20,8 +20,13 @@ export default function PrintHeader({
       {/* 1. KOP SURAT PERUSAHAAN */}
       <div className="flex items-start justify-between pb-3">
         <div className="flex items-center space-x-3.5">
+<<<<<<< HEAD
           <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-lg tracking-wider border-2 border-slate-700 shadow-sm print:border-slate-800">
             PAM
+=======
+          <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-lg tracking-wider border-2 border-blue-700 shadow-sm print:border-slate-800">
+            PK
+>>>>>>> 155e110 (update admin)
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight uppercase">
