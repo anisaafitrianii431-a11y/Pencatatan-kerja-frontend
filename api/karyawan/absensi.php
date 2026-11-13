@@ -143,11 +143,13 @@ if ($method === 'GET') {
         if (!$jobData) {
             jsonResponse(false, "Data pekerjaan tidak ditemukan dalam sistem.", null, 404);
         }
-        if ($jobData['status'] === 'belum_mulai') {
-            jsonResponse(false, "Absensi terkunci: pekerjaan \"{$jobData['nama_pekerjaan']}\" masih berstatus Belum Dimulai.", null, 422);
-        }
         if ($jobData['status'] === 'selesai') {
             jsonResponse(false, "Pekerjaan ini sudah berstatus selesai dan tidak dapat menerima absensi baru.", null, 422);
+        }
+        if ($jobData['status'] === 'belum_mulai') {
+            // Aktifkan otomatis pekerjaan menjadi 'berjalan' saat karyawan ditugaskan melakukan absensi
+            $pdo->prepare("UPDATE pekerjaan SET status = 'berjalan' WHERE id_pekerjaan = ?")->execute([$id_pekerjaan]);
+            $jobData['status'] = 'berjalan';
         }
         if ($jobData['status'] !== 'berjalan') {
             jsonResponse(false, "Absensi terkunci: pekerjaan harus berstatus Sedang Berjalan.", null, 422);

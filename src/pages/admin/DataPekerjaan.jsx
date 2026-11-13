@@ -1193,7 +1193,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       radius_meter: values.radius_meter ? Number(values.radius_meter) : 100,
       tanggal_mulai: values.tanggal_mulai || null,
       target_selesai: values.target_selesai || null,
-      status: isEdit ? values.status : STATUS_PEKERJAAN.BELUM_MULAI,
+      status: values.status || STATUS_PEKERJAAN.BELUM_MULAI,
       metode_penentuan: values.metode_penentuan,
       kuota_pekerja:
         values.is_unlimited_kuota || !values.kuota_pekerja
@@ -1460,23 +1460,100 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
             </div>
           </div>
 
-          {/* Status Pekerjaan (Otomatis) */}
-          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-xs text-slate-600">
-            <span className="font-semibold text-slate-800 block mb-0.5">
-              Status Pekerjaan:{' '}
-              <span className="text-blue-600 font-bold">
-                {mode === 'create'
-                  ? 'Belum Dimulai (Otomatis)'
-                  : values.status === 'selesai'
-                  ? 'Selesai'
-                  : values.status === 'berjalan'
-                  ? 'Sedang Berjalan'
-                  : 'Belum Dimulai'}
+          {/* Status Pekerjaan (Dapat Ditentukan / Diedit Admin) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span>Status Pekerjaan:</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  values.status === STATUS_PEKERJAAN.BERJALAN
+                    ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-700/20'
+                    : values.status === STATUS_PEKERJAAN.SELESAI
+                    ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-600/20'
+                    : 'bg-amber-100 text-amber-800 ring-1 ring-amber-600/20'
+                }`}>
+                  {values.status === STATUS_PEKERJAAN.BERJALAN
+                    ? 'Sedang Berjalan'
+                    : values.status === STATUS_PEKERJAAN.SELESAI
+                    ? 'Selesai'
+                    : 'Belum Dimulai'}
+                </span>
+              </label>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Pilih status untuk membuka / mengunci izin absensi
               </span>
-            </span>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Status berubah menjadi <em>Sedang Berjalan</em> saat karyawan melakukan absensi masuk pertama, dan menjadi <em>Selesai</em> setelah Admin menyetujui laporan akhir penyelesaian pekerjaan.
-            </p>
+            </div>
+
+            {/* Tombol Pilihan Status Interaktif */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* 1. Belum Dimulai */}
+              <button
+                type="button"
+                onClick={() => updateField('status', STATUS_PEKERJAAN.BELUM_MULAI)}
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition cursor-pointer border ${
+                  values.status === STATUS_PEKERJAAN.BELUM_MULAI
+                    ? 'bg-amber-500 text-white border-amber-600 shadow-sm ring-2 ring-amber-500/20'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${values.status === STATUS_PEKERJAAN.BELUM_MULAI ? 'bg-white' : 'bg-amber-500'}`} />
+                <span>Belum Dimulai</span>
+              </button>
+
+              {/* 2. Sedang Berjalan (Absensi Aktif) */}
+              <button
+                type="button"
+                onClick={() => updateField('status', STATUS_PEKERJAAN.BERJALAN)}
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition cursor-pointer border ${
+                  values.status === STATUS_PEKERJAAN.BERJALAN
+                    ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-600/20'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50/50 hover:text-blue-700 hover:border-blue-300'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${values.status === STATUS_PEKERJAAN.BERJALAN ? 'bg-white animate-pulse' : 'bg-blue-500'}`} />
+                <span>Sedang Berjalan (Absen Buka)</span>
+              </button>
+
+              {/* 3. Selesai */}
+              <button
+                type="button"
+                onClick={() => updateField('status', STATUS_PEKERJAAN.SELESAI)}
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition cursor-pointer border ${
+                  values.status === STATUS_PEKERJAAN.SELESAI
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm ring-2 ring-emerald-600/20'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${values.status === STATUS_PEKERJAAN.SELESAI ? 'bg-white' : 'bg-emerald-500'}`} />
+                <span>Selesai</span>
+              </button>
+            </div>
+
+            {/* Keterangan Status Kontekstual */}
+            <div className="text-[11px] leading-relaxed pt-0.5">
+              {values.status === STATUS_PEKERJAAN.BERJALAN ? (
+                <div className="flex items-start gap-1.5 text-blue-700 bg-blue-50/80 px-2.5 py-1.5 rounded-lg border border-blue-200/60">
+                  <span className="font-bold">✓</span>
+                  <span>
+                    Status <strong>Sedang Berjalan</strong>: Karyawan yang ditugaskan dapat langsung melakukan absensi masuk dan pulang pada proyek ini.
+                  </span>
+                </div>
+              ) : values.status === STATUS_PEKERJAAN.SELESAI ? (
+                <div className="flex items-start gap-1.5 text-emerald-700 bg-emerald-50/80 px-2.5 py-1.5 rounded-lg border border-emerald-200/60">
+                  <span className="font-bold">✓</span>
+                  <span>
+                    Status <strong>Selesai</strong>: Seluruh pekerjaan telah tuntas dan absensi baru ditutup.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-1.5 text-amber-800 bg-amber-50/80 px-2.5 py-1.5 rounded-lg border border-amber-200/60">
+                  <span className="font-bold">ℹ</span>
+                  <span>
+                    Status <strong>Belum Dimulai</strong>: Absensi terkunci. Klik tombol <strong>"Sedang Berjalan (Absen Buka)"</strong> di atas agar karyawan bisa absen.
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Siapa yang Menentukan Pekerja? (3 Metode) */}
