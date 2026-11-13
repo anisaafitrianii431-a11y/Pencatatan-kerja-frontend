@@ -143,6 +143,12 @@ function ensureKaryawanProfileSchema($pdo) {
         if (!$pdo->query("SHOW COLUMNS FROM karyawan LIKE 'no_rekening'")->fetch()) {
             $pdo->exec("ALTER TABLE karyawan ADD COLUMN no_rekening VARCHAR(60) DEFAULT NULL AFTER nama_bank");
         }
+        if (!$pdo->query("SHOW COLUMNS FROM karyawan LIKE 'kode_karyawan'")->fetch()) {
+            $pdo->exec("ALTER TABLE karyawan ADD COLUMN kode_karyawan VARCHAR(30) DEFAULT NULL AFTER jabatan");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM `user` LIKE 'username'")->fetch()) {
+            $pdo->exec("ALTER TABLE `user` ADD COLUMN username VARCHAR(50) DEFAULT NULL AFTER email");
+        }
     } catch (Exception $e) {
         error_log("Karyawan profile schema migration error: " . $e->getMessage());
     }

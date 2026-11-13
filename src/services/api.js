@@ -2498,6 +2498,20 @@ function mapRestPathToPhp(path) {
   if (path.startsWith('/absensi/')) {
     return `/absensi.php?id_absensi=${path.replace('/absensi/', '')}`;
   }
+  if (path === '/users' || path.startsWith('/users?')) {
+    return '/users.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
+  }
+  const userResetMatch = path.match(/^\/users\/(\d+)\/reset-password\/?$/);
+  if (userResetMatch) {
+    return `/users.php?action=reset_password&id_user=${userResetMatch[1]}`;
+  }
+  const userStatusMatch = path.match(/^\/users\/(\d+)\/status\/?$/);
+  if (userStatusMatch) {
+    return `/users.php?action=status&id_user=${userStatusMatch[1]}`;
+  }
+  if (path.startsWith('/users/')) {
+    return `/users.php?id_user=${path.replace('/users/', '')}`;
+  }
   return path;
 }
 
@@ -2728,6 +2742,90 @@ function handleLocalApiFallback(path, method, body) {
 
   if (path.startsWith('/absensi')) {
     return db.absensi || [];
+  }
+
+  if (path.startsWith('/users')) {
+    if (!Array.isArray(db.user)) db.user = [];
+
+    // Pastikan setiap karyawan memiliki akun login
+    (db.karyawan || []).forEach(k => {
+      let u = db.user.find(usr => Number(usr.id_karyawan) === Number(k.id_karyawan));
+      if (!u) {
+        const nextUid = db.user.length ? Math.max(...db.user.map(x => Number(x.id_user) || 0)) + 1 : 1;
+        const slug = String(k.nama || 'karyawan').toLowerCase().replace(/[^a-z0-9]/g, '');
+        u = {
+          id_user: nextUid,
+          kode_user: k.kode_karyawan || `USER${String(nextUid).padStart(3, '0')}`,
+          id_karyawan: Number(k.id_karyawan),
+          username: k.kode_karyawan || `${slug}${k.id_karyawan}`,
+          email: k.email || `${slug}${k.id_karyawan}@jamkerja.com`,
+          kata_sandi: 'karyawan123',
+          peran: 'karyawan',
+          aktif: k.status === 'nonaktif' ? 0 : 1,
+          created_at: new Date().toISOString()
+        };
+        db.user.push(u);
+      }
+    });
+
+    const enrichUser = (u) => {
+      const k = u.id_karyawan ? (db.karyawan || []).find(item => Number(item.id_karyawan) === Number(u.id_karyawan)) : null;
+      const isAktif = Number(u.aktif) === 1 || u.aktif === true;
+      const finalCode = u.kode_karyawan || u.kode_user || (u.peran === 'admin' ? 'ADM001' : `USER${String(u.id_user).padStart(3, '0')}`);
+      return {
+        ...u,
+        id_user: Number(u.id_user),
+        kode_user: finalCode,
+        id_karyawan: u.id_karyawan ? Number(u.id_karyawan) : null,
+        username: u.username || (k ? k.kode_karyawan : finalCode),
+        email: u.email || (k ? k.email : ''),
+        peran: u.peran || 'karyawan',
+        aktif: isAktif ? 1 : 0,
+        nama: u.nama || (k ? k.nama : (u.peran === 'admin' ? 'Administrator' : 'Pengguna')),
+        jabatan: u.jabatan || (k ? k.jabatan : (u.peran === 'admin' ? 'Administrator Sistem' : '-')),
+        kode_karyawan: u.peran === 'admin' ? '' : (k?.kode_karyawan || finalCode),
+        nomor_hp: u.nomor_hp || (k?.no_hp || ''),
+        status_karyawan: isAktif ? 'aktif' : 'nonaktif'
+      };
+    };
+
+    if (method === 'GET') {
+      const idMatch = path.match(/^\/users\/(\d+)$/);
+      if (idMatch) {
+        const u = db.user.find(usr => Number(usr.id_user) === Number(idMatch[1]));
+        if (!u) throw new Error('Data pengguna tidak ditemukan.');
+        return enrichUser(u);
+      }
+      return db.user.map(enrichUser);
+    }
+
+    const resetMatch = path.match(/^\/users\/(\d+)\/reset-password$/);
+    if (resetMatch && method === 'POST') {
+      const uId = Number(resetMatch[1]);
+      const idx = db.user.findIndex(usr => Number(usr.id_user) === uId);
+      if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+      db.user[idx].kata_sandi = body?.kata_sandi || 'karyawan123';
+      saveLocalData(db);
+      return enrichUser(db.user[idx]);
+    }
+
+    const statusMatch = path.match(/^\/users\/(\d+)\/status$/);
+    if (statusMatch && (method === 'PUT' || method === 'POST')) {
+      const uId = Number(statusMatch[1]);
+      const idx = db.user.findIndex(usr => Number(usr.id_user) === uId);
+      if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+      const nextAktif = (body?.aktif === 1 || body?.aktif === true || body?.status === 'aktif') ? 1 : 0;
+      db.user[idx].aktif = nextAktif;
+      if (db.user[idx].id_karyawan) {
+        const kIdx = (db.karyawan || []).findIndex(k => Number(k.id_karyawan) === Number(db.user[idx].id_karyawan));
+        if (kIdx !== -1) {
+          db.karyawan[kIdx].status = nextAktif ? 'aktif' : 'nonaktif';
+          db.karyawan[kIdx].aktif = nextAktif;
+        }
+      }
+      saveLocalData(db);
+      return enrichUser(db.user[idx]);
+    }
   }
 
   return null;
