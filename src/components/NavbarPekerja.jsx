@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import WorkerAvatar from './WorkerAvatar.jsx'
 
 function Icon({ name, className = 'h-5 w-5' }) {
   const paths = {
@@ -50,14 +51,14 @@ function Icon({ name, className = 'h-5 w-5' }) {
 function NavbarPekerja({
   onToggleSidebar,
   isSidebarOpen = false,
-  workerName = 'Budi Santoso',
+  workerName = 'Pekerja',
+  workerPhoto = '',
   onSelectMenuItem = () => {},
   onLogout = () => {},
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const profileRef = useRef(null)
-  const avatarInitial = workerName.trim().charAt(0).toUpperCase()
 
   useEffect(() => {
     function handlePointerDown(event) {
@@ -135,9 +136,11 @@ function NavbarPekerja({
             onClick={() => setIsProfileOpen((isOpen) => !isOpen)}
             type="button"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800 ring-2 ring-white">
-              {avatarInitial}
-            </span>
+            <WorkerAvatar
+              name={workerName}
+              photoPath={workerPhoto}
+              className="h-10 w-10 rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800 ring-2 ring-white"
+            />
             <span className="hidden max-w-36 sm:block">
               <span className="block truncate text-sm font-semibold leading-5 text-slate-800">
                 {workerName}

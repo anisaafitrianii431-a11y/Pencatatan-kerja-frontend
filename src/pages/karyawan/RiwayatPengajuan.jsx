@@ -56,10 +56,10 @@ function RiwayatPengajuan({ onNavigate = () => {} }) {
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800"
-                onClick={() => onNavigate('Pekerjaan Saya')}
+                onClick={() => onNavigate('List Pekerjaan')}
                 type="button"
               >
-                Lihat Pekerjaan Saya
+                Lihat List Pekerjaan
               </button>
               <button
                 className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"

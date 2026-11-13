@@ -255,22 +255,22 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
             Area Kerja Karyawan · CV. Putra Anugrah Mandiri
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Selamat Datang, {worker?.nama || 'Pekerja'}!
+            Selamat Datang, {worker?.nama || workerName || 'Pekerja'}!
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-emerald-100">
             Pantau penugasan resmi dan daftar pekerjaan terkini langsung dari
             database perusahaan.
           </p>
-          {worker && (
+          {(worker || workerName) && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-medium text-emerald-100">
               <span className="rounded-lg bg-emerald-900/60 px-2.5 py-1 backdrop-blur-sm">
-                Jabatan: {worker.jabatan || 'Pekerja'}
+                Jabatan: {worker?.jabatan || 'Pekerja'}
               </span>
               <span className="rounded-lg bg-emerald-900/60 px-2.5 py-1 backdrop-blur-sm">
-                Tarif: {CURRENCY_FORMATTER.format(worker.tarif_per_jam)} / jam
+                Tarif: {CURRENCY_FORMATTER.format(worker?.tarif_per_jam || 0)} / jam
               </span>
               <span className="rounded-lg bg-emerald-900/60 px-2.5 py-1 backdrop-blur-sm">
-                ID Karyawan: {worker.id_karyawan}
+                ID Karyawan: {worker?.id_karyawan || workerId || '—'}
               </span>
             </div>
           )}
@@ -281,10 +281,10 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
         >
           <button
             className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm"
-            onClick={() => onNavigate('Pekerjaan Saya')}
+            onClick={() => onNavigate('List Pekerjaan')}
             type="button"
           >
-            <span>Pekerjaan Saya</span>
+            <span>List Pekerjaan</span>
             <Icon className="h-4 w-4" name="arrow" />
           </button>
           <button
@@ -323,8 +323,8 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
         <SectionHeader
           buttonLabel="Buka Semua"
           description="Pekerjaan yang ditugaskan kepada Anda oleh Admin."
-          onClick={() => onNavigate('Pekerjaan Saya')}
-          title="Pekerjaan Saya (Terbaru)"
+          onClick={() => onNavigate('List Pekerjaan')}
+          title="List Pekerjaan (Terbaru)"
         />
         {isLoading ? (
           <div

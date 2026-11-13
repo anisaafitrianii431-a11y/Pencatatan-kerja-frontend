@@ -6,7 +6,8 @@ import SidebarPekerja from '../components/SidebarPekerja.jsx'
 function PekerjaLayout({
   activeItem = 'Dashboard',
   onSelectMenuItem = () => {},
-  workerName = 'Budi Santoso',
+  workerName = 'Pekerja',
+  workerPhoto = '',
   onLogout = () => {},
   children,
 }) {
@@ -31,6 +32,7 @@ function PekerjaLayout({
         onToggleSidebar={toggleSidebar}
         onLogout={onLogout}
         workerName={workerName}
+        workerPhoto={workerPhoto}
       />
 
       <div className="min-h-screen min-w-0 lg:ml-72">
@@ -40,6 +42,7 @@ function PekerjaLayout({
           onSelectMenuItem={handleSelectMenuItem}
           onToggleSidebar={toggleSidebar}
           workerName={workerName}
+          workerPhoto={workerPhoto}
         />
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children || <Outlet />}

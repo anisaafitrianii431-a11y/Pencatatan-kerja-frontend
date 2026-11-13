@@ -1,6 +1,6 @@
 /**
  * Utilitas Kompresi Gambar Otomatis Berbasis Canvas HTML5
- * Mengurangi ukuran gambar (foto kamera HP / kwitansi) hingga 80-95%
+ * Mengurangi ukuran gambar (foto kamera HP / kuitansi) hingga 80-95%
  * sebelum diunggah ke server tanpa mengurangi keterbacaan teks bukti transaksi.
  */
 

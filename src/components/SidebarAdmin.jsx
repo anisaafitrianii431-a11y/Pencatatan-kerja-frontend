@@ -48,6 +48,32 @@ const iconContent = {
       <circle cx="12" cy="10" r="3" />
     </>
   ),
+  wallet: (
+    <>
+      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+      <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </>
+  ),
+  approval: (
+    <>
+      <path d="m9 12 2 2 4-4" />
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+    </>
+  ),
+  chart: (
+    <>
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </>
+  ),
   recap: (
     <>
       <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -95,9 +121,15 @@ const menuItems = [
   { label: 'Data Karyawan', icon: 'employees' },
   { label: 'Data Pekerjaan', icon: 'jobs' },
   { label: 'Penugasan', icon: 'assignments' },
+  { label: 'Penggajian Karyawan', icon: 'wallet' },
+  { label: 'Rekap Jam Kerja Tim', icon: 'clock' },
+  { label: 'Approval Presensi', icon: 'approval' },
+  { label: 'Approval Reimburse', icon: 'receipt' },
+  { label: 'Kontribusi Proyek', icon: 'chart' },
   { label: 'Rekap Absensi', icon: 'recap' },
   { label: 'Manajemen Pengguna', icon: 'users' },
-  { label: 'Pengeluaran & Kwitansi', icon: 'receipt' },
+  { label: 'Pemasukan & Kas Kantor', icon: 'wallet' },
+  { label: 'Pengeluaran & Kuitansi', icon: 'receipt' },
   { label: 'Lokasi Kerja', icon: 'location' },
 ]
 

@@ -221,6 +221,11 @@ export default function VerifikasiPengeluaranAdminPage({ currentUser }) {
                       }`}>
                         {item.jenis_dana === 'pribadi' ? 'Dana Pribadi (Reimburse)' : 'Kas Kantor'}
                       </span>
+                      {item.jenis_dana !== 'pribadi' && item.nama_penanggung_jawab && (
+                        <div className="mt-1 text-[10px] font-bold text-blue-700">
+                          PJ: {item.nama_penanggung_jawab}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right font-black text-slate-900 text-sm">
                       {formatRupiah(item.nominal)}
@@ -297,6 +302,12 @@ export default function VerifikasiPengeluaranAdminPage({ currentUser }) {
                 <div className="font-bold text-slate-800 mt-0.5">
                   {selectedItemModal.jenis_dana === 'pribadi' ? 'Dana Pribadi (Reimburse)' : 'Kas Kantor'}
                 </div>
+                {selectedItemModal.jenis_dana !== 'pribadi' && selectedItemModal.nama_penanggung_jawab && (
+                  <div className="text-[11px] font-semibold text-blue-700 mt-1">
+                    PJ: {selectedItemModal.nama_penanggung_jawab}
+                    {selectedItemModal.keterangan_kas ? ` • ${selectedItemModal.keterangan_kas}` : ''}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -307,7 +318,7 @@ export default function VerifikasiPengeluaranAdminPage({ currentUser }) {
               </div>
             )}
 
-            {/* Gambar Struk / Kwitansi */}
+            {/* Gambar Struk / Kuitansi */}
             <div className="max-h-[55vh] overflow-auto flex items-center justify-center bg-slate-100 rounded-xl p-3 border border-slate-200">
               {selectedItemModal.foto_kwitansi ? (
                 <img

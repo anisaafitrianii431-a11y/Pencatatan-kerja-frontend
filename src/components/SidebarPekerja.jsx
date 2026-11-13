@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import WorkerAvatar from './WorkerAvatar.jsx'
 
 const iconContent = {
   dashboard: (
@@ -59,6 +60,20 @@ const iconContent = {
   ),
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   close: <path d="m18 6-12 12M6 6l12 12" />,
+  wallet: (
+    <>
+      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+      <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+    </>
+  ),
+  chart: (
+    <>
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </>
+  ),
   logout: (
     <>
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -88,11 +103,10 @@ function Icon({ name, className = 'h-5 w-5' }) {
 const mainMenuItems = [
   { label: 'Dashboard', icon: 'dashboard' },
   { label: 'Pekerjaan Tersedia', icon: 'available' },
-  { label: 'Pekerjaan Saya', icon: 'mine' },
-  { label: 'Riwayat Pengajuan', icon: 'history' },
-  { label: 'Rekap Absensi', icon: 'recap' },
+  { label: 'List Pekerjaan', icon: 'mine' },
+  { label: 'Slip Gaji Pribadi', icon: 'wallet' },
+  { label: 'Absensi', icon: 'attendance' },
   { label: 'Pengeluaran Saya', icon: 'receipt' },
-  { label: 'Presensi & Jam Kerja', icon: 'attendance' },
 ]
 
 function SidebarPekerja({
@@ -101,8 +115,9 @@ function SidebarPekerja({
   onToggleSidebar,
   onSelectMenuItem,
   onClose,
-  onLogout = () => {},
-  workerName = 'Budi Santoso',
+  onLogout = () => { },
+  workerName = 'Pekerja',
+  workerPhoto = '',
 }) {
   const [selectedItem, setSelectedItem] = useState('Dashboard')
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -160,9 +175,8 @@ function SidebarPekerja({
 
       <aside
         aria-label="Navigasi pekerja"
-        className={`worker-sidebar fixed inset-y-0 left-0 z-50 flex h-dvh w-72 flex-col border-r border-slate-800 bg-[#111827] text-slate-100 shadow-xl shadow-slate-900/20 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:shadow-none ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`worker-sidebar fixed inset-y-0 left-0 z-50 flex h-dvh w-72 flex-col border-r border-slate-800 bg-[#111827] text-slate-100 shadow-xl shadow-slate-900/20 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:shadow-none ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex h-[88px] shrink-0 items-center justify-between border-b border-slate-800 px-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -210,21 +224,19 @@ function SidebarPekerja({
             return (
               <button
                 aria-current={isActive ? 'page' : undefined}
-                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
-                  isActive
-                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
+                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${isActive
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
                 key={label}
                 onClick={() => selectMenuItem(label)}
                 type="button"
               >
                 <Icon
-                  className={`h-5 w-5 shrink-0 ${
-                    isActive
-                      ? 'text-white'
-                      : 'text-slate-400 group-hover:text-white'
-                  }`}
+                  className={`h-5 w-5 shrink-0 ${isActive
+                    ? 'text-white'
+                    : 'text-slate-400 group-hover:text-white'
+                    }`}
                   name={icon}
                 />
                 <span className="truncate">{label}</span>
@@ -243,9 +255,11 @@ function SidebarPekerja({
             title="Buka Profil Saya"
             type="button"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-semibold text-white">
-              {(workerName || 'P').trim().charAt(0).toUpperCase()}
-            </div>
+            <WorkerAvatar
+              name={workerName}
+              photoPath={workerPhoto}
+              className="h-10 w-10 rounded-full bg-emerald-600 text-sm font-semibold text-white"
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">
                 {workerName || 'Pekerja'}

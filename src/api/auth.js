@@ -47,12 +47,22 @@ function readUser(result) {
 
   return {
     id: user.id_user ?? user.id,
-    employeeId: user.id_karyawan ?? null,
+    id_user: user.id_user ?? user.id,
+    employeeId: user.id_karyawan ?? user.employeeId ?? null,
+    id_karyawan: user.id_karyawan ?? user.employeeId ?? null,
     email: user.email || '',
     name: user.name || user.nama || user.email || 'Pengguna',
+    nama: user.nama || user.name || user.email || 'Pengguna',
     jabatan: user.jabatan || '',
     tarif_per_jam: Number(user.tarif_per_jam) || 0,
+    no_hp: user.no_hp || '',
+    alamat: user.alamat || '',
+    foto_profil: user.foto_profil || '',
+    kontak_darurat: user.kontak_darurat || '',
+    nama_bank: user.nama_bank || '',
+    no_rekening: user.no_rekening || '',
     role,
+    peran: role,
   }
 }
 
@@ -302,5 +312,33 @@ export async function logout() {
   } finally {
     localStorage.removeItem('ruangkerja_user')
     localStorage.removeItem('jam_kerja_auth')
+  }
+}
+
+export async function updateProfile(payload) {
+  const result = await request('/auth.php?action=update_profile', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  const updatedUser = readUser(result)
+  localStorage.setItem('ruangkerja_user', JSON.stringify(updatedUser))
+  localStorage.setItem('jam_kerja_auth', JSON.stringify({
+    id_user: updatedUser.id || (updatedUser.role === 'admin' ? 1 : 2),
+    id_karyawan: updatedUser.employeeId || null,
+    peran: updatedUser.role,
+    email: updatedUser.email,
+    nama: updatedUser.name,
+  }))
+  return { user: updatedUser, message: result?.message || 'Pengaturan akun berhasil diperbarui!' }
+}
+
+export async function changePassword({ password_lama, password_baru }) {
+  const result = await request('/auth.php?action=change_password', {
+    method: 'POST',
+    body: JSON.stringify({ password_lama, password_baru }),
+  })
+  return {
+    success: Boolean(result?.success),
+    message: result?.message || 'Kata sandi berhasil diperbarui!',
   }
 }

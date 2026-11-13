@@ -26,14 +26,15 @@ import {
   angkaTerbilang, 
   formatPeriodeIndo, 
   generateNoDokumen,
-  formatTanggalCetak 
+  formatTanggalCetak,
+  getJakartaCurrentPeriode
 } from '../../utils/printHelpers';
 
 export default function DetailJamAdminPage({ currentUser, query = {} }) {
   const navigate = useNavigate();
   // Ambil parameter dari query URL hash (#/admin/detail-jam?id_karyawan=1&periode=2026-11&id_gaji=4)
   const initialKaryawanId = query.id_karyawan ? Number(query.id_karyawan) : 0;
-  const initialPeriode = query.periode || new Date().toISOString().slice(0, 7);
+  const initialPeriode = query.periode || getJakartaCurrentPeriode();
   const initialGajiId = query.id_gaji ? Number(query.id_gaji) : 0;
 
   const [periode, setPeriode] = useState(initialPeriode);
@@ -625,7 +626,7 @@ export default function DetailJamAdminPage({ currentUser, query = {} }) {
         <Modal
           isOpen={!!previewImage}
           onClose={() => setPreviewImage(null)}
-          title="Pratinjau Foto Bukti / Kwitansi"
+          title="Pratinjau Foto Bukti / Kuitansi"
           maxWidth="max-w-xl"
         >
           <div className="p-2 flex flex-col items-center justify-center space-y-4">

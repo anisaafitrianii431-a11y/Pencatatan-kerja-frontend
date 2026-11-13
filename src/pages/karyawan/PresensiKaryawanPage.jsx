@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Clock, 
-  Wallet, 
-  Receipt, 
-  CheckCircle2, 
-  RefreshCw, 
-  AlertCircle, 
-  Check, 
+import {
+  Clock,
+  Wallet,
+  Receipt,
+  CheckCircle2,
+  RefreshCw,
+  AlertCircle,
+  Check,
   ArrowRight,
   Plus,
   Camera,
@@ -15,10 +15,12 @@ import {
   X
 } from 'lucide-react';
 import { AbsensiService, PengeluaranService, PekerjaanService, getFileUrl } from '../../services/api';
+import { getSyncedJakartaNow, subscribeNtpSync, syncNtpTime } from '../../utils/ntpTime';
 import Modal from '../../components/Modal';
 
 export default function PresensiKaryawanPage({ currentUser }) {
-  const [selectedPeriode, setSelectedPeriode] = useState(new Date().toISOString().slice(0, 7));
+  const [ntpNow, setNtpNow] = useState(() => getSyncedJakartaNow());
+  const [selectedPeriode, setSelectedPeriode] = useState(() => getSyncedJakartaNow().periode);
   const [rawAbsensiList, setRawAbsensiList] = useState([]);
   const [rawPengeluaranList, setRawPengeluaranList] = useState([]);
   const [proyekList, setProyekList] = useState([]);
@@ -42,15 +44,11 @@ export default function PresensiKaryawanPage({ currentUser }) {
   const [isKlaimModalOpen, setIsKlaimModalOpen] = useState(false);
   const [selectedFotoModal, setSelectedFotoModal] = useState(null);
 
-  // Form Inputs: Presensi Masuk
+  // Form Inputs: Presensi Masuk (jam & tanggal otomatis mengikuti waktu NTP)
   const [masukProyekId, setMasukProyekId] = useState('');
-  const [masukJam, setMasukJam] = useState(new Date().toTimeString().slice(0, 5));
   const [masukCatatan, setMasukCatatan] = useState('');
 
-  // Form Inputs: Presensi Pulang
-  const [pulangJam, setPulangJam] = useState(new Date().toTimeString().slice(0, 5));
-
-  // Form Inputs: Klaim Pengeluaran Material & Foto Kwitansi
+  // Form Inputs: Klaim Pengeluaran Material & Foto Kuitansi
   const [klaimProyekId, setKlaimProyekId] = useState('');
   const [klaimNominal, setKlaimNominal] = useState('');
   const [klaimKeterangan, setKlaimKeterangan] = useState('');
@@ -114,8 +112,27 @@ export default function PresensiKaryawanPage({ currentUser }) {
     loadData();
   }, [selectedPeriode, currentUser]);
 
-  // Sesi absensi hari ini
-  const todayStr = new Date().toISOString().slice(0, 10);
+  useEffect(() => {
+    const refreshNtpClock = () => setNtpNow(getSyncedJakartaNow());
+    const unsubNtp = subscribeNtpSync(refreshNtpClock);
+    syncNtpTime().then(refreshNtpClock);
+    const timer = setInterval(refreshNtpClock, 15000);
+    return () => {
+      unsubNtp();
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMasukModalOpen || isPulangModalOpen) {
+      syncNtpTime({ force: true }).then(() => setNtpNow(getSyncedJakartaNow()));
+    }
+  }, [isMasukModalOpen, isPulangModalOpen]);
+
+  // Sesi absensi hari ini (menggunakan tanggal NTP Asia/Jakarta)
+  const todayStr = ntpNow.tanggal;
+  const masukJam = ntpNow.jamMenit;
+  const pulangJam = ntpNow.jamMenit;
   const todaySession = rawAbsensiList.find(a => a.tanggal === todayStr);
   const isWorkingNow = todaySession && !todaySession.jam_pulang;
   const isFinishedToday = todaySession && todaySession.jam_pulang;
@@ -126,14 +143,16 @@ export default function PresensiKaryawanPage({ currentUser }) {
     setSubmitting(true);
     setErrorMsg('');
     try {
+      await syncNtpTime({ maxAgeMs: 15_000 });
+      const currentNtp = getSyncedJakartaNow();
       await AbsensiService.absenMasuk({
         id_pekerjaan: masukProyekId || null,
         id_karyawan: currentUser?.id_karyawan,
-        tanggal: todayStr,
-        jam_masuk: masukJam + ':00',
+        tanggal: currentNtp.tanggal,
+        jam_masuk: currentNtp.jam,
         catatan: masukCatatan
       });
-      setSuccessMsg('Presensi masuk berhasil dicatat! Status: Menunggu approval admin.');
+      setSuccessMsg('Presensi masuk berhasil dicatat sesuai jam NTP server! Status: Menunggu approval admin.');
       setIsMasukModalOpen(false);
       setMasukCatatan('');
       loadData();
@@ -152,8 +171,10 @@ export default function PresensiKaryawanPage({ currentUser }) {
     setSubmitting(true);
     setErrorMsg('');
     try {
-      await AbsensiService.absenPulang(todaySession.id_absensi, pulangJam + ':00');
-      setSuccessMsg('Presensi pulang berhasil dicatat! Durasi kerja hari ini selesai.');
+      await syncNtpTime({ maxAgeMs: 15_000 });
+      const currentNtp = getSyncedJakartaNow();
+      await AbsensiService.absenPulang(todaySession.id_absensi, currentNtp.jam);
+      setSuccessMsg('Presensi pulang berhasil dicatat sesuai jam NTP server! Durasi kerja hari ini selesai.');
       setIsPulangModalOpen(false);
       loadData();
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -164,7 +185,7 @@ export default function PresensiKaryawanPage({ currentUser }) {
     }
   };
 
-  // Handler Foto Nota Kwitansi
+  // Handler Foto Nota Kuitansi
   const handleFotoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -217,7 +238,7 @@ export default function PresensiKaryawanPage({ currentUser }) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* ======================================================== */}
       {/* 1. HEADER UTAMA & FILTER BULAN                           */}
       {/* ======================================================== */}
@@ -231,7 +252,7 @@ export default function PresensiKaryawanPage({ currentUser }) {
             <span>Presensi & Jam Kerja</span>
           </h1>
           <p className="text-sm text-slate-500">
-            Catat jam kedatangan/kepulangan harian dan ajukan nota talangan belanja material.
+            Catat jam kedatangan/kepulangan harian dan ajukan pengembalian dana.
           </p>
         </div>
 
@@ -292,11 +313,10 @@ export default function PresensiKaryawanPage({ currentUser }) {
 
         {/* Stepper 5 Kolom */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 pt-1">
-          
+
           {/* Langkah 1 */}
-          <div className={`p-4 rounded-xl border transition flex flex-col justify-between ${
-            todaySession ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200'
-          }`}>
+          <div className={`p-4 rounded-xl border transition flex flex-col justify-between ${todaySession ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200'
+            }`}>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                 Langkah 1
@@ -334,9 +354,8 @@ export default function PresensiKaryawanPage({ currentUser }) {
           </div>
 
           {/* Langkah 2 */}
-          <div className={`p-4 rounded-xl border transition flex flex-col justify-between ${
-            isWorkingNow ? 'bg-blue-50/60 border-blue-200 ring-2 ring-blue-400/20' : isFinishedToday ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-100 opacity-70'
-          }`}>
+          <div className={`p-4 rounded-xl border transition flex flex-col justify-between ${isWorkingNow ? 'bg-blue-50/60 border-blue-200 ring-2 ring-blue-400/20' : isFinishedToday ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-100 opacity-70'
+            }`}>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                 Langkah 2
@@ -367,9 +386,8 @@ export default function PresensiKaryawanPage({ currentUser }) {
           </div>
 
           {/* Langkah 3 */}
-          <div className={`p-4 rounded-xl border transition flex flex-col justify-between ${
-            isFinishedToday ? 'bg-emerald-50/60 border-emerald-200' : isWorkingNow ? 'bg-amber-50/60 border-amber-200' : 'bg-slate-50 border-slate-100 opacity-70'
-          }`}>
+          <div className={`p-4 rounded-xl border transition flex flex-col justify-between ${isFinishedToday ? 'bg-emerald-50/60 border-emerald-200' : isWorkingNow ? 'bg-amber-50/60 border-amber-200' : 'bg-slate-50 border-slate-100 opacity-70'
+            }`}>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                 Langkah 3
@@ -386,8 +404,8 @@ export default function PresensiKaryawanPage({ currentUser }) {
                 {isFinishedToday
                   ? `Pulang: ${todaySession.jam_pulang?.slice(0, 5)} WIB (${todaySession.durasi_jam || 0} Jam)`
                   : isWorkingNow
-                  ? 'Klik saat selesai jam kerja.'
-                  : 'Kunci jam pulang.'}
+                    ? 'Klik saat selesai jam kerja.'
+                    : 'Kunci jam pulang.'}
               </p>
             </div>
             <div className="mt-3 pt-2 border-t border-slate-200/60">
@@ -425,13 +443,12 @@ export default function PresensiKaryawanPage({ currentUser }) {
             </div>
             <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px]">
               <span className="text-slate-400">Status Hari Ini:</span>
-              <span className={`font-bold px-1.5 py-0.5 rounded ${
-                todaySession?.status_verifikasi === 'disetujui'
+              <span className={`font-bold px-1.5 py-0.5 rounded ${todaySession?.status_verifikasi === 'disetujui'
                   ? 'bg-emerald-100 text-emerald-700'
                   : todaySession?.status_verifikasi === 'ditolak'
-                  ? 'bg-rose-100 text-rose-700'
-                  : 'bg-amber-100 text-amber-700'
-              }`}>
+                    ? 'bg-rose-100 text-rose-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
                 {todaySession?.status_verifikasi || 'Belum ada'}
               </span>
             </div>
@@ -538,13 +555,12 @@ export default function PresensiKaryawanPage({ currentUser }) {
                       </td>
                       <td className="py-2.5 font-bold text-[#b81d52]">{a.durasi_jam || 0} Jam</td>
                       <td className="py-2.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          a.status_verifikasi === 'disetujui'
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${a.status_verifikasi === 'disetujui'
                             ? 'bg-emerald-100 text-emerald-700'
                             : a.status_verifikasi === 'ditolak'
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}>
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
                           {a.status_verifikasi}
                         </span>
                       </td>
@@ -601,13 +617,12 @@ export default function PresensiKaryawanPage({ currentUser }) {
                         )}
                       </td>
                       <td className="py-2.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          p.status_ganti === 'sudah'
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${p.status_ganti === 'sudah'
                             ? 'bg-emerald-100 text-emerald-700'
                             : p.status_verifikasi === 'disetujui'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}>
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
                           {p.status_ganti === 'sudah' ? 'Cair' : p.status_verifikasi === 'disetujui' ? 'Disetujui' : 'Menunggu'}
                         </span>
                       </td>
@@ -658,14 +673,15 @@ export default function PresensiKaryawanPage({ currentUser }) {
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Jam Masuk:</label>
+              <label className="block font-semibold text-slate-700 mb-1">Jam Masuk (NTP):</label>
               <input
                 type="time"
                 value={masukJam}
-                onChange={(e) => setMasukJam(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#b81d52]"
+                disabled
+                className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-100 font-mono font-bold text-slate-700"
                 required
               />
+              <p className="mt-1 text-[10px] text-slate-500">Mengikuti waktu NTP server otomatis.</p>
             </div>
           </div>
 
@@ -719,14 +735,15 @@ export default function PresensiKaryawanPage({ currentUser }) {
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Jam Pulang:</label>
+            <label className="block font-semibold text-slate-700 mb-1">Jam Pulang (NTP):</label>
             <input
               type="time"
               value={pulangJam}
-              onChange={(e) => setPulangJam(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#b81d52]"
+              disabled
+              className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-100 font-mono font-bold text-slate-700"
               required
             />
+            <p className="mt-1 text-[10px] text-slate-500">Otomatis dicatat sesuai waktu NTP server saat konfirmasi.</p>
           </div>
 
           <div className="pt-2 flex justify-end space-x-2">

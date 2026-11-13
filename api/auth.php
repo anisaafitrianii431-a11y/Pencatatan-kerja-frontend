@@ -10,13 +10,184 @@ if ($action === 'ping') {
     jsonResponse(true, "API Online", ["status" => "ok"]);
 }
 
+// 0.5. WAKTU NTP OTORITATIF (ANTI-MANIPULASI JAM PERANGKAT)
+if ($action === 'ntp_time') {
+    $ntpTime = getAuthoritativeJakartaTime(true);
+    jsonResponse(true, "Waktu NTP Asia/Jakarta berhasil diambil", $ntpTime);
+}
+
 // 1. CEK SESI PENGGUNA AKTIF (ME)
 if ($action === 'me') {
     $user = getCurrentUser();
     if ($user) {
+        if (!empty($user['id_user']) && $pdo) {
+            $freshUser = fetchAuthUserRecord($pdo, (int)$user['id_user']);
+            if ($freshUser) {
+                $user = $freshUser;
+                $_SESSION['user'] = $freshUser;
+            }
+        }
         jsonResponse(true, "Sesi aktif", $user);
     } else {
         jsonResponse(false, "Belum login", null, 401);
+    }
+}
+
+// 1.5. PERBARUI PROFIL & PENGATURAN AKUN PENGGUNA (NAMA, EMAIL, FOTO, KONTAK/WA, ALAMAT, REKENING)
+if ($action === 'update_profile') {
+    if (!in_array($method, ['POST', 'PUT'], true)) {
+        jsonResponse(false, "Metode HTTP tidak didukung", null, 405);
+    }
+
+    $user = requireLogin();
+    ensureKaryawanProfileSchema($pdo);
+
+    $userId = intval($user['id_user'] ?? 0);
+    $karyawanId = intval($user['id_karyawan'] ?? 0);
+
+    $nama = trim((string)($body['nama'] ?? ''));
+    $rawEmail = trim((string)($body['email'] ?? ''));
+    $email = filter_var($rawEmail, FILTER_VALIDATE_EMAIL);
+    $noHp = trim((string)($body['no_hp'] ?? $body['telepon'] ?? ''));
+    $alamat = trim((string)($body['alamat'] ?? ''));
+    $kontakDarurat = trim((string)($body['kontak_darurat'] ?? ''));
+    $namaBank = trim((string)($body['nama_bank'] ?? ''));
+    $noRekening = trim((string)($body['no_rekening'] ?? ''));
+    $fotoInput = trim((string)($body['foto_profil'] ?? ''));
+    $hapusFoto = !empty($body['hapus_foto_profil']);
+
+    if ($nama === '' || mb_strlen($nama) < 3 || mb_strlen($nama) > 100) {
+        jsonResponse(false, "Nama lengkap wajib diisi (minimal 3 dan maksimal 100 karakter).", null, 400);
+    }
+    if (!$email || mb_strlen($email) > 100) {
+        jsonResponse(false, "Format alamat email tidak valid.", null, 400);
+    }
+    if ($noHp !== '') {
+        $digitsOnly = preg_replace('/\D+/', '', $noHp);
+        if (!preg_match('/^[0-9+\-\s()]{8,25}$/', $noHp) || strlen($digitsOnly) < 8 || strlen($digitsOnly) > 16) {
+            jsonResponse(false, "Format nomor HP / WhatsApp tidak valid (gunakan 8–16 digit angka).", null, 400);
+        }
+    }
+    if (mb_strlen($alamat) > 500) {
+        jsonResponse(false, "Alamat domisili maksimal 500 karakter.", null, 400);
+    }
+    if (mb_strlen($kontakDarurat) > 120) {
+        jsonResponse(false, "Kontak darurat maksimal 120 karakter.", null, 400);
+    }
+    if (mb_strlen($namaBank) > 60) {
+        jsonResponse(false, "Nama bank / e-wallet maksimal 60 karakter.", null, 400);
+    }
+    if ($noRekening !== '' && (!preg_match('/^[0-9\-\s]{4,40}$/', $noRekening))) {
+        jsonResponse(false, "Nomor rekening hanya boleh berisi angka, spasi, atau tanda hubung (minimal 4 digit).", null, 400);
+    }
+
+    // Pastikan email belum dipakai pengguna lain
+    $stmtDup = $pdo->prepare("SELECT id_user FROM `user` WHERE email = ? AND id_user != ?");
+    $stmtDup->execute([$email, $userId]);
+    if ($stmtDup->fetch()) {
+        jsonResponse(false, "Email '$email' sudah digunakan oleh akun lain.", null, 400);
+    }
+
+    $currentFotoPath = null;
+    if ($karyawanId > 0) {
+        $stmtFoto = $pdo->prepare("SELECT foto_profil FROM karyawan WHERE id_karyawan = ? LIMIT 1");
+        $stmtFoto->execute([$karyawanId]);
+        $currentFotoPath = $stmtFoto->fetchColumn() ?: null;
+    }
+
+    $nextFotoPath = $currentFotoPath;
+    $newSavedFile = null;
+
+    if ($hapusFoto) {
+        $nextFotoPath = null;
+    } elseif ($fotoInput !== '' && preg_match('/^data:image\/(\w+);base64,/', $fotoInput, $matches)) {
+        $ext = strtolower($matches[1]);
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            jsonResponse(false, "Format foto profil harus JPG, PNG, atau WEBP.", null, 400);
+        }
+        $base64Data = substr($fotoInput, strpos($fotoInput, ',') + 1);
+        $decoded = base64_decode($base64Data, true);
+        if ($decoded === false || strlen($decoded) === 0) {
+            jsonResponse(false, "Data foto profil tidak valid.", null, 400);
+        }
+        if (strlen($decoded) > 2 * 1024 * 1024) {
+            jsonResponse(false, "Ukuran foto profil maksimal 2 MB.", null, 400);
+        }
+
+        $uploadDir = __DIR__ . '/uploads/';
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0755, true);
+        }
+        $fileName = 'profil_' . bin2hex(random_bytes(12)) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
+        if (@file_put_contents($uploadDir . $fileName, $decoded) === false) {
+            jsonResponse(false, "Gagal menyimpan file foto profil di server.", null, 500);
+        }
+        $nextFotoPath = 'uploads/' . $fileName;
+        $newSavedFile = $uploadDir . $fileName;
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        if ($userId > 0) {
+            $stmtUserUpd = $pdo->prepare("UPDATE `user` SET email = ? WHERE id_user = ?");
+            $stmtUserUpd->execute([$email, $userId]);
+        }
+
+        if ($karyawanId > 0) {
+            $stmtKaryUpd = $pdo->prepare("
+                UPDATE karyawan
+                SET nama = ?, no_hp = ?, alamat = ?, foto_profil = ?,
+                    kontak_darurat = ?, nama_bank = ?, no_rekening = ?
+                WHERE id_karyawan = ?
+            ");
+            $stmtKaryUpd->execute([
+                trim(strip_tags($nama)),
+                $noHp !== '' ? $noHp : null,
+                $alamat !== '' ? trim(strip_tags($alamat)) : null,
+                $nextFotoPath,
+                $kontakDarurat !== '' ? trim(strip_tags($kontakDarurat)) : null,
+                $namaBank !== '' ? trim(strip_tags($namaBank)) : null,
+                $noRekening !== '' ? $noRekening : null,
+                $karyawanId,
+            ]);
+        }
+
+        $pdo->commit();
+
+        // Hapus file foto lama jika diganti atau dihapus
+        if (($hapusFoto || $newSavedFile !== null) && $currentFotoPath && strpos($currentFotoPath, 'uploads/profil_') === 0) {
+            $oldFilePath = __DIR__ . '/' . $currentFotoPath;
+            if (is_file($oldFilePath)) {
+                @unlink($oldFilePath);
+            }
+        }
+
+        $updatedUser = $userId > 0 ? fetchAuthUserRecord($pdo, $userId) : null;
+        if (!$updatedUser) {
+            $updatedUser = array_merge($user, [
+                'nama' => $nama,
+                'email' => $email,
+                'no_hp' => $noHp !== '' ? $noHp : null,
+                'alamat' => $alamat !== '' ? $alamat : null,
+                'foto_profil' => $nextFotoPath,
+                'kontak_darurat' => $kontakDarurat !== '' ? $kontakDarurat : null,
+                'nama_bank' => $namaBank !== '' ? $namaBank : null,
+                'no_rekening' => $noRekening !== '' ? $noRekening : null,
+            ]);
+        }
+
+        $_SESSION['user'] = $updatedUser;
+        jsonResponse(true, "Pengaturan akun & profil berhasil diperbarui!", $updatedUser);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        if ($newSavedFile && is_file($newSavedFile)) {
+            @unlink($newSavedFile);
+        }
+        error_log("Error update profile: " . $e->getMessage());
+        jsonResponse(false, "Gagal memperbarui profil akun. Silakan coba lagi.", null, 500);
     }
 }
 
@@ -140,9 +311,11 @@ if ($method === 'POST') {
         jsonResponse(false, "Email dan kata sandi wajib diisi.", null, 400);
     }
 
+    ensureKaryawanProfileSchema($pdo);
     $stmt = $pdo->prepare("
         SELECT u.id_user, u.id_karyawan, u.email, u.kata_sandi, u.peran, u.aktif,
-               k.nama, k.jabatan, k.tarif_per_jam
+               k.nama, k.jabatan, k.tarif_per_jam,
+               k.no_hp, k.alamat, k.foto_profil, k.kontak_darurat, k.nama_bank, k.no_rekening
         FROM `user` u
         LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
         WHERE u.email = ?

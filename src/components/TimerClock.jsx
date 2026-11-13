@@ -1,18 +1,31 @@
 import { useEffect, useState } from 'react';
+import { getSyncedNowDate, subscribeNtpSync, syncNtpTime } from '../utils/ntpTime.js';
 
 /**
- * TimerClock — Menampilkan jam real-time (HH:MM:SS)
+ * TimerClock — Menampilkan jam real-time berbasis waktu NTP (Asia/Jakarta, HH:MM:SS)
  */
 export default function TimerClock({ size = 'md' }) {
-  const [waktu, setWaktu] = useState(new Date());
+  const [waktu, setWaktu] = useState(() => getSyncedNowDate());
 
   useEffect(() => {
-    const interval = setInterval(() => setWaktu(new Date()), 1000);
-    return () => clearInterval(interval);
+    const unsubNtp = subscribeNtpSync(() => setWaktu(getSyncedNowDate()));
+    syncNtpTime().then(() => setWaktu(getSyncedNowDate()));
+    const interval = setInterval(() => setWaktu(getSyncedNowDate()), 1000);
+    return () => {
+      unsubNtp();
+      clearInterval(interval);
+    };
   }, []);
 
-  const jam = waktu.toLocaleTimeString('id-ID', { hour12: false });
+  const jam = waktu.toLocaleTimeString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
   const tanggal = waktu.toLocaleDateString('id-ID', {
+    timeZone: 'Asia/Jakarta',
     weekday: 'long',
     year: 'numeric',
     month: 'long',

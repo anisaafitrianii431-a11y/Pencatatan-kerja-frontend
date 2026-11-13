@@ -12,12 +12,14 @@ import {
 } from '../../services/pekerjaanApi.js'
 import { getKaryawan } from '../../services/karyawanApi.js'
 import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog.jsx'
+import { formatCoordPair, getGoogleMapsUrl, parseCoordinates } from '../../utils/geoLocation.js'
 
 const PAGE_SIZE = 8
 const EMPTY_FORM = {
   nama_pekerjaan: '',
   deskripsi: '',
   lokasi: '',
+  titik_lokasi: '',
   tanggal_mulai: '',
   target_selesai: '',
   status: STATUS_PEKERJAAN.BELUM_MULAI,
@@ -51,7 +53,8 @@ const STATUS_PRESENTATION = {
 
 function formatDate(value) {
   if (!value) return '—'
-  return DATE_FORMATTER.format(new Date(`${value}T00:00:00`))
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
 }
 
 function getJakartaToday() {
@@ -185,6 +188,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
           nama_pekerjaan: job.nama_pekerjaan || '',
           deskripsi: job.deskripsi || '',
           lokasi: job.lokasi || '',
+          titik_lokasi: job.titik_lokasi || '',
           tanggal_mulai: job.tanggal_mulai || '',
           target_selesai: job.target_selesai || '',
           status: job.status || STATUS_PEKERJAAN.BELUM_MULAI,
@@ -197,10 +201,30 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
         },
   )
   const [validationMessage, setValidationMessage] = useState('')
+  const [detectingGps, setDetectingGps] = useState(false)
 
   function updateField(field, value) {
     setValues((current) => ({ ...current, [field]: value }))
     setValidationMessage('')
+  }
+
+  function handleDetectGps() {
+    if (!navigator.geolocation) {
+      setValidationMessage('Browser ini tidak mendukung deteksi lokasi GPS.')
+      return
+    }
+    setDetectingGps(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updateField('titik_lokasi', formatCoordPair(pos.coords.latitude, pos.coords.longitude))
+        setDetectingGps(false)
+      },
+      () => {
+        setValidationMessage('Gagal mengambil koordinat GPS. Pastikan izin lokasi browser aktif.')
+        setDetectingGps(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
   }
 
   function toggleEmployee(employeeId) {
@@ -219,10 +243,24 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    const rawTitik = String(values.titik_lokasi || '').trim()
+    let formattedTitik = ''
+    if (rawTitik) {
+      const parsed = parseCoordinates(rawTitik)
+      if (!parsed) {
+        setValidationMessage(
+          'Format koordinat titik GPS tidak valid. Gunakan format: latitude, longitude (contoh: -0.906661, 100.361413).',
+        )
+        return
+      }
+      formattedTitik = formatCoordPair(parsed.lat, parsed.lng)
+    }
+
     const normalized = {
       nama_pekerjaan: values.nama_pekerjaan.trim(),
       deskripsi: values.deskripsi.trim(),
       lokasi: values.lokasi.trim(),
+      titik_lokasi: formattedTitik,
       tanggal_mulai: values.tanggal_mulai || null,
       target_selesai: values.target_selesai || null,
       status: values.status,
@@ -324,6 +362,29 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                 <WorkIcon name="location" className="h-3.5 w-3.5 text-slate-400" />
                 {job?.lokasi || 'Lokasi belum ditentukan'}
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                {job?.titik_lokasi ? (
+                  <>
+                    <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-600/15">
+                      Titik GPS: {job.titik_lokasi}
+                    </span>
+                    {getGoogleMapsUrl(job.titik_lokasi) && (
+                      <a
+                        href={getGoogleMapsUrl(job.titik_lokasi)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold text-blue-600 hover:underline"
+                      >
+                        Lihat di Google Maps ↗
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-600/15">
+                    Titik koordinat GPS proyek belum disetel
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
@@ -438,6 +499,49 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                   className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </div>
+            </div>
+
+            {/* Titik Koordinat GPS */}
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <label
+                  htmlFor="job-titik-lokasi"
+                  className="block text-xs font-semibold text-slate-700"
+                >
+                  Titik Koordinat GPS Proyek (Acuan Validasi Absensi)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleDetectGps}
+                  disabled={detectingGps}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                >
+                  {detectingGps ? 'Mendeteksi GPS...' : 'Gunakan GPS Saat Ini'}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="job-titik-lokasi"
+                  type="text"
+                  placeholder="Contoh: -0.906661, 100.361413"
+                  value={values.titik_lokasi}
+                  onChange={(e) => updateField('titik_lokasi', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-mono text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                />
+                {getGoogleMapsUrl(values.titik_lokasi) && (
+                  <a
+                    href={getGoogleMapsUrl(values.titik_lokasi)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-blue-600 hover:bg-slate-100"
+                  >
+                    Cek Maps ↗
+                  </a>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Masukkan latitude dan longitude proyek agar sistem menghitung jarak absen pekerja secara otomatis (toleransi 150 m).
+              </p>
             </div>
 
             {/* Tanggal & Status */}

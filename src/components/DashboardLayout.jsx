@@ -97,7 +97,7 @@ export default function DashboardLayout({ currentUser, currentRoute, children })
     },
     {
       id: 'presensi',
-      label: 'Presensi & Jam Kerja',
+      label: 'Absensi',
       icon: Clock,
       href: '#/karyawan/presensi',
       isActive: sub === 'presensi',
@@ -108,13 +108,6 @@ export default function DashboardLayout({ currentUser, currentRoute, children })
       icon: Wallet,
       href: '#/karyawan/gaji',
       isActive: sub === 'gaji',
-    },
-    {
-      id: 'proyek',
-      label: 'Progres Proyek',
-      icon: Layers,
-      href: '#/karyawan/proyek',
-      isActive: sub === 'proyek' || sub === 'rekap',
     },
   ];
 
@@ -326,7 +319,7 @@ export default function DashboardLayout({ currentUser, currentRoute, children })
                       onClick={() => setShowUserDropdown(false)}
                       className="block px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 no-underline"
                     >
-                      Presensi & Jam Kerja
+                      Absensi
                     </a>
                     <a
                       href="#/karyawan/gaji"
@@ -334,13 +327,6 @@ export default function DashboardLayout({ currentUser, currentRoute, children })
                       className="block px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 no-underline"
                     >
                       Slip Gaji Pribadi
-                    </a>
-                    <a
-                      href="#/karyawan/proyek"
-                      onClick={() => setShowUserDropdown(false)}
-                      className="block px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 no-underline"
-                    >
-                      Progres Proyek
                     </a>
                   </>
                 )}

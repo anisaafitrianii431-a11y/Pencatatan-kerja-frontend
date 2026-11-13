@@ -25,7 +25,9 @@ const STATUS_PRESENTATION = {
 }
 
 function formatDate(value) {
-  return value ? DATE_FORMATTER.format(new Date(`${value}T00:00:00`)) : 'Belum ditentukan'
+  if (!value) return 'Belum ditentukan'
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : DATE_FORMATTER.format(date)
 }
 
 function getJakartaToday() {
@@ -124,7 +126,10 @@ function Icon({ name, className = 'h-5 w-5' }) {
 }
 
 function StatusBadge({ status }) {
-  const presentation = STATUS_PRESENTATION[status]
+  const presentation = STATUS_PRESENTATION[status] ?? {
+    label: status || 'Tidak tersedia',
+    className: 'bg-slate-100 text-slate-700',
+  }
 
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${presentation.className}`}>
@@ -330,7 +335,7 @@ function ClaimConfirmModal({ job, isClaiming, onConfirm, onCancel }) {
           </div>
 
           <p className="text-xs leading-5 text-slate-500">
-            Setelah diambil, pekerjaan ini akan langsung tercatat sebagai penugasan mandiri Anda dan masuk ke menu <strong className="font-semibold text-slate-700">Pekerjaan Saya</strong>. Pekerja lain tidak akan dapat mengambil pekerjaan ini.
+            Setelah diambil, pekerjaan ini akan langsung tercatat sebagai penugasan mandiri Anda dan masuk ke menu <strong className="font-semibold text-slate-700">List Pekerjaan</strong>. Pekerja lain tidak akan dapat mengambil pekerjaan ini.
           </p>
         </div>
 
@@ -471,10 +476,10 @@ function PekerjaanTersedia({ onNavigate = () => {}, workerId, workerName }) {
       setSelectedJob(null)
       setNotice({
         type: 'success',
-        message: `Selamat! Pekerjaan "${jobName}" berhasil Anda ambil. Pekerjaan kini dapat dikelola pada menu Pekerjaan Saya.`,
+        message: `Selamat! Pekerjaan "${jobName}" berhasil Anda ambil. Pekerjaan kini dapat dikelola pada menu List Pekerjaan.`,
         action: {
-          label: 'Buka Pekerjaan Saya',
-          onClick: () => onNavigate('Pekerjaan Saya'),
+          label: 'Buka List Pekerjaan',
+          onClick: () => onNavigate('List Pekerjaan'),
         },
       })
       setReloadKey((key) => key + 1)
@@ -513,7 +518,7 @@ function PekerjaanTersedia({ onNavigate = () => {}, workerId, workerName }) {
       : 'Pekerjaan Tidak Ditemukan'
   const emptyDescription =
     jobs.length === 0
-      ? 'Pekerjaan dengan metode terbuka yang belum melewati deadline akan muncul di sini. Pekerjaan yang sudah ditugaskan kepada Anda dapat dilihat pada menu Pekerjaan Saya.'
+      ? 'Pekerjaan dengan metode terbuka yang belum melewati deadline akan muncul di sini. Pekerjaan yang sudah ditugaskan kepada Anda dapat dilihat pada menu List Pekerjaan.'
       : 'Coba ubah kata pencarian atau filter yang dipilih.'
 
   return (
@@ -669,10 +674,10 @@ function PekerjaanTersedia({ onNavigate = () => {}, workerId, workerName }) {
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <button
                 className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                onClick={() => onNavigate('Pekerjaan Saya')}
+                onClick={() => onNavigate('List Pekerjaan')}
                 type="button"
               >
-                Buka Pekerjaan Saya
+                Buka List Pekerjaan
               </button>
               <button
                 className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"

@@ -194,21 +194,6 @@ export default function LoginPage({ onLoginSuccess, isBackendLive }) {
                 <span>{loading ? 'Memvalidasi Akun...' : 'Masuk Sekarang'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-
-              {/* Tautan Pindah ke Pendaftaran Mandiri */}
-              <div className="pt-4 border-t border-slate-100 text-center">
-                <p className="text-xs text-slate-500">
-                  Belum memiliki akun kerja?{' '}
-                  <button
-                    type="button"
-                    onClick={() => switchMode('register')}
-                    className="font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center space-x-1"
-                  >
-                    <span>Daftar Karyawan Baru</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                </p>
-              </div>
             </form>
           )}
 

@@ -6,6 +6,7 @@ function normalizeJob(job) {
     id_pekerjaan: Number(job.id_pekerjaan),
     deskripsi: job.deskripsi ?? '',
     lokasi: job.lokasi ?? '',
+    titik_lokasi: job.titik_lokasi ?? '',
     tanggal_mulai: job.tanggal_mulai ?? '',
     target_selesai: job.target_selesai ?? '',
     metode_penentuan: job.metode_penentuan ?? 'terbuka',

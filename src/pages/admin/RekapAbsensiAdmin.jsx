@@ -3,6 +3,9 @@ import { getKaryawan } from '../../services/karyawanApi.js'
 import { getPekerjaan } from '../../services/pekerjaanApi.js'
 import { getPenugasan } from '../../services/penugasanApi.js'
 import { getAbsensi, verifikasiAbsensi } from '../../services/absensiApi.js'
+import { getFileUrl } from '../../services/api.js'
+import { formatWeekdayAndDate, resolveAttendanceLocation, safeFormatDate } from '../../utils/geoLocation.js'
+import AbsensiInspectionDialog from '../../components/AbsensiInspectionDialog.jsx'
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
@@ -11,9 +14,7 @@ const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
 })
 
 function formatDate(value) {
-  if (!value) return '—'
-  const date = new Date(`${value}T00:00:00`)
-  return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
+  return safeFormatDate(value, DATE_FORMATTER)
 }
 
 function Icon({ name, className = 'h-5 w-5' }) {
@@ -195,18 +196,30 @@ export default function RekapAbsensiAdmin() {
     setTimeout(() => setNotification(null), 4000)
   }
 
-  const handleVerify = async (id_absensi, status) => {
+  const handleVerify = async (id_absensi, status, catatanAdmin = '') => {
     try {
-      await verifikasiAbsensi(id_absensi, status)
+      await verifikasiAbsensi(id_absensi, status, catatanAdmin)
       showNotice('success', `Status absensi berhasil diubah menjadi "${status}".`)
       setAttendances((prev) =>
         prev.map((item) =>
-          item.id_absensi === id_absensi ? { ...item, status_verifikasi: status } : item,
+          item.id_absensi === id_absensi
+            ? {
+                ...item,
+                status_verifikasi: status,
+                catatan_admin: catatanAdmin !== '' ? catatanAdmin : item.catatan_admin,
+              }
+            : item,
         ),
       )
-      if (selectedAttendance && selectedAttendance.id_absensi === id_absensi) {
-        setSelectedAttendance((prev) => ({ ...prev, status_verifikasi: status }))
-      }
+      setSelectedAttendance((prev) =>
+        prev && prev.id_absensi === id_absensi
+          ? {
+              ...prev,
+              status_verifikasi: status,
+              catatan_admin: catatanAdmin !== '' ? catatanAdmin : prev.catatan_admin,
+            }
+          : prev,
+      )
     } catch (err) {
       showNotice('error', err.message || 'Gagal mengubah status verifikasi.')
     }
@@ -778,10 +791,11 @@ export default function RekapAbsensiAdmin() {
                       <th className="px-4 py-3.5">Karyawan</th>
                       <th className="px-4 py-3.5">ID</th>
                       <th className="px-4 py-3.5">Pekerjaan</th>
-                      <th className="px-4 py-3.5">Tanggal</th>
+                      <th className="px-4 py-3.5">Hari &amp; Tanggal</th>
                       <th className="px-4 py-3.5">Jam Masuk</th>
                       <th className="px-4 py-3.5">Jam Pulang</th>
                       <th className="px-4 py-3.5">Durasi</th>
+                      <th className="px-4 py-3.5">Foto &amp; Titik Lokasi</th>
                       <th className="px-4 py-3.5">Status</th>
                       <th className="px-4 py-3.5 text-center">Aksi Verifikasi</th>
                     </tr>
@@ -789,7 +803,7 @@ export default function RekapAbsensiAdmin() {
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {filteredAttendances.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-8 text-center text-slate-400">
+                        <td colSpan={11} className="py-8 text-center text-slate-400">
                           Tidak ditemukan riwayat absensi yang cocok dengan filter.
                         </td>
                       </tr>
@@ -797,6 +811,9 @@ export default function RekapAbsensiAdmin() {
                       filteredAttendances.map((item, index) => {
                         const emp = employees.find((e) => e.id_karyawan === item.id_karyawan)
                         const job = jobs.find((j) => j.id_pekerjaan === item.id_pekerjaan)
+                        const loc = resolveAttendanceLocation(item, job?.titik_lokasi || '')
+                        const fotoMasukUrl = item.foto_lokasi ? getFileUrl(item.foto_lokasi) : ''
+                        const fotoPulangUrl = item.foto_pulang ? getFileUrl(item.foto_pulang) : ''
 
                         return (
                           <tr key={item.id_absensi} className="transition hover:bg-slate-50/60">
@@ -819,10 +836,13 @@ export default function RekapAbsensiAdmin() {
                             </td>
                             <td className="px-4 py-3">
                               <p className="font-semibold text-slate-900">{job?.nama_pekerjaan || item.nama_pekerjaan || 'Proyek'}</p>
-                              <p className="text-[10px] text-slate-400">{job?.lokasi || item.lokasi || 'Lokasi Kantor'}</p>
+                              <p className="text-[10px] text-slate-400">{job?.lokasi || item.lokasi_pekerjaan || item.lokasi || 'Lokasi belum diisi'}</p>
                             </td>
                             <td className="px-4 py-3 font-semibold text-slate-900">
-                              {formatDate(item.tanggal)}
+                              <span className="block text-[10px] font-bold text-blue-700">
+                                {formatWeekdayAndDate(item.tanggal, true).weekday}
+                              </span>
+                              <span>{formatDate(item.tanggal)}</span>
                             </td>
                             <td className="px-4 py-3 text-slate-600">
                               {item.jam_masuk ? item.jam_masuk.slice(0, 5) : '—'}
@@ -839,6 +859,50 @@ export default function RekapAbsensiAdmin() {
                             <td className="px-4 py-3 font-bold text-blue-600">
                               {item.durasi_format || `${item.durasi_jam || 0} jam`}
                             </td>
+                            <td className="px-4 py-3 min-w-[180px]">
+                              <div className="space-y-1.5">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${loc.matchMasuk.toneClass}`}>
+                                  {loc.matchMasuk.label}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  {fotoMasukUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedAttendance({ ...item, emp, job })}
+                                      aria-label={`Periksa foto masuk ${emp?.nama || item.nama_karyawan}`}
+                                      className="overflow-hidden rounded border border-slate-200 bg-slate-100"
+                                    >
+                                      <img
+                                        src={fotoMasukUrl}
+                                        alt={`Foto masuk ${emp?.nama || item.nama_karyawan}`}
+                                        className="h-8 w-10 object-cover"
+                                      />
+                                    </button>
+                                  )}
+                                  {fotoPulangUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedAttendance({ ...item, emp, job })}
+                                      aria-label={`Periksa foto pulang ${emp?.nama || item.nama_karyawan}`}
+                                      className="overflow-hidden rounded border border-slate-200 bg-slate-100"
+                                    >
+                                      <img
+                                        src={fotoPulangUrl}
+                                        alt={`Foto pulang ${emp?.nama || item.nama_karyawan}`}
+                                        className="h-8 w-10 object-cover"
+                                      />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedAttendance({ ...item, emp, job })}
+                                    className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 hover:bg-blue-100"
+                                  >
+                                    Lihat Detail
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
                             <td className="px-4 py-3">
                               <StatusBadge status={item.status_verifikasi} />
                             </td>
@@ -848,6 +912,7 @@ export default function RekapAbsensiAdmin() {
                                   <>
                                     <button
                                       type="button"
+                                      aria-label={`Setujui absensi ${emp?.nama || item.nama_karyawan}`}
                                       title="Setujui Absensi"
                                       onClick={() => handleVerify(item.id_absensi, 'disetujui')}
                                       className="rounded-lg bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800"
@@ -856,6 +921,7 @@ export default function RekapAbsensiAdmin() {
                                     </button>
                                     <button
                                       type="button"
+                                      aria-label={`Tolak absensi ${emp?.nama || item.nama_karyawan}`}
                                       title="Tolak Absensi"
                                       onClick={() => handleVerify(item.id_absensi, 'ditolak')}
                                       className="rounded-lg bg-rose-50 p-1.5 text-rose-700 transition hover:bg-rose-100 hover:text-rose-800"
@@ -866,6 +932,7 @@ export default function RekapAbsensiAdmin() {
                                 ) : (
                                   <button
                                     type="button"
+                                    aria-label={`Ubah verifikasi absensi ${emp?.nama || item.nama_karyawan}`}
                                     title="Ubah Verifikasi"
                                     onClick={() => setSelectedAttendance({ ...item, emp, job })}
                                     className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
@@ -886,85 +953,16 @@ export default function RekapAbsensiAdmin() {
           </div>
         )}
 
-        {/* Modal Detail / Ubah Status Verifikasi */}
-        {selectedAttendance && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-base font-bold text-slate-900">Detail & Verifikasi Absensi</h3>
-                <button
-                  onClick={() => setSelectedAttendance(null)}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <Icon name="cross" className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-3 text-xs">
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Nama Karyawan:</span>
-                  <span className="font-bold text-slate-900">
-                    {selectedAttendance.emp?.nama || selectedAttendance.nama_karyawan}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Pekerjaan:</span>
-                  <span className="font-semibold text-slate-800">
-                    {selectedAttendance.job?.nama_pekerjaan || selectedAttendance.nama_pekerjaan}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Tanggal:</span>
-                  <span className="font-medium text-slate-800">{formatDate(selectedAttendance.tanggal)}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Jam Masuk / Pulang:</span>
-                  <span className="font-mono text-slate-800">
-                    {selectedAttendance.jam_masuk?.slice(0, 5)} - {selectedAttendance.jam_pulang?.slice(0, 5) || 'Aktif'}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Durasi Kerja:</span>
-                  <span className="font-bold text-blue-600">{selectedAttendance.durasi_format}</span>
-                </div>
-                <div className="flex justify-between items-center pt-1">
-                  <span className="text-slate-500">Status Saat Ini:</span>
-                  <StatusBadge status={selectedAttendance.status_verifikasi} />
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedAttendance(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Tutup
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleVerify(selectedAttendance.id_absensi, 'ditolak')
-                    setSelectedAttendance(null)
-                  }}
-                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700"
-                >
-                  Tolak
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleVerify(selectedAttendance.id_absensi, 'disetujui')
-                    setSelectedAttendance(null)
-                  }}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
-                >
-                  Setujui
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <AbsensiInspectionDialog
+          attendance={selectedAttendance}
+          employee={selectedAttendance?.emp}
+          job={selectedAttendance?.job}
+          onClose={() => setSelectedAttendance(null)}
+          onVerify={(id, status, catatanAdmin) => {
+            handleVerify(id, status, catatanAdmin)
+            setSelectedAttendance(null)
+          }}
+        />
       </div>
     </div>
   )

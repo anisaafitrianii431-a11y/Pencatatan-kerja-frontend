@@ -35,13 +35,14 @@ import PrintSignatures from '../../components/PrintSignatures';
 import { 
   angkaTerbilang, 
   formatPeriodeIndo, 
-  generateNoDokumen 
+  generateNoDokumen,
+  getJakartaCurrentPeriode
 } from '../../utils/printHelpers';
 
 export default function GajiAdminPage({ currentUser }) {
   const navigate = useNavigate();
   const isAdmin = true;
-  const [periode, setPeriode] = useState(new Date().toISOString().slice(0, 7)); // 'YYYY-MM'
+  const [periode, setPeriode] = useState(() => getJakartaCurrentPeriode()); // 'YYYY-MM'
   const [gajiList, setGajiList] = useState([]);
   const [proyekList, setProyekList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1343,7 +1344,7 @@ export default function GajiAdminPage({ currentUser }) {
               />
             </div>
 
-            {/* Upload Foto Bukti Transfer / Kwitansi */}
+            {/* Upload Foto Bukti Transfer / Kuitansi */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                 <span>Unggah Foto Bukti Transfer (Opsional):</span>
@@ -1409,7 +1410,7 @@ export default function GajiAdminPage({ currentUser }) {
         <Modal
           isOpen={!!previewImage}
           onClose={() => setPreviewImage(null)}
-          title="Pratinjau Foto Bukti / Kwitansi"
+          title="Pratinjau Foto Bukti / Kuitansi"
           maxWidth="max-w-xl"
         >
           <div className="p-2 flex flex-col items-center justify-center space-y-4">

@@ -23,7 +23,9 @@ const STATUS_LABELS = Object.fromEntries(
 )
 
 function formatDate(value) {
-  return value ? DATE_FORMATTER.format(new Date(`${value}T00:00:00`)) : '—'
+  if (!value) return '—'
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
 }
 
 function getJakartaToday() {

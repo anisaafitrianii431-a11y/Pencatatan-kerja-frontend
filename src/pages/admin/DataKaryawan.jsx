@@ -9,7 +9,13 @@ import AdminAvatar from '../../components/AdminAvatar.jsx'
 import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog.jsx'
 
 const PAGE_SIZE = 8
-const EMPTY_FORM = { nama: '', jabatan: '', tarif_per_jam: '' }
+const EMPTY_FORM = {
+  nama: '',
+  jabatan: '',
+  tarif_per_jam: '',
+  email: '',
+  kata_sandi: '',
+}
 
 const currencyFormatter = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -116,7 +122,14 @@ function EmployeeIcon({ name, className = 'h-4 w-4' }) {
   )
 }
 
-function EmployeeModal({ mode, employee, isSaving, onClose, onSave }) {
+function EmployeeModal({
+  mode,
+  employee,
+  isSaving,
+  serverError = '',
+  onClose,
+  onSave,
+}) {
   const isDetail = mode === 'detail'
   const isEdit = mode === 'edit'
   const [values, setValues] = useState(
@@ -126,31 +139,55 @@ function EmployeeModal({ mode, employee, isSaving, onClose, onSave }) {
           jabatan: employee.jabatan || '',
           tarif_per_jam:
             employee.tarif_per_jam != null ? String(employee.tarif_per_jam) : '',
+          email: employee.email || '',
+          kata_sandi: '',
         }
       : EMPTY_FORM,
   )
   const [validationMessage, setValidationMessage] = useState('')
+  const displayedError = validationMessage || serverError
 
   async function handleSubmit(event) {
     event.preventDefault()
     const nama = values.nama.trim()
     const jabatan = values.jabatan.trim()
     const tarif = Number(values.tarif_per_jam)
+    const email = (values.email || '').trim()
+    const kataSandi = (values.kata_sandi || '').trim()
 
     if (!nama) {
       setValidationMessage('Nama karyawan wajib diisi.')
       return
     }
 
-    if (!values.tarif_per_jam || !Number.isFinite(tarif) || tarif < 0) {
+    if (
+      values.tarif_per_jam === '' ||
+      !Number.isFinite(tarif) ||
+      tarif < 0
+    ) {
       setValidationMessage(
         'Tarif per jam harus berupa angka valid (Rp0 atau lebih).',
       )
       return
     }
 
+    if (mode === 'create' && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setValidationMessage('Format email login tidak valid.')
+      return
+    }
+
+    if (mode === 'create' && kataSandi && kataSandi.length < 6) {
+      setValidationMessage('Kata sandi minimal 6 karakter.')
+      return
+    }
+
     setValidationMessage('')
-    await onSave({ nama, jabatan, tarif_per_jam: tarif })
+    const payload = { nama, jabatan, tarif_per_jam: tarif }
+    if (mode === 'create' && email) {
+      payload.email = email
+      if (kataSandi) payload.kata_sandi = kataSandi
+    }
+    await onSave(payload)
   }
 
   const title =
@@ -268,7 +305,7 @@ function EmployeeModal({ mode, employee, isSaving, onClose, onSave }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {validationMessage && (
+            {displayedError && (
               <div
                 className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700"
                 role="alert"
@@ -277,7 +314,7 @@ function EmployeeModal({ mode, employee, isSaving, onClose, onSave }) {
                   name="alert"
                   className="h-4 w-4 shrink-0 text-rose-600"
                 />
-                <span>{validationMessage}</span>
+                <span>{displayedError}</span>
               </div>
             )}
 
@@ -366,6 +403,55 @@ function EmployeeModal({ mode, employee, isSaving, onClose, onSave }) {
                 )}
             </div>
 
+            {mode === 'create' && (
+              <div className="grid grid-cols-1 gap-3.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="emp-email"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    Email Login (Opsional)
+                  </label>
+                  <input
+                    id="emp-email"
+                    type="email"
+                    maxLength={100}
+                    placeholder="nama@email.com"
+                    value={values.email}
+                    onChange={(e) =>
+                      setValues((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="emp-password"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    Kata Sandi Awal (Opsional)
+                  </label>
+                  <input
+                    id="emp-password"
+                    type="password"
+                    maxLength={100}
+                    placeholder="Default: karyawan123"
+                    value={values.kata_sandi}
+                    onChange={(e) =>
+                      setValues((prev) => ({
+                        ...prev,
+                        kata_sandi: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 sm:col-span-2">
+                  Isi email bila ingin sekaligus membuatkan akun login untuk karyawan ini.
+                </p>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4">
               <button
@@ -428,6 +514,7 @@ function DataKaryawan() {
   const { employees, isReady, isSaving, storageError } = store
   const [notice, setNotice] = useState(null)
   const [modal, setModal] = useState(null)
+  const [modalError, setModalError] = useState('')
   const [pendingDelete, setPendingDelete] = useState(null)
 
   // Filters & Sorting
@@ -556,7 +643,8 @@ function DataKaryawan() {
   }
 
   async function handleSaveEmployee(values) {
-    setStore((current) => ({ ...current, isSaving: true, storageError: '' }))
+    setModalError('')
+    setStore((current) => ({ ...current, isSaving: true }))
     try {
       const savedEmployee =
         modal.mode === 'create'
@@ -579,6 +667,7 @@ function DataKaryawan() {
         }
       })
       setModal(null)
+      setModalError('')
       setPage(1)
       showNotice(
         modal.mode === 'create'
@@ -590,14 +679,14 @@ function DataKaryawan() {
       setStore((current) => ({
         ...current,
         isSaving: false,
-        storageError: error.message,
       }))
+      setModalError(error.message)
       showNotice(`Perubahan gagal disimpan: ${error.message}`, 'error')
     }
   }
 
   async function handleDeleteEmployee(employee) {
-    setStore((current) => ({ ...current, isSaving: true, storageError: '' }))
+    setStore((current) => ({ ...current, isSaving: true }))
     try {
       await deleteKaryawan(employee.id_karyawan)
       const nextEmployees = employees.filter(
@@ -614,7 +703,6 @@ function DataKaryawan() {
       setStore((current) => ({
         ...current,
         isSaving: false,
-        storageError: error.message,
       }))
       setPendingDelete(null)
       showNotice(`Karyawan gagal dihapus: ${error.message}`, 'error')
@@ -653,7 +741,10 @@ function DataKaryawan() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setModal({ mode: 'create' })}
+            onClick={() => {
+              setModalError('')
+              setModal({ mode: 'create' })
+            }}
             disabled={!isReady}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
           >
@@ -1064,9 +1155,10 @@ function DataKaryawan() {
                           {/* Detail */}
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              setModalError('')
                               setModal({ mode: 'detail', employee })
-                            }
+                            }}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition shadow-2xs"
                             title={`Lihat detail ${employee.nama}`}
                             aria-label={`Lihat detail ${employee.nama}`}
@@ -1077,9 +1169,10 @@ function DataKaryawan() {
                           {/* Edit */}
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              setModalError('')
                               setModal({ mode: 'edit', employee })
-                            }
+                            }}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition shadow-2xs"
                             title={`Edit data ${employee.nama}`}
                             aria-label={`Edit data ${employee.nama}`}
@@ -1163,9 +1256,13 @@ function DataKaryawan() {
           isSaving={isSaving}
           mode={modal.mode}
           onClose={() => {
-            if (!isSaving) setModal(null)
+            if (!isSaving) {
+              setModal(null)
+              setModalError('')
+            }
           }}
           onSave={handleSaveEmployee}
+          serverError={modalError}
         />
       )}
 

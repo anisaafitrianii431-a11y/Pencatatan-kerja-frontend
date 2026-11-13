@@ -173,9 +173,12 @@ function StatusBadge({ status }) {
   )
 }
 
-function StatisticsCard({ label, value, sublabel, icon, tone, isLoading }) {
+function StatisticsCard({ label, value, sublabel, icon, tone, isLoading, onClick }) {
   return (
-    <article className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition hover:border-slate-300">
+    <article
+      onClick={onClick}
+      className={`flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition hover:border-slate-300 ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : ''}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           {label}
@@ -925,6 +928,11 @@ function DashboardAdmin({ onNavigate = () => {} }) {
                 label: 'Atur Penugasan',
                 icon: 'assignments',
                 target: 'Penugasan',
+              },
+              {
+                label: 'Kelola Penggajian',
+                icon: 'wallet',
+                target: 'Penggajian Karyawan',
               },
             ].map((action) => (
               <button

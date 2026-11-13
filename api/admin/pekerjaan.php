@@ -4,6 +4,8 @@
 // ==========================================================
 require_once __DIR__ . '/../config/database.php';
 
+ensurePekerjaanPenugasanSchema($pdo);
+
 // Otorisasi: Wajib Admin
 $currentUser = requireAdmin();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -21,10 +23,55 @@ $sqlDurasi = "
 ";
 
 if ($method === 'GET') {
-    // Admin melihat semua pekerjaan
+    $action = $_GET['action'] ?? '';
+    $id = intval($_GET['id_pekerjaan'] ?? 0);
+
+    if ($action === 'tersedia') {
+        jsonResponse(true, "Daftar pekerjaan tersedia berhasil dimuat", fetchAvailableOpenJobs($pdo));
+    }
+
+    if ($id > 0) {
+        $stmt = $pdo->prepare("
+            SELECT p.*,
+                   (SELECT COUNT(DISTINCT pn.id_karyawan) FROM penugasan pn WHERE pn.id_pekerjaan = p.id_pekerjaan) AS total_pekerja,
+                   (SELECT GROUP_CONCAT(k.nama ORDER BY pn.id_penugasan ASC SEPARATOR ', ')
+                    FROM penugasan pn JOIN karyawan k ON pn.id_karyawan = k.id_karyawan
+                    WHERE pn.id_pekerjaan = p.id_pekerjaan) AS nama_karyawan_list,
+                   (SELECT GROUP_CONCAT(pn.id_karyawan ORDER BY pn.id_penugasan ASC SEPARATOR ',')
+                    FROM penugasan pn WHERE pn.id_pekerjaan = p.id_pekerjaan) AS id_karyawan_list,
+                   (SELECT IFNULL(SUM($sqlDurasi), 0) FROM absensi a WHERE a.id_pekerjaan = p.id_pekerjaan AND a.status_verifikasi = 'disetujui' AND a.jam_pulang IS NOT NULL) AS total_jam_kerja,
+                   (SELECT IFNULL(SUM(nominal), 0) FROM pengeluaran pg WHERE pg.id_pekerjaan = p.id_pekerjaan AND pg.status_verifikasi = 'disetujui') AS total_pengeluaran
+            FROM pekerjaan p
+            WHERE p.id_pekerjaan = ?
+        ");
+        $stmt->execute([$id]);
+        $job = $stmt->fetch();
+        if (!$job) {
+            jsonResponse(false, "Data pekerjaan tidak ditemukan", null, 404);
+        }
+
+        $stmtWorkers = $pdo->prepare("
+            SELECT pn.id_penugasan, pn.id_karyawan, pn.peran_tugas, pn.jenis_penugasan, k.nama, k.jabatan
+            FROM penugasan pn
+            JOIN karyawan k ON pn.id_karyawan = k.id_karyawan
+            WHERE pn.id_pekerjaan = ?
+            ORDER BY pn.id_penugasan ASC
+        ");
+        $stmtWorkers->execute([$id]);
+        $job['assigned_workers'] = $stmtWorkers->fetchAll();
+
+        jsonResponse(true, "Detail pekerjaan berhasil dimuat (Admin)", $job);
+    }
+
+    // Admin melihat semua pekerjaan beserta daftar pekerja terassign
     $sql = "
         SELECT p.*,
                (SELECT COUNT(DISTINCT pn.id_karyawan) FROM penugasan pn WHERE pn.id_pekerjaan = p.id_pekerjaan) AS total_pekerja,
+               (SELECT GROUP_CONCAT(k.nama ORDER BY pn.id_penugasan ASC SEPARATOR ', ')
+                FROM penugasan pn JOIN karyawan k ON pn.id_karyawan = k.id_karyawan
+                WHERE pn.id_pekerjaan = p.id_pekerjaan) AS nama_karyawan_list,
+               (SELECT GROUP_CONCAT(pn.id_karyawan ORDER BY pn.id_penugasan ASC SEPARATOR ',')
+                FROM penugasan pn WHERE pn.id_pekerjaan = p.id_pekerjaan) AS id_karyawan_list,
                (SELECT IFNULL(SUM($sqlDurasi), 0) FROM absensi a WHERE a.id_pekerjaan = p.id_pekerjaan AND a.status_verifikasi = 'disetujui' AND a.jam_pulang IS NOT NULL) AS total_jam_kerja,
                (SELECT IFNULL(SUM(nominal), 0) FROM pengeluaran pg WHERE pg.id_pekerjaan = p.id_pekerjaan AND pg.status_verifikasi = 'disetujui') AS total_pengeluaran
         FROM pekerjaan p
@@ -43,25 +90,65 @@ if ($method === 'GET') {
     $titik_lokasi = trim($body['titik_lokasi'] ?? '');
     $tanggal_mulai = !empty($body['tanggal_mulai']) ? $body['tanggal_mulai'] : null;
     $target_selesai = !empty($body['target_selesai']) ? $body['target_selesai'] : null;
-    $status = $body['status'] ?? 'belum_mulai';
+    $status = in_array($body['status'] ?? '', ['belum_mulai', 'berjalan', 'selesai'], true)
+        ? $body['status']
+        : 'belum_mulai';
+    $metode = ($body['metode_penentuan'] ?? 'terbuka') === 'langsung' ? 'langsung' : 'terbuka';
+    $employeeIds = array_values(array_unique(array_filter(
+        array_map('intval', is_array($body['id_karyawan_list'] ?? null) ? $body['id_karyawan_list'] : []),
+        fn($v) => $v > 0
+    )));
 
     if (empty($nama)) {
         jsonResponse(false, "Nama pekerjaan wajib diisi", null, 400);
     }
+    if ($metode === 'langsung' && empty($employeeIds)) {
+        jsonResponse(false, "Pilih minimal satu pekerja untuk metode penetapan langsung.", null, 400);
+    }
 
-    $stmt = $pdo->prepare("
-        INSERT INTO pekerjaan (nama_pekerjaan, deskripsi, lokasi, titik_lokasi, tanggal_mulai, target_selesai, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ");
-    $stmt->execute([$nama, $deskripsi, $lokasi, $titik_lokasi, $tanggal_mulai, $target_selesai, $status]);
+    try {
+        $pdo->beginTransaction();
 
-    jsonResponse(true, "Pekerjaan '$nama' berhasil ditambahkan oleh Admin!", [
-        "id_pekerjaan" => $pdo->lastInsertId()
-    ], 201);
+        $stmt = $pdo->prepare("
+            INSERT INTO pekerjaan (nama_pekerjaan, deskripsi, lokasi, titik_lokasi, tanggal_mulai, target_selesai, status, metode_penentuan)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$nama, $deskripsi, $lokasi, $titik_lokasi, $tanggal_mulai, $target_selesai, $status, $metode]);
+        $newId = intval($pdo->lastInsertId());
+
+        if ($metode === 'langsung' && !empty($employeeIds)) {
+            $stmtAssign = $pdo->prepare("
+                INSERT INTO penugasan (id_pekerjaan, id_karyawan, peran_tugas, jenis_penugasan, status_baca)
+                VALUES (?, ?, 'Anggota Tim Pelaksana', 'admin', 'belum')
+            ");
+            foreach ($employeeIds as $empId) {
+                $stmtAssign->execute([$newId, $empId]);
+            }
+        }
+
+        $pdo->commit();
+
+        jsonResponse(true, "Pekerjaan '$nama' berhasil ditambahkan oleh Admin!", [
+            "id_pekerjaan" => $newId,
+            "nama_pekerjaan" => $nama,
+            "deskripsi" => $deskripsi,
+            "lokasi" => $lokasi,
+            "titik_lokasi" => $titik_lokasi,
+            "tanggal_mulai" => $tanggal_mulai,
+            "target_selesai" => $target_selesai,
+            "status" => $status,
+            "metode_penentuan" => $metode,
+        ], 201);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        jsonResponse(false, "Gagal menambahkan pekerjaan: " . $e->getMessage(), null, 500);
+    }
 
 } elseif ($method === 'PUT') {
     // Ubah Data Pekerjaan
-    $id = intval($body['id_pekerjaan'] ?? 0);
+    $id = intval($_GET['id_pekerjaan'] ?? $body['id_pekerjaan'] ?? 0);
     if ($id <= 0) {
         jsonResponse(false, "ID Pekerjaan tidak valid", null, 400);
     }
@@ -72,17 +159,91 @@ if ($method === 'GET') {
     $titik_lokasi = trim($body['titik_lokasi'] ?? '');
     $tanggal_mulai = !empty($body['tanggal_mulai']) ? $body['tanggal_mulai'] : null;
     $target_selesai = !empty($body['target_selesai']) ? $body['target_selesai'] : null;
-    $status = $body['status'] ?? 'berjalan';
+    $status = in_array($body['status'] ?? '', ['belum_mulai', 'berjalan', 'selesai'], true)
+        ? $body['status']
+        : 'berjalan';
+    $metode = ($body['metode_penentuan'] ?? 'terbuka') === 'langsung' ? 'langsung' : 'terbuka';
+    $employeeIds = array_values(array_unique(array_filter(
+        array_map('intval', is_array($body['id_karyawan_list'] ?? null) ? $body['id_karyawan_list'] : []),
+        fn($v) => $v > 0
+    )));
 
-    $stmt = $pdo->prepare("
-        UPDATE pekerjaan 
-        SET nama_pekerjaan = ?, deskripsi = ?, lokasi = ?, titik_lokasi = ?, 
-            tanggal_mulai = ?, target_selesai = ?, status = ?
-        WHERE id_pekerjaan = ?
-    ");
-    $stmt->execute([$nama, $deskripsi, $lokasi, $titik_lokasi, $tanggal_mulai, $target_selesai, $status, $id]);
+    if (empty($nama)) {
+        jsonResponse(false, "Nama pekerjaan wajib diisi", null, 400);
+    }
+    if ($metode === 'langsung' && empty($employeeIds)) {
+        jsonResponse(false, "Pilih minimal satu pekerja untuk metode penetapan langsung.", null, 400);
+    }
 
-    jsonResponse(true, "Data pekerjaan berhasil diperbarui (Admin)");
+    try {
+        $pdo->beginTransaction();
+
+        $stmtPrev = $pdo->prepare("SELECT metode_penentuan, titik_lokasi FROM pekerjaan WHERE id_pekerjaan = ? FOR UPDATE");
+        $stmtPrev->execute([$id]);
+        $prev = $stmtPrev->fetch();
+        if (!$prev) {
+            $pdo->rollBack();
+            jsonResponse(false, "Data pekerjaan tidak ditemukan", null, 404);
+        }
+
+        $nextTitik = array_key_exists('titik_lokasi', $body)
+            ? trim((string) ($body['titik_lokasi'] ?? ''))
+            : ($prev['titik_lokasi'] ?? '');
+
+        $stmt = $pdo->prepare("
+            UPDATE pekerjaan 
+            SET nama_pekerjaan = ?, deskripsi = ?, lokasi = ?, titik_lokasi = ?, 
+                tanggal_mulai = ?, target_selesai = ?, status = ?, metode_penentuan = ?
+            WHERE id_pekerjaan = ?
+        ");
+        $stmt->execute([$nama, $deskripsi, $lokasi, $nextTitik, $tanggal_mulai, $target_selesai, $status, $metode, $id]);
+        $titik_lokasi = $nextTitik;
+
+        if ($metode === 'langsung') {
+            $stmtExisting = $pdo->prepare("SELECT id_karyawan FROM penugasan WHERE id_pekerjaan = ?");
+            $stmtExisting->execute([$id]);
+            $existingIds = array_map('intval', $stmtExisting->fetchAll(PDO::FETCH_COLUMN));
+
+            $toDelete = array_diff($existingIds, $employeeIds);
+            if (!empty($toDelete)) {
+                $placeholders = implode(',', array_fill(0, count($toDelete), '?'));
+                $stmtDel = $pdo->prepare("DELETE FROM penugasan WHERE id_pekerjaan = ? AND id_karyawan IN ($placeholders)");
+                $stmtDel->execute(array_merge([$id], array_values($toDelete)));
+            }
+
+            $toInsert = array_diff($employeeIds, $existingIds);
+            if (!empty($toInsert)) {
+                $stmtIns = $pdo->prepare("
+                    INSERT INTO penugasan (id_pekerjaan, id_karyawan, peran_tugas, jenis_penugasan, status_baca)
+                    VALUES (?, ?, 'Anggota Tim Pelaksana', 'admin', 'belum')
+                ");
+                foreach ($toInsert as $empId) {
+                    $stmtIns->execute([$id, $empId]);
+                }
+            }
+        } elseif ($prev['metode_penentuan'] === 'langsung' && $metode === 'terbuka') {
+            // Jika diubah dari langsung ke terbuka, bersihkan penugasan admin agar terbuka kembali
+            $pdo->prepare("DELETE FROM penugasan WHERE id_pekerjaan = ? AND jenis_penugasan = 'admin'")->execute([$id]);
+        }
+
+        $pdo->commit();
+        jsonResponse(true, "Data pekerjaan berhasil diperbarui (Admin)", [
+            "id_pekerjaan" => $id,
+            "nama_pekerjaan" => $nama,
+            "deskripsi" => $deskripsi,
+            "lokasi" => $lokasi,
+            "titik_lokasi" => $titik_lokasi,
+            "tanggal_mulai" => $tanggal_mulai,
+            "target_selesai" => $target_selesai,
+            "status" => $status,
+            "metode_penentuan" => $metode,
+        ]);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        jsonResponse(false, "Gagal memperbarui pekerjaan: " . $e->getMessage(), null, 500);
+    }
 
 } elseif ($method === 'DELETE') {
     // Hapus Pekerjaan (dengan pengecekan integritas data relasi F-06)

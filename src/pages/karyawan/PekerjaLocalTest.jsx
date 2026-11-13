@@ -5,7 +5,6 @@ import { getKaryawan } from '../../services/karyawanApi.js'
 import DashboardPekerja from './DashboardPekerja.jsx'
 import PekerjaanSaya from './PekerjaanSaya.jsx'
 import PekerjaanTersedia from './PekerjaanTersedia.jsx'
-import RiwayatPengajuan from './RiwayatPengajuan.jsx'
 import ProfilPekerja from './ProfilPekerja.jsx'
 import PengaturanPekerja from './PengaturanPekerja.jsx'
 
@@ -203,7 +202,7 @@ function PekerjaLocalTest() {
         workerId={activeEmployee.id_karyawan}
       />
     )
-  } else if (currentPage === 'Pekerjaan Saya') {
+  } else if (currentPage === 'List Pekerjaan' || currentPage === 'Pekerjaan Saya') {
     pageContent = (
       <PekerjaanSaya
         key={activeEmployee.id_karyawan}
@@ -217,12 +216,6 @@ function PekerjaLocalTest() {
         onNavigate={setCurrentPage}
         workerId={activeEmployee.id_karyawan}
         workerName={activeEmployee.nama}
-      />
-    )
-  } else if (currentPage === 'Riwayat Pengajuan') {
-    pageContent = (
-      <RiwayatPengajuan
-        onNavigate={setCurrentPage}
       />
     )
   } else if (currentPage === 'Profil Saya') {

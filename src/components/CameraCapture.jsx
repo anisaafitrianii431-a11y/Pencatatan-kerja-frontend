@@ -1,487 +1,555 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useId } from 'react'
+import {
+  calculateDistanceMeters,
+  formatCoordPair,
+  getGoogleMapsUrl,
+  getLocationMatchMeta,
+} from '../utils/geoLocation.js'
+import { getSyncedJakartaNow, syncNtpTime } from '../utils/ntpTime.js'
 
 /**
- * CameraCapture — Modal kamera + GPS untuk absensi foto
- *
- * Alur:
- *  1. Minta izin kamera & lokasi secara bersamaan
- *  2. Tampilkan preview video live
- *  3. Ambil foto (snapshot dari video)
- *  4. Reverse geocoding → alamat teks (via Nominatim/OpenStreetMap, gratis)
- *  5. Tampilkan overlay: foto + alamat + koordinat
- *  6. Tombol "Gunakan Foto" → kirim { foto, lokasi } ke parent
- *
- * Props:
- *   mode       : 'masuk' | 'pulang'
- *   onCapture  : function({ foto: string, lokasi: { lat, lng, alamat } })
- *   onCancel   : function()
+ * CameraCapture — Dialog kamera langsung (<dialog> native) + GPS untuk absensi pekerjaan.
+ * Menampilkan perbandingan real-time antara koordinat GPS pekerja dan titik lokasi pekerjaan.
  */
-export default function CameraCapture({ mode = 'masuk', onCapture, onCancel }) {
-  const videoRef   = useRef(null);
-  const canvasRef  = useRef(null);
-  const streamRef  = useRef(null);
+export default function CameraCapture({
+  mode = 'masuk',
+  job = null,
+  onCapture,
+  onCancel,
+  isSubmitting = false,
+  submitError = '',
+}) {
+  const dialogRef = useRef(null)
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const streamRef = useRef(null)
+  const pointerStartedOutsideRef = useRef(false)
+  const titleId = useId()
+  const noteInputId = useId()
 
-  const [fase, setFase]         = useState('loading');  // loading | kamera | preview | error
-  const [errorMsg, setErrorMsg] = useState('');
-  const [snapshot, setSnapshot] = useState(null);       // dataURL
-  const [lokasi, setLokasi]     = useState(null);       // { lat, lng, alamat }
-  const [loadingLokasi, setLoadingLokasi] = useState(false);
-  const [facingMode, setFacingMode] = useState('user'); // 'user' = depan, 'environment' = belakang
+  const [fase, setFase] = useState('loading') // 'loading' | 'kamera' | 'preview' | 'error'
+  const [errorMsg, setErrorMsg] = useState('')
+  const [snapshot, setSnapshot] = useState(null)
+  const [lokasi, setLokasi] = useState(null) // { lat, lng, coordText, alamat }
+  const [lokasiError, setLokasiError] = useState('')
+  const [loadingLokasi, setLoadingLokasi] = useState(true)
+  const [facingMode, setFacingMode] = useState('user')
+  const [catatan, setCatatan] = useState('')
+  const [isOvernight, setIsOvernight] = useState(false)
+  const [capturedNtp, setCapturedNtp] = useState(null)
 
-  // ── Mulai kamera ───────────────────────────────────────────
-  const startCamera = useCallback(async (facing = facingMode) => {
-    // Hentikan stream lama jika ada
+  const stopCameraStream = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
     }
-    setFase('loading');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setFase('kamera');
-    } catch (err) {
-      console.error('Camera error:', err);
-      setErrorMsg(
-        err.name === 'NotAllowedError'
-          ? 'Izin kamera ditolak. Mohon izinkan akses kamera di pengaturan browser.'
-          : `Kamera tidak dapat diakses: ${err.message}`
-      );
-      setFase('error');
-    }
-  }, [facingMode]);
+  }, [])
 
-  useEffect(() => {
-    startCamera(facingMode);
-    // Cleanup saat unmount
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
-    };
-  }, []);
+  const fetchCurrentLocation = useCallback(async () => {
+    setLoadingLokasi(true)
+    setLokasiError('')
 
-  // ── Ambil lokasi GPS + reverse geocoding ──────────────────
-  async function ambilLokasi() {
     if (!navigator.geolocation) {
-      return { lat: null, lng: null, alamat: 'Geolokasi tidak didukung perangkat ini' };
+      setLokasiError('Browser atau perangkat tidak mendukung GPS / geolokasi.')
+      setLoadingLokasi(false)
+      return null
     }
-    return new Promise(resolve => {
+
+    return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          const lat = pos.coords.latitude.toFixed(6);
-          const lng = pos.coords.longitude.toFixed(6);
-          // Reverse geocoding via Nominatim (OpenStreetMap) — gratis, tanpa API key
+          const lat = Number(pos.coords.latitude)
+          const lng = Number(pos.coords.longitude)
+          const coordText = formatCoordPair(lat, lng)
+          let alamat = coordText
+
           try {
             const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=id`,
-              { headers: { 'Accept-Language': 'id' } }
-            );
-            const data = await res.json();
-            const alamat = data.display_name ?? `${lat}, ${lng}`;
-            resolve({ lat: parseFloat(lat), lng: parseFloat(lng), alamat });
+              `https://nominatim.openstreetmap.org/reverse?lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}&format=json&accept-language=id`,
+              { headers: { 'Accept-Language': 'id' } },
+            )
+            if (res.ok) {
+              const data = await res.json()
+              if (data?.display_name) alamat = data.display_name
+            }
           } catch {
-            resolve({ lat: parseFloat(lat), lng: parseFloat(lng), alamat: `${lat}, ${lng}` });
+            // Fallback ke string koordinat jika reverse geocoding gagal/offline
           }
+
+          const resolved = { lat, lng, coordText, alamat }
+          setLokasi(resolved)
+          setLoadingLokasi(false)
+          resolve(resolved)
         },
         (err) => {
-          resolve({ lat: null, lng: null, alamat: 'Lokasi tidak dapat diakses' });
+          const message =
+            err.code === 1
+              ? 'Izin akses lokasi GPS ditolak. Aktifkan izin lokasi browser lalu klik Deteksi Ulang GPS.'
+              : 'Gagal mendeteksi titik GPS. Pastikan layanan lokasi aktif lalu coba lagi.'
+          setLokasiError(message)
+          setLoadingLokasi(false)
+          resolve(null)
         },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    });
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      )
+    })
+  }, [])
+
+  const startCamera = useCallback(
+    async (facing = facingMode) => {
+      stopCameraStream()
+      setFase('loading')
+      setErrorMsg('')
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setErrorMsg('Browser tidak mendukung akses kamera langsung (getUserMedia).')
+        setFase('error')
+        return
+      }
+
+      try {
+        let stream
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false,
+          })
+        } catch {
+          // Fallback otomatis ke kamera apa pun yang tersedia (mis. webcam laptop)
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          })
+        }
+
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+        }
+        setFase('kamera')
+      } catch (err) {
+        setErrorMsg(
+          err?.name === 'NotAllowedError'
+            ? 'Izin kamera ditolak. Mohon izinkan akses kamera di pengaturan browser Anda.'
+            : `Kamera langsung tidak dapat diakses: ${err?.message || 'Perangkat tidak ditemukan'}`,
+        )
+        setFase('error')
+      }
+    },
+    [facingMode, stopCameraStream],
+  )
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (dialog && !dialog.open) {
+      dialog.showModal()
+    }
+    syncNtpTime({ force: true })
+    startCamera('user')
+    fetchCurrentLocation()
+
+    return () => {
+      stopCameraStream()
+      if (dialog?.open) {
+        dialog.close()
+      }
+    }
+  }, [fetchCurrentLocation, startCamera, stopCameraStream])
+
+  const handleCancelEvent = (event) => {
+    event.preventDefault()
+    if (isSubmitting) return
+    stopCameraStream()
+    onCancel?.()
   }
 
-  // ── Ambil foto (snapshot dari video) ─────────────────────
-  async function handleAmbilFoto() {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
+  const handleDialogPointerDown = (event) => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const rect = dialog.getBoundingClientRect()
+    pointerStartedOutsideRef.current =
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
+  }
 
-    canvas.width  = video.videoWidth  || 1280;
-    canvas.height = video.videoHeight || 720;
+  const handleDialogPointerUp = (event) => {
+    if (isSubmitting) return
+    const dialog = dialogRef.current
+    if (!dialog || !pointerStartedOutsideRef.current) return
+    const rect = dialog.getBoundingClientRect()
+    const releasedOutside =
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
+    if (releasedOutside) {
+      stopCameraStream()
+      onCancel?.()
+    }
+  }
 
-    const ctx = canvas.getContext('2d');
+  const handleAmbilFoto = () => {
+    if (!videoRef.current || !canvasRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    canvas.width = video.videoWidth || 1280
+    canvas.height = video.videoHeight || 720
 
-    // Flip horizontal jika pakai kamera depan
+    const ctx = canvas.getContext('2d')
+    ctx.save()
     if (facingMode === 'user') {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
     }
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    ctx.restore()
 
-    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-    setSnapshot(dataURL);
-
-    // Hentikan kamera setelah foto
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
+    const dataURL = canvas.toDataURL('image/jpeg', 0.82)
+    setCapturedNtp(getSyncedJakartaNow())
+    setSnapshot(dataURL)
+    stopCameraStream()
+    setFase('preview')
+    if (!lokasi?.coordText && !loadingLokasi) {
+      fetchCurrentLocation()
     }
-
-    setFase('preview');
-    setLoadingLokasi(true);
-
-    // Ambil lokasi secara paralel
-    const lokasiData = await ambilLokasi();
-    setLokasi(lokasiData);
-    setLoadingLokasi(false);
   }
 
-  // ── Ulangi (kembali ke kamera) ────────────────────────────
-  function handleUlangi() {
-    setSnapshot(null);
-    setLokasi(null);
-    startCamera(facingMode);
+  const handleUlangi = () => {
+    setSnapshot(null)
+    setCapturedNtp(null)
+    startCamera(facingMode)
   }
 
-  // ── Flip kamera ───────────────────────────────────────────
-  function handleFlip() {
-    const newFacing = facingMode === 'user' ? 'environment' : 'user';
-    setFacingMode(newFacing);
-    startCamera(newFacing);
+  const handleFlip = () => {
+    const nextFacing = facingMode === 'user' ? 'environment' : 'user'
+    setFacingMode(nextFacing)
+    startCamera(nextFacing)
   }
 
-  // ── Gunakan foto ──────────────────────────────────────────
-  function handleGunakan() {
-    if (!snapshot) return;
-    onCapture({ foto: snapshot, lokasi });
+  const handleSubmitFoto = async () => {
+    if (!snapshot || !lokasi?.coordText || isSubmitting) return
+    await onCapture?.({
+      foto: snapshot,
+      titik_lokasi: lokasi.coordText,
+      lokasi,
+      catatan: catatan.trim(),
+      is_overnight: isOvernight,
+    })
   }
 
-  const labelMode = mode === 'masuk' ? '🏢 Absen Masuk' : '🏠 Absen Pulang';
-  const colorMode = mode === 'masuk' ? 'var(--clr-success)' : 'var(--clr-danger)';
+  const distanceMeters = calculateDistanceMeters(lokasi?.coordText, job?.titik_lokasi)
+  const locationMeta = getLocationMatchMeta(
+    distanceMeters,
+    Boolean(job?.titik_lokasi && String(job.titik_lokasi).trim()),
+    Boolean(lokasi?.coordText),
+  )
+  const isMasuk = mode === 'masuk'
+  const headerAccent = isMasuk ? 'text-emerald-700' : 'text-rose-700'
+  const jobMapUrl = getGoogleMapsUrl(job?.titik_lokasi)
+  const workerMapUrl = getGoogleMapsUrl(lokasi?.coordText)
 
   return (
-    <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div style={modalStyle}>
-        {/* ── Header ───────────────────────────────────────── */}
-        <div style={modalHeaderStyle}>
-          <div>
-            <div style={{ fontWeight: 700, color: colorMode, fontSize: 'var(--text-lg)' }}>
-              {labelMode}
-            </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--clr-text-muted)' }}>
-              Ambil foto untuk merekam kehadiran Anda
-            </div>
-          </div>
-          <button
-            onClick={onCancel}
-            style={closeBtnStyle}
-            id="btn-camera-cancel"
-            aria-label="Tutup"
-          >✕</button>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      onCancel={handleCancelEvent}
+      onPointerDown={handleDialogPointerDown}
+      onPointerUp={handleDialogPointerUp}
+      className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-slate-200 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-950/60 backdrop:backdrop-blur-xs"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4">
+        <div className="min-w-0">
+          <h2 id={titleId} className={`text-base font-bold ${headerAccent}`}>
+            {isMasuk ? '📸 Ambil Absen Masuk' : '🏠 Ambil Absen Pulang'}
+          </h2>
+          {job?.nama_pekerjaan && (
+            <p className="mt-0.5 truncate text-xs font-semibold text-slate-800">
+              Pekerjaan: {job.nama_pekerjaan}
+            </p>
+          )}
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Foto kamera langsung &amp; titik GPS akan dikirim untuk persetujuan Admin.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (isSubmitting) return
+            stopCameraStream()
+            onCancel?.()
+          }}
+          disabled={isSubmitting}
+          aria-label="Tutup dialog kamera"
+          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
+        >
+          ✕
+        </button>
+      </div>
 
-        {/* ── Loading ──────────────────────────────────────── */}
-        {fase === 'loading' && (
-          <div style={centerStyle}>
-            <div style={spinnerStyle} />
-            <p style={{ color: 'var(--clr-text-muted)', marginTop: 'var(--sp-4)' }}>
-              Memulai kamera…
-            </p>
-          </div>
-        )}
-
-        {/* ── Error ────────────────────────────────────────── */}
-        {fase === 'error' && (
-          <div style={{ ...centerStyle, gap: 'var(--sp-4)', padding: 'var(--sp-8)' }}>
-            <span style={{ fontSize: '3rem' }}>📵</span>
-            <p style={{ color: 'var(--clr-danger)', textAlign: 'center', fontSize: 'var(--text-sm)' }}>
-              {errorMsg}
-            </p>
-            <button className="btn btn-outline btn-sm" onClick={() => startCamera(facingMode)}>
-              🔄 Coba Lagi
-            </button>
-          </div>
-        )}
-
-        {/* ── Video Preview (kamera aktif) ──────────────────── */}
-        {fase === 'kamera' && (
-          <div style={{ position: 'relative' }}>
-            <video
-              ref={videoRef}
-              style={{
-                width: '100%',
-                borderRadius: 'var(--radius-md)',
-                display: 'block',
-                maxHeight: 340,
-                objectFit: 'cover',
-                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
-                background: '#000',
-              }}
-              playsInline
-              muted
-            />
-            {/* Overlay grid panduan */}
-            <div style={gridOverlayStyle} />
-
-            {/* Tombol flip kamera */}
-            <button
-              onClick={handleFlip}
-              style={flipBtnStyle}
-              id="btn-flip-camera"
-              title="Ganti kamera"
-            >
-              🔄
-            </button>
-
-            {/* Label mode di atas video */}
-            <div style={videoLabelStyle(colorMode)}>
-              {labelMode}
+      {/* Body */}
+      <div className="max-h-[75vh] space-y-4 overflow-y-auto p-5">
+        {/* Ringkasan Titik Lokasi Pekerjaan vs GPS Anda */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 text-xs space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-bold text-slate-800">Verifikasi Titik GPS Lokasi</span>
+            <div className="flex items-center gap-2">
+              {!loadingLokasi && (
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${locationMeta.toneClass}`}>
+                  {locationMeta.label}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={fetchCurrentLocation}
+                disabled={loadingLokasi || isSubmitting}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {loadingLokasi ? 'Mendeteksi...' : 'Deteksi Ulang GPS'}
+              </button>
             </div>
           </div>
-        )}
 
-        {/* ── Foto Hasil + Lokasi ──────────────────────────── */}
-        {fase === 'preview' && snapshot && (
-          <div>
-            {/* Foto */}
-            <div style={{ position: 'relative' }}>
-              <img
-                src={snapshot}
-                alt="Foto absensi"
-                style={{
-                  width: '100%',
-                  borderRadius: 'var(--radius-md)',
-                  display: 'block',
-                  maxHeight: 300,
-                  objectFit: 'cover',
-                }}
-              />
-              <div style={photoStampStyle(colorMode)}>
-                {new Date().toLocaleString('id-ID', {
-                  day: '2-digit', month: 'short', year: 'numeric',
-                  hour: '2-digit', minute: '2-digit', hour12: false,
-                })}
-              </div>
-            </div>
-
-            {/* Lokasi */}
-            <div style={lokasiBoxStyle}>
-              {loadingLokasi ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', color: 'var(--clr-text-muted)' }}>
-                  <div style={{ ...spinnerStyle, width: 16, height: 16, borderWidth: 2 }} />
-                  <span style={{ fontSize: 'var(--text-xs)' }}>Mendeteksi lokasi…</span>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-slate-200/80 bg-white p-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                Titik Lokasi Pekerjaan
+              </p>
+              <p className="mt-0.5 font-semibold text-slate-800">
+                {job?.lokasi || 'Lokasi belum diisi'}
+              </p>
+              {job?.titik_lokasi ? (
+                <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[11px] text-slate-600">
+                  <span className="truncate">{job.titik_lokasi}</span>
+                  {jobMapUrl && (
+                    <a
+                      href={jobMapUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 font-sans font-semibold text-emerald-700 hover:underline"
+                    >
+                      Peta
+                    </a>
+                  )}
                 </div>
+              ) : (
+                <p className="mt-1 text-[11px] text-slate-400">Koordinat target belum disetel</p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-slate-200/80 bg-white p-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                Titik GPS Anda Sekarang
+              </p>
+              {loadingLokasi ? (
+                <p className="mt-1 text-[11px] font-medium text-slate-500">
+                  Mengambil koordinat satelit GPS...
+                </p>
               ) : lokasi ? (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--sp-2)' }}>
-                    <span style={{ fontSize: '1rem', flexShrink: 0 }}>📍</span>
-                    <div>
-                      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--clr-text-primary)', marginBottom: 2 }}>
-                        Lokasi Anda Saat Ini
-                      </div>
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--clr-text-secondary)', lineHeight: 1.5 }}>
-                        {lokasi.alamat}
-                      </div>
-                      {lokasi.lat && (
-                        <div style={{ fontSize: '0.68rem', color: 'var(--clr-text-muted)', marginTop: 3 }}>
-                          {lokasi.lat}, {lokasi.lng}
-                        </div>
-                      )}
-                    </div>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-700">{lokasi.alamat}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[11px] text-emerald-700">
+                    <span className="truncate">{lokasi.coordText}</span>
+                    {workerMapUrl && (
+                      <a
+                        href={workerMapUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 font-sans font-semibold text-emerald-700 hover:underline"
+                      >
+                        Peta
+                      </a>
+                    )}
                   </div>
                 </>
               ) : (
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--clr-text-muted)' }}>
-                  ⚠️ Lokasi tidak tersedia
-                </div>
+                <p className="mt-1 text-[11px] font-medium text-rose-600">
+                  {lokasiError || 'Koordinat GPS belum tersedia.'}
+                </p>
               )}
             </div>
           </div>
+        </div>
+
+        {/* Status Error Submit dari Parent */}
+        {submitError && (
+          <div
+            role="alert"
+            className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold text-rose-800"
+          >
+            {submitError}
+          </div>
         )}
 
-        {/* ── Canvas tersembunyi untuk capture ─────────────── */}
-        <canvas ref={canvasRef} style={{ display: 'none' }} />
+        {/* Kamera View */}
+        {fase === 'loading' && (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-14">
+            <div className="h-9 w-9 animate-spin rounded-full border-3 border-slate-200 border-t-emerald-600" />
+            <p className="mt-3 text-xs font-medium text-slate-500">Menyiapkan kamera langsung...</p>
+          </div>
+        )}
 
-        {/* ── Action Buttons ────────────────────────────────── */}
-        <div style={actionBarStyle}>
-          {fase === 'kamera' && (
-            <>
-              <button className="btn btn-outline" onClick={onCancel} id="btn-camera-batal">
-                Batal
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleAmbilFoto}
-                id="btn-ambil-foto"
-                style={{ flex: 1 }}
-              >
-                📸 Ambil Foto
-              </button>
-            </>
-          )}
-
-          {fase === 'preview' && (
-            <>
-              <button className="btn btn-outline" onClick={handleUlangi} id="btn-ulangi-foto">
-                🔄 Ulangi
-              </button>
-              <button
-                className="btn"
-                onClick={handleGunakan}
-                id="btn-gunakan-foto"
-                disabled={loadingLokasi}
-                style={{
-                  flex: 1,
-                  background: colorMode,
-                  color: '#fff',
-                  opacity: loadingLokasi ? 0.6 : 1,
-                }}
-              >
-                {loadingLokasi ? '⏳ Mendeteksi lokasi…' : `✅ Gunakan Foto`}
-              </button>
-            </>
-          )}
-
-          {fase === 'error' && (
-            <button className="btn btn-outline btn-block" onClick={onCancel}>
-              Kembali
+        {fase === 'error' && (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-rose-200 bg-rose-50/70 p-8 text-center">
+            <p className="text-sm font-bold text-rose-800">Kamera Tidak Tersedia</p>
+            <p className="text-xs text-rose-700">{errorMsg}</p>
+            <button
+              type="button"
+              onClick={() => startCamera(facingMode)}
+              className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+            >
+              Coba Aktifkan Kamera Lagi
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
+        {fase === 'kamera' && (
+          <div className="relative overflow-hidden rounded-xl bg-slate-950">
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+              className="block max-h-80 w-full object-cover"
+            />
+            <div className="pointer-events-none absolute inset-0 border-2 border-white/15" />
+            <span
+              className={`absolute top-3 left-3 rounded-full px-3 py-1 text-[11px] font-bold text-white shadow ${
+                isMasuk ? 'bg-emerald-600/90' : 'bg-rose-600/90'
+              }`}
+            >
+              {isMasuk ? 'Kamera Absen Masuk' : 'Kamera Absen Pulang'}
+            </span>
+            <button
+              type="button"
+              onClick={handleFlip}
+              aria-label="Ganti kamera depan atau belakang"
+              className="absolute top-3 right-3 rounded-lg bg-slate-900/70 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-xs hover:bg-slate-900"
+            >
+              Ganti Kamera
+            </button>
+          </div>
+        )}
+
+        {fase === 'preview' && snapshot && (
+          <div className="space-y-3">
+            <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
+              <img
+                src={snapshot}
+                alt={`Hasil foto absen ${isMasuk ? 'masuk' : 'pulang'} di lokasi pekerjaan`}
+                className="block max-h-72 w-full object-cover"
+              />
+              <span className="absolute right-2.5 bottom-2.5 rounded-md bg-slate-950/75 px-2.5 py-1 font-mono text-[11px] text-white">
+                {(capturedNtp || getSyncedJakartaNow()).previewLabel} WIB
+                {lokasi?.coordText ? ` • ${lokasi.coordText}` : ''}
+              </span>
+            </div>
+
+            {isMasuk ? (
+              <div>
+                <label htmlFor={noteInputId} className="mb-1 block text-xs font-semibold text-slate-700">
+                  Catatan Pekerjaan Saat Absen (Opsional)
+                </label>
+                <input
+                  id={noteInputId}
+                  type="text"
+                  maxLength={200}
+                  value={catatan}
+                  onChange={(e) => setCatatan(e.target.value)}
+                  placeholder="Contoh: Tiba di lokasi, mulai pengecekan instalasi"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={isOvernight}
+                  onChange={(e) => setIsOvernight(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>Shift malam (pekerjaan melewati pukul 00:00)</span>
+              </label>
+            )}
+          </div>
+        )}
+
+        <canvas ref={canvasRef} className="hidden" />
       </div>
-    </div>
-  );
+
+      {/* Footer Actions */}
+      <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/70 px-5 py-3.5">
+        {fase === 'kamera' && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                stopCameraStream()
+                onCancel?.()
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              id="btn-ambil-foto"
+              onClick={handleAmbilFoto}
+              className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
+            >
+              📸 Ambil Foto Langsung
+            </button>
+          </>
+        )}
+
+        {fase === 'preview' && (
+          <>
+            <button
+              type="button"
+              onClick={handleUlangi}
+              disabled={isSubmitting}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Foto Ulang
+            </button>
+            <button
+              type="button"
+              id="btn-gunakan-foto"
+              onClick={handleSubmitFoto}
+              disabled={loadingLokasi || !lokasi?.coordText || isSubmitting}
+              className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                isMasuk ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+              }`}
+            >
+              {isSubmitting
+                ? 'Mengirim Absen ke Admin...'
+                : loadingLokasi
+                  ? 'Menunggu Titik GPS...'
+                  : !lokasi?.coordText
+                    ? 'Aktifkan GPS Terlebih Dahulu'
+                    : isMasuk
+                      ? '✅ Kirim Absen Masuk'
+                      : '✅ Kirim Absen Pulang'}
+            </button>
+          </>
+        )}
+
+        {(fase === 'error' || fase === 'loading') && (
+          <button
+            type="button"
+            onClick={() => {
+              stopCameraStream()
+              onCancel?.()
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Tutup
+          </button>
+        )}
+      </div>
+    </dialog>
+  )
 }
-
-/* ── Styles ─────────────────────────────────────────────────── */
-const overlayStyle = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.75)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-  padding: 'var(--sp-4)',
-  backdropFilter: 'blur(4px)',
-};
-
-const modalStyle = {
-  background: 'var(--clr-bg-card)',
-  border: '1px solid var(--clr-border)',
-  borderRadius: 'var(--radius-xl)',
-  width: '100%',
-  maxWidth: 440,
-  overflow: 'hidden',
-  boxShadow: 'var(--shadow-lg)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 0,
-};
-
-const modalHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: 'var(--sp-5)',
-  borderBottom: '1px solid var(--clr-border)',
-};
-
-const closeBtnStyle = {
-  background: 'var(--clr-bg-surface)',
-  border: '1px solid var(--clr-border)',
-  borderRadius: 'var(--radius-md)',
-  color: 'var(--clr-text-muted)',
-  cursor: 'pointer',
-  width: 32,
-  height: 32,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontFamily: 'inherit',
-  fontSize: 'var(--text-sm)',
-};
-
-const centerStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 'var(--sp-10)',
-};
-
-const spinnerStyle = {
-  width: 36,
-  height: 36,
-  border: '3px solid var(--clr-border)',
-  borderTop: '3px solid var(--clr-primary)',
-  borderRadius: '50%',
-  animation: 'spin 0.8s linear infinite',
-};
-
-const gridOverlayStyle = {
-  position: 'absolute',
-  inset: 0,
-  borderRadius: 'var(--radius-md)',
-  pointerEvents: 'none',
-  backgroundImage: `
-    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
-  `,
-  backgroundSize: '33.33% 33.33%',
-};
-
-const flipBtnStyle = {
-  position: 'absolute',
-  top: 10,
-  right: 10,
-  background: 'rgba(0,0,0,0.5)',
-  border: 'none',
-  borderRadius: 'var(--radius-md)',
-  color: '#fff',
-  cursor: 'pointer',
-  padding: '6px 10px',
-  fontSize: '1rem',
-  backdropFilter: 'blur(4px)',
-};
-
-const videoLabelStyle = (color) => ({
-  position: 'absolute',
-  top: 10,
-  left: 10,
-  background: `${color}cc`,
-  color: '#fff',
-  fontSize: 'var(--text-xs)',
-  fontWeight: 700,
-  padding: '4px 10px',
-  borderRadius: 'var(--radius-full)',
-  backdropFilter: 'blur(4px)',
-});
-
-const photoStampStyle = (color) => ({
-  position: 'absolute',
-  bottom: 8,
-  right: 10,
-  background: 'rgba(0,0,0,0.65)',
-  color: '#fff',
-  fontSize: '0.65rem',
-  padding: '3px 8px',
-  borderRadius: 'var(--radius-sm)',
-  fontFamily: 'monospace',
-  letterSpacing: '0.03em',
-});
-
-const lokasiBoxStyle = {
-  margin: 'var(--sp-3) var(--sp-5) 0',
-  background: 'var(--clr-bg-surface)',
-  border: '1px solid var(--clr-border)',
-  borderRadius: 'var(--radius-md)',
-  padding: 'var(--sp-3) var(--sp-4)',
-};
-
-const actionBarStyle = {
-  display: 'flex',
-  gap: 'var(--sp-3)',
-  padding: 'var(--sp-5)',
-  borderTop: '1px solid var(--clr-border)',
-  marginTop: 'var(--sp-3)',
-};

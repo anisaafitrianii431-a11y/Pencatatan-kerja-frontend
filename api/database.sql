@@ -8,7 +8,9 @@ USE db_jam_kerja;
 
 -- Hapus tabel jika sudah ada (urutkan sesuai FK)
 DROP TABLE IF EXISTS gaji;
+DROP TABLE IF EXISTS kas_kantor_pengembalian;
 DROP TABLE IF EXISTS pengeluaran;
+DROP TABLE IF EXISTS kas_kantor;
 DROP TABLE IF EXISTS absensi;
 DROP TABLE IF EXISTS penugasan;
 DROP TABLE IF EXISTS pekerjaan;
@@ -57,6 +59,7 @@ CREATE TABLE pekerjaan (
     tanggal_mulai DATE DEFAULT NULL,
     target_selesai DATE DEFAULT NULL,
     status ENUM('belum_mulai', 'berjalan', 'selesai') NOT NULL DEFAULT 'belum_mulai',
+    metode_penentuan ENUM('terbuka', 'langsung') NOT NULL DEFAULT 'terbuka',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -69,6 +72,7 @@ CREATE TABLE penugasan (
     id_pekerjaan INT NOT NULL,
     id_karyawan INT NOT NULL,
     peran_tugas VARCHAR(100) DEFAULT 'Anggota' COMMENT 'Peran/tugas pekerja pada proyek ini',
+    jenis_penugasan ENUM('admin', 'mandiri') NOT NULL DEFAULT 'admin' COMMENT 'Asal penugasan dari admin atau klaim mandiri',
     status_baca ENUM('belum', 'sudah') NOT NULL DEFAULT 'belum' COMMENT 'Status notifikasi tugas baru bagi karyawan',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_penugasan_pekerjaan FOREIGN KEY (id_pekerjaan) 
@@ -89,10 +93,15 @@ CREATE TABLE absensi (
     tanggal DATE NOT NULL,
     jam_masuk TIME NOT NULL,
     jam_pulang TIME DEFAULT NULL,
-    status_verifikasi ENUM('menunggu', 'disetujui', 'ditolak') NOT NULL DEFAULT 'disetujui' COMMENT 'Otomatis disetujui saat GPS & selfie valid',
+    status_verifikasi ENUM('menunggu', 'disetujui', 'ditolak') NOT NULL DEFAULT 'menunggu' COMMENT 'Menunggu persetujuan Admin berdasarkan titik lokasi & foto kamera',
     foto_lokasi VARCHAR(255) DEFAULT NULL,
+    foto_pulang VARCHAR(255) DEFAULT NULL,
     titik_lokasi VARCHAR(100) DEFAULT NULL,
+    titik_pulang VARCHAR(100) DEFAULT NULL,
+    jarak_masuk INT DEFAULT NULL,
+    jarak_pulang INT DEFAULT NULL,
     catatan VARCHAR(255) DEFAULT NULL,
+    catatan_admin VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_absensi_pekerjaan FOREIGN KEY (id_pekerjaan) 
         REFERENCES pekerjaan(id_pekerjaan) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -101,8 +110,34 @@ CREATE TABLE absensi (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------
--- 6. TABEL: pengeluaran
--- Mencatat uang terpakai, jenis dana (kantor/pribadi), foto kwitansi
+-- 6. TABEL: kas_kantor
+-- Mencatat pemasukan / penyerahan uang kantor ke penanggung jawab
+-- ----------------------------------------------------------
+CREATE TABLE kas_kantor (
+    id_kas INT AUTO_INCREMENT PRIMARY KEY,
+    id_pekerjaan INT DEFAULT NULL,
+    id_karyawan INT NOT NULL COMMENT 'Penanggung jawab / pemegang uang kantor',
+    id_pelapor INT DEFAULT NULL COMMENT 'Karyawan yang mengajukan laporan pemasukan (jika diinput karyawan)',
+    dibuat_oleh ENUM('admin', 'karyawan') NOT NULL DEFAULT 'admin',
+    tanggal DATE NOT NULL,
+    nominal_masuk DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    keterangan VARCHAR(255) DEFAULT NULL,
+    bukti_serah VARCHAR(255) DEFAULT NULL,
+    status_verifikasi ENUM('menunggu', 'disetujui', 'ditolak') NOT NULL DEFAULT 'disetujui',
+    catatan_admin VARCHAR(255) DEFAULT NULL,
+    status_lpj ENUM('berjalan', 'selesai') NOT NULL DEFAULT 'berjalan',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_kas_pekerjaan FOREIGN KEY (id_pekerjaan)
+        REFERENCES pekerjaan(id_pekerjaan) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_kas_karyawan FOREIGN KEY (id_karyawan)
+        REFERENCES karyawan(id_karyawan) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_kas_pelapor FOREIGN KEY (id_pelapor)
+        REFERENCES karyawan(id_karyawan) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------
+-- 7. TABEL: pengeluaran
+-- Mencatat uang terpakai, jenis dana (kantor/pribadi), foto kuitansi
 -- ----------------------------------------------------------
 CREATE TABLE pengeluaran (
     id_pengeluaran INT AUTO_INCREMENT PRIMARY KEY,
@@ -111,6 +146,7 @@ CREATE TABLE pengeluaran (
     tanggal DATE NOT NULL,
     nominal DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
     jenis_dana ENUM('kantor', 'pribadi') NOT NULL,
+    id_kas INT DEFAULT NULL COMMENT 'Referensi paket dana kantor & penanggung jawabnya',
     keterangan VARCHAR(255) DEFAULT NULL,
     foto_kwitansi VARCHAR(255) DEFAULT NULL,
     status_verifikasi ENUM('menunggu', 'disetujui', 'ditolak') NOT NULL DEFAULT 'menunggu',
@@ -119,7 +155,29 @@ CREATE TABLE pengeluaran (
     CONSTRAINT fk_pengeluaran_pekerjaan FOREIGN KEY (id_pekerjaan) 
         REFERENCES pekerjaan(id_pekerjaan) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_pengeluaran_karyawan FOREIGN KEY (id_karyawan) 
-        REFERENCES karyawan(id_karyawan) ON DELETE CASCADE ON UPDATE CASCADE
+        REFERENCES karyawan(id_karyawan) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_pengeluaran_kas FOREIGN KEY (id_kas)
+        REFERENCES kas_kantor(id_kas) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------
+-- 8. TABEL: kas_kantor_pengembalian
+-- Mencatat pengembalian / setor sisa uang kantor ke Admin (LPJ)
+-- ----------------------------------------------------------
+CREATE TABLE kas_kantor_pengembalian (
+    id_pengembalian INT AUTO_INCREMENT PRIMARY KEY,
+    id_kas INT NOT NULL,
+    id_karyawan INT DEFAULT NULL COMMENT 'Pekerja yang menyetor sisa dana',
+    tanggal DATE NOT NULL,
+    nominal DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    keterangan VARCHAR(255) DEFAULT NULL,
+    bukti_foto VARCHAR(255) DEFAULT NULL,
+    status_konfirmasi ENUM('menunggu', 'diterima', 'ditolak') NOT NULL DEFAULT 'menunggu',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_pengembalian_kas FOREIGN KEY (id_kas)
+        REFERENCES kas_kantor(id_kas) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_pengembalian_karyawan FOREIGN KEY (id_karyawan)
+        REFERENCES karyawan(id_karyawan) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------
@@ -185,12 +243,17 @@ INSERT INTO absensi (id_pekerjaan, id_karyawan, tanggal, jam_masuk, jam_pulang, 
 (2, 2, '2026-11-02', '09:00:00', '18:00:00', 'disetujui', 'Audit indexing database'),
 (2, 1, '2026-11-03', '09:00:00', '15:00:00', 'menunggu', 'Cek temperatur data center');
 
+-- Data Pemasukan / Penyerahan Kas Kantor (Uang Muka Proyek)
+INSERT INTO kas_kantor (id_kas, id_pekerjaan, id_karyawan, id_pelapor, dibuat_oleh, tanggal, nominal_masuk, keterangan, status_verifikasi, status_lpj) VALUES
+(1, 1, 1, NULL, 'admin', '2026-11-01', 750000.00, 'Uang muka operasional & sewa alat Proyek Gedung B (PJ: Budi Santoso)', 'disetujui', 'berjalan'),
+(2, 2, 2, NULL, 'admin', '2026-11-02', 300000.00, 'Dana pembelian lisensi software maintenance server (PJ: Siti Rahma)', 'disetujui', 'selesai');
+
 -- Data Pengeluaran (Sesuai contoh use case)
-INSERT INTO pengeluaran (id_pekerjaan, id_karyawan, tanggal, nominal, jenis_dana, keterangan, foto_kwitansi, status_verifikasi, status_ganti) VALUES
-(1, 1, '2026-11-02', 150000.00, 'pribadi', 'Beli konektor RJ45 Cat6 dan isolasi listrik', 'uploads/kwitansi_sample1.jpg', 'disetujui', 'sudah'),
-(1, 1, '2026-11-03', 500000.00, 'kantor', 'Sewa tangga scaffolding 2 hari', 'uploads/kwitansi_sample2.jpg', 'disetujui', 'sudah'),
-(2, 2, '2026-11-02', 300000.00, 'kantor', 'Lisensi software utility tuning database', 'uploads/kwitansi_sample3.jpg', 'disetujui', 'sudah'),
-(1, 3, '2026-11-04', 75000.00, 'pribadi', 'Beli paku klem kabel dan mata bor beton', 'uploads/kwitansi_sample4.jpg', 'menunggu', 'belum');
+INSERT INTO pengeluaran (id_pekerjaan, id_karyawan, tanggal, nominal, jenis_dana, id_kas, keterangan, foto_kwitansi, status_verifikasi, status_ganti) VALUES
+(1, 1, '2026-11-02', 150000.00, 'pribadi', NULL, 'Beli konektor RJ45 Cat6 dan isolasi listrik', 'uploads/kwitansi_sample1.jpg', 'disetujui', 'sudah'),
+(1, 1, '2026-11-03', 500000.00, 'kantor', 1, 'Sewa tangga scaffolding 2 hari', 'uploads/kwitansi_sample2.jpg', 'disetujui', 'sudah'),
+(2, 2, '2026-11-02', 300000.00, 'kantor', 2, 'Lisensi software utility tuning database', 'uploads/kwitansi_sample3.jpg', 'disetujui', 'sudah'),
+(1, 3, '2026-11-04', 75000.00, 'pribadi', NULL, 'Beli paku klem kabel dan mata bor beton', 'uploads/kwitansi_sample4.jpg', 'menunggu', 'belum');
 
 -- Data Gaji (Bulan sebelumnya / periode 2026-10)
 INSERT INTO gaji (id_karyawan, periode, total_jam, tarif, total_upah, total_ganti, total_dibayar, status_bayar, tanggal_bayar) VALUES

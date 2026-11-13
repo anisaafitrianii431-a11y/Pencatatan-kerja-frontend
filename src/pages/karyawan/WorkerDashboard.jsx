@@ -62,7 +62,7 @@ export default function WorkerDashboard() {
         <WorkerStat
           icon="⌂"
           tone="purple"
-          label="Pekerjaan Saya"
+          label="List Pekerjaan"
           value={`${jobs.length} Proyek`}
           detail="Pekerjaan aktif yang ditugaskan"
         />

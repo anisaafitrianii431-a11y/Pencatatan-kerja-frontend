@@ -21,41 +21,40 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
     getPenugasan(),
   ])
 
-  // 1. Cari berdasarkan id_karyawan jika ID valid (misal id 1, 2, 3...)
-  let worker =
+  // 1. Cocokkan berdasarkan id_karyawan numerik terlebih dahulu agar identitas worker selalu akurat
+  let worker = null
+  if (
     Number.isInteger(normalizedEmployeeId) &&
     normalizedEmployeeId > 0 &&
     normalizedEmployeeId < 1000000
-      ? employees.find((emp) => emp.id_karyawan === normalizedEmployeeId)
-      : null
+  ) {
+    worker = employees.find((emp) => emp.id_karyawan === normalizedEmployeeId) || null
+  }
 
-  // 2. Jika tidak ditemukan via ID (misal login lokal dengan ID timestamp), cari berdasarkan kecocokan nama
+  // 2. Jika belum ditemukan via ID, cari berdasarkan kecocokan nama pekerja
   if (!worker && employeeName) {
     const searchName = employeeName.trim().toLowerCase()
     const firstName = searchName.split(/\s+/)[0]
     worker =
+      employees.find((emp) => (emp.nama || '').trim().toLowerCase() === searchName) ||
       employees.find((emp) => {
-        const empName = emp.nama.toLowerCase()
+        const empName = (emp.nama || '').trim().toLowerCase()
         const empFirst = empName.split(/\s+/)[0]
         return (
           empName.includes(searchName) ||
           searchName.includes(empName) ||
-          (firstName.length > 2 && empFirst === firstName)
+          (firstName.length >= 3 && empFirst === firstName)
         )
-      }) || null
+      }) ||
+      null
   }
 
-  // 3. Fallback aman ke karyawan pertama di database (misal Budi Santoso, ID 1) jika ada
-  if (!worker && employees.length > 0) {
-    worker = employees[0]
-  }
-
-  // 4. Fallback virtual jika database karyawan benar-benar kosong
+  // 3. Fallback aman: jika data karyawan belum terdaftar di tabel, tetap gunakan identitas user yang login
   if (!worker) {
     worker = {
-      id_karyawan: 1,
-      nama: employeeName || 'Karyawan',
-      jabatan: 'Staff',
+      id_karyawan: normalizedEmployeeId || 1,
+      nama: employeeName || 'Pekerja',
+      jabatan: 'Staff Lapangan',
       tarif_per_jam: 0,
     }
   }
@@ -68,10 +67,27 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
     .filter(
       (assignment) => Number(assignment.id_karyawan) === targetWorkerId,
     )
-    .map((assignment) => ({
-      assignment,
-      job: jobsById.get(assignment.id_pekerjaan) ?? null,
-    }))
+    .map((assignment) => {
+      const matchedJob = jobsById.get(assignment.id_pekerjaan) ?? null
+      const fallbackJob =
+        !matchedJob && assignment.nama_pekerjaan
+          ? {
+              id_pekerjaan: Number(assignment.id_pekerjaan),
+              nama_pekerjaan: assignment.nama_pekerjaan,
+              deskripsi: assignment.deskripsi ?? '',
+              lokasi: assignment.lokasi ?? '',
+              tanggal_mulai: assignment.tanggal_mulai ?? '',
+              target_selesai: assignment.target_selesai ?? '',
+              status: assignment.status_pekerjaan || 'belum_mulai',
+              metode_penentuan: assignment.metode_penentuan ?? 'terbuka',
+            }
+          : null
+
+      return {
+        assignment,
+        job: matchedJob ?? fallbackJob,
+      }
+    })
 
   return { worker, assignedJobs }
 }

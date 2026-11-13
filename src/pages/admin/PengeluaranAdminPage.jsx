@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Receipt, 
   CheckCircle2, 
@@ -6,7 +7,6 @@ import {
   AlertCircle, 
   Eye, 
   Check, 
-  DollarSign, 
   CreditCard,
   Building,
   User,
@@ -22,16 +22,31 @@ import {
   ZoomIn,
   Search,
   RotateCcw,
-  Trash2
+  Trash2,
+  Wallet
 } from 'lucide-react';
 import { PengeluaranService, PekerjaanService, PekerjaService } from '../../services/api';
 import Modal from '../../components/Modal';
 
 export default function PengeluaranAdminPage({ currentUser }) {
+  const navigate = useNavigate();
   const [pengeluaranList, setPengeluaranList] = useState([]);
   const [pekerjaanList, setPekerjaanList] = useState([]);
   const [pekerjaList, setPekerjaList] = useState([]);
   const [rekapData, setRekapData] = useState({ daftar: [], summary: { total_uang_pribadi: 0, total_uang_kantor: 0, grand_total: 0 } });
+  const [kasData, setKasData] = useState({
+    daftar: [],
+    pengembalian: [],
+    summary: {
+      total_kas_masuk: 0,
+      total_terpakai_disetujui: 0,
+      total_terpakai_menunggu: 0,
+      total_sisa_dikembalikan: 0,
+      total_sisa_tanggungan: 0,
+      menunggu_konfirmasi_kembali: 0,
+      menunggu_verifikasi_kas: 0
+    }
+  });
   const [loading, setLoading] = useState(true);
 
   // Tab view: 'daftar' | 'rekap'
@@ -75,17 +90,30 @@ export default function PengeluaranAdminPage({ currentUser }) {
       if (filterJob) filter.id_pekerjaan = filterJob;
       if (filterWorker) filter.id_karyawan = filterWorker;
 
-      const [expenses, jobs, workers, rekap] = await Promise.all([
+      const [expenses, jobs, workers, rekap, kasRes] = await Promise.all([
         PengeluaranService.getAll(filter),
         PekerjaanService.getAll(),
         PekerjaService.getAll(),
-        PengeluaranService.getRekap()
+        PengeluaranService.getRekap(),
+        PengeluaranService.getKasList().catch(() => ({
+          daftar: [],
+          pengembalian: [],
+          summary: {
+            total_kas_masuk: 0,
+            total_terpakai_disetujui: 0,
+            total_terpakai_menunggu: 0,
+            total_sisa_dikembalikan: 0,
+            total_sisa_tanggungan: 0,
+            menunggu_konfirmasi_kembali: 0
+          }
+        }))
       ]);
 
-      setPengeluaranList(expenses);
-      setPekerjaanList(jobs);
-      setPekerjaList(workers);
+      setPengeluaranList(expenses || []);
+      setPekerjaanList(jobs || []);
+      setPekerjaList(workers || []);
       setRekapData(rekap || { daftar: [], summary: { total_uang_pribadi: 0, total_uang_kantor: 0, grand_total: 0 } });
+      setKasData(kasRes || { daftar: [], pengembalian: [], summary: {} });
     } catch (err) {
       setErrorMsg(err.message || 'Gagal memuat data pengeluaran');
     } finally {
@@ -115,14 +143,14 @@ export default function PengeluaranAdminPage({ currentUser }) {
     const nextStatus = currentStatus === 'sudah' ? 'belum' : 'sudah';
     try {
       await PengeluaranService.toggleGanti(id, nextStatus);
-      setSuccessMsg(`Status penggantian uang pribadi berhasil diubah: ${nextStatus === 'sudah' ? 'LUNAS DIGANTI' : 'BELUM DIGANTI'}`);
+      setSuccessMsg(`Status pengembalian dana pribadi berhasil diubah: ${nextStatus === 'sudah' ? 'SUDAH DIKEMBALIKAN' : 'PENGEMBALIAN DANA'}`);
       loadData();
       if (selectedExpense && selectedExpense.id_pengeluaran === id) {
         setSelectedExpense(prev => prev ? { ...prev, status_ganti: nextStatus } : null);
       }
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
-      setErrorMsg(err.message || 'Gagal mengubah status penggantian');
+      setErrorMsg(err.message || 'Gagal mengubah status pengembalian');
     }
   };
 
@@ -151,7 +179,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
     return item.status_verifikasi === filterStatus;
   });
 
-  // Rekapitulasi Biaya per Proyek (dihitung dinamis dari data pengeluaran yang telah disetujui & data pekerjaan)
+  // Rekapitulasi Biaya per Proyek (dihitung dinamis dari data pengeluaran disetujui & kas kantor)
   const computedRekap = useMemo(() => {
     const projectMap = {};
 
@@ -162,9 +190,35 @@ export default function PengeluaranAdminPage({ currentUser }) {
         lokasi: pj.lokasi || pj.titik_lokasi || pj.nama_lokasi || 'Lokasi Proyek',
         uang_pribadi: 0,
         uang_kantor: 0,
+        kas_masuk: 0,
+        kas_dikembalikan: 0,
+        sisa_kas_proyek: 0,
         total_pengeluaran: 0,
         total_nota: 0,
       };
+    });
+
+    (kasData?.daftar || [])
+      .filter(kk => (kk.status_verifikasi || 'disetujui') === 'disetujui')
+      .forEach(kk => {
+        if (!kk.id_pekerjaan) return;
+      const id = kk.id_pekerjaan;
+      if (!projectMap[id]) {
+        projectMap[id] = {
+          id_pekerjaan: id,
+          nama_pekerjaan: kk.nama_pekerjaan || `Proyek #${id}`,
+          lokasi: kk.lokasi_pekerjaan || 'Lokasi Proyek',
+          uang_pribadi: 0,
+          uang_kantor: 0,
+          kas_masuk: 0,
+          kas_dikembalikan: 0,
+          sisa_kas_proyek: 0,
+          total_pengeluaran: 0,
+          total_nota: 0,
+        };
+      }
+      projectMap[id].kas_masuk += Number(kk.nominal_masuk) || 0;
+      projectMap[id].kas_dikembalikan += Number(kk.total_dikembalikan) || 0;
     });
 
     pengeluaranList
@@ -178,6 +232,9 @@ export default function PengeluaranAdminPage({ currentUser }) {
             lokasi: p.lokasi || 'Lokasi Proyek',
             uang_pribadi: 0,
             uang_kantor: 0,
+            kas_masuk: 0,
+            kas_dikembalikan: 0,
+            sisa_kas_proyek: 0,
             total_pengeluaran: 0,
             total_nota: 0,
           };
@@ -192,9 +249,14 @@ export default function PengeluaranAdminPage({ currentUser }) {
         projectMap[id].total_nota += 1;
       });
 
-    const daftar = Object.values(projectMap);
+    const daftar = Object.values(projectMap).map(item => ({
+      ...item,
+      sisa_kas_proyek: Math.max(0, item.kas_masuk - item.uang_kantor - item.kas_dikembalikan)
+    }));
     const totalPribadi = daftar.reduce((sum, d) => sum + d.uang_pribadi, 0);
     const totalKantor = daftar.reduce((sum, d) => sum + d.uang_kantor, 0);
+    const totalKasMasuk = daftar.reduce((sum, d) => sum + d.kas_masuk, 0);
+    const totalSisaKas = daftar.reduce((sum, d) => sum + d.sisa_kas_proyek, 0);
     const grandTotal = totalPribadi + totalKantor;
 
     return {
@@ -202,10 +264,12 @@ export default function PengeluaranAdminPage({ currentUser }) {
       summary: {
         total_uang_pribadi: totalPribadi,
         total_uang_kantor: totalKantor,
+        total_kas_masuk: totalKasMasuk,
+        total_sisa_kas: totalSisaKas,
         grand_total: grandTotal,
       }
     };
-  }, [pengeluaranList, pekerjaanList]);
+  }, [pengeluaranList, pekerjaanList, kasData]);
 
   // Filter khusus untuk Tab Rekapitulasi Proyek
   const filteredRekapList = useMemo(() => {
@@ -221,8 +285,8 @@ export default function PengeluaranAdminPage({ currentUser }) {
         const matchLokasi = (item.lokasi || '').toLowerCase().includes(query);
         if (!matchNama && !matchLokasi) return false;
       }
-      // 3. Filter hanya yang memiliki pengeluaran
-      if (rekapOnlyWithExpenses && item.total_pengeluaran === 0) {
+      // 3. Filter hanya yang memiliki pengeluaran atau kas
+      if (rekapOnlyWithExpenses && item.total_pengeluaran === 0 && item.kas_masuk === 0) {
         return false;
       }
       return true;
@@ -233,10 +297,14 @@ export default function PengeluaranAdminPage({ currentUser }) {
   const filteredRekapSummary = useMemo(() => {
     const totalPribadi = filteredRekapList.reduce((sum, d) => sum + d.uang_pribadi, 0);
     const totalKantor = filteredRekapList.reduce((sum, d) => sum + d.uang_kantor, 0);
+    const totalKasMasuk = filteredRekapList.reduce((sum, d) => sum + d.kas_masuk, 0);
+    const totalSisaKas = filteredRekapList.reduce((sum, d) => sum + d.sisa_kas_proyek, 0);
     const grandTotal = totalPribadi + totalKantor;
     return {
       total_uang_pribadi: totalPribadi,
       total_uang_kantor: totalKantor,
+      total_kas_masuk: totalKasMasuk,
+      total_sisa_kas: totalSisaKas,
       grand_total: grandTotal,
     };
   }, [filteredRekapList]);
@@ -251,31 +319,43 @@ export default function PengeluaranAdminPage({ currentUser }) {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center space-x-2">
             <Receipt className="w-7 h-7 text-blue-600" />
-            <span>Data Pengeluaran & Kwitansi</span>
+            <span>Data Pengeluaran &amp; Kuitansi</span>
           </h1>
           <p className="text-sm text-slate-500">
-            Periksa nota/bukti belanja lapangan, setujui penggantian uang pribadi pekerja, dan pantau biaya proyek.
+            Periksa nota/bukti belanja lapangan, setujui pengembalian dana pribadi pekerja, dan pantau biaya proyek.
           </p>
         </div>
 
-        <button
-          onClick={loadData}
-          className="p-2.5 text-slate-600 hover:text-blue-600 bg-white border border-slate-200 rounded-xl transition self-start sm:self-auto shadow-sm"
-          title="Segarkan Data"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={loadData}
+            className="p-2.5 text-slate-600 hover:text-blue-600 bg-white border border-slate-200 rounded-xl transition shadow-sm cursor-pointer"
+            title="Segarkan Data"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/pemasukan')}
+            className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm transition cursor-pointer"
+          >
+            <Wallet className="w-4 h-4" />
+            <span>Kelola Pemasukan &amp; Kas</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Alerts */}
       {errorMsg && (
-        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl flex items-center space-x-3 text-sm">
+        <div role="alert" className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl flex items-center space-x-3 text-sm">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
       {successMsg && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl flex items-center space-x-3 text-sm">
+        <div role="status" className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl flex items-center space-x-3 text-sm">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
           <span>{successMsg}</span>
         </div>
@@ -292,7 +372,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
         </div>
 
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm">
-          <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Uang Pribadi Belum Diganti</div>
+          <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Pengembalian Dana (Belum Cair)</div>
           <div className="text-2xl font-extrabold text-amber-600 mt-1">
             {formatRupiah(totalReimbursBelum)}
           </div>
@@ -304,7 +384,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
           <div className="text-2xl font-extrabold text-blue-600 mt-1">
             {formatRupiah(computedRekap.summary.total_uang_kantor)}
           </div>
-          <div className="text-xs text-blue-700 mt-1">Kas operasional kantor</div>
+          <div className="text-xs text-blue-600 mt-1">Belanja kas operasional disetujui</div>
         </div>
 
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -316,21 +396,27 @@ export default function PengeluaranAdminPage({ currentUser }) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 space-x-6 text-sm font-bold">
+      {/* Tabs (single row, non-wrapping per WCAG / Modern Web Guidance) */}
+      <div role="tablist" aria-label="Tampilan Data Pengeluaran" className="flex flex-nowrap overflow-x-auto border-b border-slate-200 gap-x-6 text-sm font-bold">
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'daftar'}
           onClick={() => setActiveTab('daftar')}
-          className={`pb-3 border-b-2 flex items-center space-x-2 transition ${
+          className={`pb-3 border-b-2 flex items-center space-x-2 whitespace-nowrap shrink-0 transition cursor-pointer ${
             activeTab === 'daftar' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Receipt className="w-4 h-4" />
-          <span>Daftar Bukti & Verifikasi Kwitansi ({filteredExpenses.length})</span>
+          <span>Daftar Bukti &amp; Verifikasi Kuitansi ({filteredExpenses.length})</span>
         </button>
 
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'rekap'}
           onClick={() => setActiveTab('rekap')}
-          className={`pb-3 border-b-2 flex items-center space-x-2 transition ${
+          className={`pb-3 border-b-2 flex items-center space-x-2 whitespace-nowrap shrink-0 transition cursor-pointer ${
             activeTab === 'rekap' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -342,7 +428,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
       {activeTab === 'daftar' ? (
         <div className="space-y-4">
           {/* Filters */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <search className="block bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
               <Filter className="w-3.5 h-3.5 text-blue-600" />
               <span>Filter Pengeluaran</span>
@@ -403,7 +489,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
                 </select>
               </div>
             </div>
-          </div>
+          </search>
 
           {/* Table */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -418,7 +504,12 @@ export default function PengeluaranAdminPage({ currentUser }) {
                 <p className="text-sm font-medium">Tidak ada data pengeluaran yang sesuai filter.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div
+                role="region"
+                tabIndex={0}
+                aria-label="Tabel Daftar Bukti dan Verifikasi Kuitansi"
+                className="overflow-x-auto focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-100">
                     <tr>
@@ -429,7 +520,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
                       <th className="py-3 px-3 text-right">Nominal</th>
                       <th className="py-3 px-3 text-center">Bukti Nota</th>
                       <th className="py-3 px-3">Verifikasi</th>
-                      <th className="py-3 px-3">Status Ganti</th>
+                      <th className="py-3 px-3">Status Pengembalian</th>
                       <th className="py-3 px-3 text-center sticky right-0 bg-slate-50 z-20 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.08)] border-l border-slate-200 min-w-[140px]">
                         Aksi Verifikasi
                       </th>
@@ -462,9 +553,16 @@ export default function PengeluaranAdminPage({ currentUser }) {
                                 Dana Pribadi
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                                Kas Kantor
-                              </span>
+                              <div className="space-y-0.5">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200 inline-block">
+                                  Kas Kantor
+                                </span>
+                                {p.nama_penanggung_jawab && (
+                                  <div className="text-[10px] text-slate-500 font-medium">
+                                    PJ: {p.nama_penanggung_jawab}
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="py-3 px-3 text-right font-bold text-slate-800 whitespace-nowrap">
@@ -520,10 +618,12 @@ export default function PengeluaranAdminPage({ currentUser }) {
                                     : 'bg-rose-100 text-rose-700 border border-rose-300 hover:bg-rose-200'
                                 }`}
                               >
-                                <span>{p.status_ganti === 'sudah' ? '✓ Lunas Diganti' : '✕ Belum Diganti'}</span>
+                                <span>{p.status_ganti === 'sudah' ? '✓ Sudah Dikembalikan' : '✕ Pengembalian Dana'}</span>
                               </button>
                             ) : (
-                              <span className="text-slate-400 text-[11px]">-</span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                {p.id_kas ? `Kas #${p.id_kas}` : 'Kas Kantor'}
+                              </span>
                             )}
                           </td>
                           <td className="py-3 px-3 whitespace-nowrap text-center sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] border-l border-slate-200">
@@ -579,7 +679,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
         /* Rekapitulasi Proyek Tab */
         <div className="space-y-4">
           {/* Filter Bar Khusus Rekapitulasi Proyek */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <search className="block bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
                 <Filter className="w-3.5 h-3.5 text-blue-600" />
@@ -651,14 +751,14 @@ export default function PengeluaranAdminPage({ currentUser }) {
                 </label>
               </div>
             </div>
-          </div>
+          </search>
 
           {/* Tabel Rekapitulasi */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <h3 className="font-bold text-slate-800 text-sm">Rekapitulasi Biaya Pengeluaran Per Proyek Multi-Hari</h3>
-                <p className="text-xs text-slate-500">Akumulasi pengeluaran yang telah disetujui (disaring berdasarkan Uang Pribadi yang diganti & Kas Kantor).</p>
+                <h3 id="rekap-proyek-heading" className="font-bold text-slate-800 text-sm">Rekapitulasi Biaya &amp; Kas Kantor Per Proyek</h3>
+                <p className="text-xs text-slate-500">Akumulasi dana pribadi, pemasukan kas kantor, realisasi biaya disetujui, serta sisa kas per proyek.</p>
               </div>
               <div className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full self-start sm:self-auto">
                 Menampilkan {filteredRekapList.length} dari {computedRekap.daftar.length} Proyek
@@ -672,14 +772,21 @@ export default function PengeluaranAdminPage({ currentUser }) {
                 <p className="text-[11px] text-slate-400 mt-1">Coba ubah pilihan proyek atau kata kunci pencarian Anda.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div
+                role="region"
+                tabIndex={0}
+                aria-labelledby="rekap-proyek-heading"
+                className="overflow-x-auto focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-100">
                     <tr>
                       <th className="py-3 px-4">Nama Proyek</th>
                       <th className="py-3 px-4">Lokasi</th>
                       <th className="py-3 px-4 text-right">Uang Pribadi (Reimburs)</th>
-                      <th className="py-3 px-4 text-right">Kas Kantor</th>
+                      <th className="py-3 px-4 text-right">Kas Kantor Masuk</th>
+                      <th className="py-3 px-4 text-right">Kas Kantor Terpakai</th>
+                      <th className="py-3 px-4 text-right">Sisa Kas Proyek</th>
                       <th className="py-3 px-4 text-right font-bold text-slate-700">Total Biaya</th>
                     </tr>
                   </thead>
@@ -689,7 +796,9 @@ export default function PengeluaranAdminPage({ currentUser }) {
                         <td className="py-3 px-4 font-bold text-slate-800">{item.nama_pekerjaan}</td>
                         <td className="py-3 px-4 text-slate-600">{item.lokasi}</td>
                         <td className="py-3 px-4 text-right font-medium text-amber-600">{formatRupiah(item.uang_pribadi)}</td>
+                        <td className="py-3 px-4 text-right font-medium text-slate-700">{formatRupiah(item.kas_masuk)}</td>
                         <td className="py-3 px-4 text-right font-medium text-blue-600">{formatRupiah(item.uang_kantor)}</td>
+                        <td className="py-3 px-4 text-right font-bold text-emerald-700">{formatRupiah(item.sisa_kas_proyek)}</td>
                         <td className="py-3 px-4 text-right font-bold text-slate-800">{formatRupiah(item.total_pengeluaran)}</td>
                       </tr>
                     ))}
@@ -700,7 +809,9 @@ export default function PengeluaranAdminPage({ currentUser }) {
                         {rekapFilterJob ? 'Total Proyek Terpilih:' : 'Grand Total Keseluruhan:'}
                       </td>
                       <td className="py-3.5 px-4 text-right text-amber-600">{formatRupiah(filteredRekapSummary.total_uang_pribadi)}</td>
+                      <td className="py-3.5 px-4 text-right text-slate-700">{formatRupiah(filteredRekapSummary.total_kas_masuk)}</td>
                       <td className="py-3.5 px-4 text-right text-blue-600">{formatRupiah(filteredRekapSummary.total_uang_kantor)}</td>
+                      <td className="py-3.5 px-4 text-right text-emerald-700">{formatRupiah(filteredRekapSummary.total_sisa_kas)}</td>
                       <td className="py-3.5 px-4 text-right text-emerald-700 text-sm font-extrabold">{formatRupiah(filteredRekapSummary.grand_total)}</td>
                     </tr>
                   </tfoot>
@@ -731,15 +842,22 @@ export default function PengeluaranAdminPage({ currentUser }) {
               {/* Sumber Dana */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Sumber Dana</span>
-                <div className="mt-1">
+                <div className="mt-1 space-y-1">
                   {selectedExpense.jenis_dana === 'pribadi' ? (
                     <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
                       <span>Dana Pribadi (Reimburs)</span>
                     </span>
                   ) : (
-                    <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300">
-                      <span>Kas Operasional Kantor</span>
-                    </span>
+                    <>
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                        <span>Kas Operasional Kantor</span>
+                      </span>
+                      {selectedExpense.nama_penanggung_jawab && (
+                        <div className="text-[11px] font-bold text-blue-700">
+                          PJ: {selectedExpense.nama_penanggung_jawab}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -820,26 +938,81 @@ export default function PengeluaranAdminPage({ currentUser }) {
                   </div>
                 </div>
 
-                {/* Status Penggantian Dana Pribadi */}
+                {/* Status Pengembalian Dana Pribadi */}
                 {selectedExpense.jenis_dana === 'pribadi' && (
                   <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-900 space-y-1.5">
                     <div className="flex items-center space-x-2 font-bold text-xs text-amber-800">
                       <CreditCard className="w-4 h-4 text-amber-600" />
-                      <span>Status Penggantian Uang Pribadi (Reimbursement)</span>
+                      <span>Status Pengembalian Dana Pribadi (Reimbursement)</span>
                     </div>
                     <p className="text-[11px] text-amber-700 leading-normal">
                       Status saat ini: <strong className={selectedExpense.status_ganti === 'sudah' ? 'text-emerald-700 font-extrabold' : 'text-rose-700 font-extrabold'}>
-                        {selectedExpense.status_ganti === 'sudah' ? 'SUDAH DIGANTI (LUNAS)' : 'BELUM DIGANTI'}
+                        {selectedExpense.status_ganti === 'sudah' ? 'SUDAH DIKEMBALIKAN (LUNAS)' : 'PENGEMBALIAN DANA'}
                       </strong>.
                       {selectedExpense.status_ganti === 'belum' 
                         ? ' Nominal ini akan otomatis digabungkan ke Slip Gaji bulanan karyawan jika disetujui.'
-                        : ' Biaya ini sudah digantikan secara lunas kepada pekerja.'}
+                        : ' Biaya ini sudah dikembalikan secara lunas kepada pekerja.'}
                     </p>
+                  </div>
+                )}
+
+                {/* Info Kas Kantor & Penanggung Jawab LPJ */}
+                {selectedExpense.jenis_dana !== 'pribadi' && (
+                  <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 text-blue-950 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2 font-bold text-xs text-blue-900">
+                        <Wallet className="w-4 h-4 text-blue-600" />
+                        <span>Pertanggungjawaban Kas Kantor (LPJ)</span>
+                      </div>
+                      {selectedExpense.id_kas && (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-mono text-[10px] font-bold">
+                          Kas #{selectedExpense.id_kas}
+                        </span>
+                      )}
+                    </div>
+                    {selectedExpense.id_kas ? (
+                      <>
+                        <div className="text-[11px] text-blue-800 space-y-1">
+                          <div>
+                            Penanggung Jawab Dana:{' '}
+                            <strong className="font-extrabold text-blue-950">
+                              {selectedExpense.nama_penanggung_jawab || '-'}
+                            </strong>
+                          </div>
+                          <div>
+                            Pembelanja / Pelapor Nota:{' '}
+                            <strong className="font-bold text-blue-950">
+                              {selectedExpense.nama_karyawan || '-'}
+                            </strong>
+                          </div>
+                          {selectedExpense.keterangan_kas && (
+                            <div className="text-blue-700">
+                              Sumber Kas: {selectedExpense.keterangan_kas}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedExpense(null);
+                            navigate('/admin/pemasukan');
+                          }}
+                          className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-blue-100 border border-blue-300 text-blue-800 text-[11px] font-bold transition shadow-xs cursor-pointer"
+                        >
+                          <Wallet className="w-3.5 h-3.5" />
+                          <span>Kelola di Pemasukan &amp; Kas Kantor</span>
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-blue-700">
+                        Catatan pengeluaran kas kantor lama (tidak tertaut ke penyerahan dana kas spesifik).
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Kolom Kanan: Bukti Kwitansi / Nota */}
+              {/* Kolom Kanan: Bukti Kuitansi / Nota */}
               <div className="flex flex-col">
                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
                   <span className="flex items-center space-x-1.5">
@@ -944,7 +1117,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
                   >
                     <CreditCard className="w-4 h-4 text-amber-600" />
                     <span>
-                      {selectedExpense.status_ganti === 'sudah' ? 'Ubah Jadi: Belum Diganti' : 'Tandai: Sudah Diganti'}
+                      {selectedExpense.status_ganti === 'sudah' ? 'Ubah Jadi: Belum Dikembalikan' : 'Tandai: Sudah Dikembalikan'}
                     </span>
                   </button>
                 )}

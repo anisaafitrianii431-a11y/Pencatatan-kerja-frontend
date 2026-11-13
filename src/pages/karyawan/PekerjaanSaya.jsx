@@ -28,9 +28,9 @@ const STATUS_PRESENTATION = {
 }
 
 function formatDate(value) {
-  return value
-    ? DATE_FORMATTER.format(new Date(`${value}T00:00:00`))
-    : 'Belum ditentukan'
+  if (!value) return 'Belum ditentukan'
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : DATE_FORMATTER.format(date)
 }
 
 function getJakartaToday() {
@@ -189,7 +189,7 @@ function WorkDetails({ job, assignment, onClose }) {
       >
         <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
           <div className="pr-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Pekerjaan Saya</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">List Pekerjaan</p>
             <h2 className="mt-1 text-lg font-bold text-slate-900" id="my-work-detail-title">
               {job.nama_pekerjaan}
             </h2>
@@ -433,7 +433,7 @@ function PekerjaanSaya({ workerId, workerName = '' }) {
       <WorkerPageHeader
         description="Tinjau seluruh pekerjaan yang ditugaskan kepada Anda, baik oleh Admin maupun yang diambil secara mandiri."
         icon={<Icon className="h-6 w-6" name="work" />}
-        title="Pekerjaan Saya"
+        title="List Pekerjaan"
       />
 
       {error && (

@@ -83,3 +83,40 @@ export function generateNoDokumen(prefix, periode, id) {
   const cleanId = String(id || '01').padStart(3, '0');
   return `PAM/${prefix}/${cleanPeriode}/${cleanId}`;
 }
+
+/**
+ * Periode bulan berjalan (YYYY-MM) sesuai zona waktu Asia/Jakarta
+ */
+export function getJakartaCurrentPeriode() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit'
+    }).format(new Date()).slice(0, 7);
+  } catch {
+    return new Date().toISOString().slice(0, 7);
+  }
+}
+
+/**
+ * Format tanggal YYYY-MM-DD menjadi Bahasa Indonesia tanpa pergeseran zona waktu
+ */
+export function formatTanggalIndo(dateStr, withWeekday = false) {
+  if (!dateStr) return '-';
+  const raw = String(dateStr).trim();
+  const baseDate = raw.length >= 10 ? raw.slice(0, 10) : raw;
+  try {
+    const parsed = new Date(`${baseDate}T00:00:00+07:00`);
+    if (Number.isNaN(parsed.getTime())) return raw;
+    return new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      ...(withWeekday ? { weekday: 'short' } : {}),
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).format(parsed);
+  } catch {
+    return raw;
+  }
+}

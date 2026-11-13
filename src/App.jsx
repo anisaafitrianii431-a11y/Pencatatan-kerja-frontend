@@ -5,48 +5,35 @@ import { useAuth } from './auth/useAuth.js'
 import { AuthProvider as LegacyAuthProvider } from './contexts/AuthContext.jsx'
 import { AbsensiProvider } from './hooks/useAbsensi.jsx'
 import DashboardHome from './components/DashboardHome.jsx'
-import DetailJamAdminPage from './pages/admin-gaji/DetailJamAdminPage.jsx'
-import GajiAdminPage from './pages/admin-gaji/GajiAdminPage.jsx'
-import JamKerjaAdminPage from './pages/admin-gaji/JamKerjaAdminPage.jsx'
-import KontribusiAdminPage from './pages/admin-gaji/KontribusiAdminPage.jsx'
-import VerifikasiAdminPage from './pages/admin-gaji/VerifikasiAdminPage.jsx'
-import VerifikasiAbsensiAdminPage from './pages/admin-gaji/VerifikasiAbsensiAdminPage.jsx'
-import VerifikasiPengeluaranAdminPage from './pages/admin-gaji/VerifikasiPengeluaranAdminPage.jsx'
-import GajiKaryawanPage from './pages/karyawan-gaji/GajiKaryawanPage.jsx'
-import PresensiKaryawanGajiPage from './pages/karyawan-gaji/PresensiKaryawanPage.jsx'
-import ProyekKaryawanPage from './pages/karyawan-gaji/ProyekKaryawanPage.jsx'
-
-// Fitur Pengeluaran & Kwitansi
+import DetailJamAdminPage from './pages/admin/DetailJamAdminPage.jsx'
+import GajiAdminPage from './pages/admin/GajiAdminPage.jsx'
+import JamKerjaAdminPage from './pages/admin/JamKerjaAdminPage.jsx'
+import KontribusiAdminPage from './pages/admin/KontribusiAdminPage.jsx'
+import VerifikasiAdminPage from './pages/admin/VerifikasiAdminPage.jsx'
+import VerifikasiAbsensiAdminPage from './pages/admin/VerifikasiAbsensiAdminPage.jsx'
+import VerifikasiPengeluaranAdminPage from './pages/admin/VerifikasiPengeluaranAdminPage.jsx'
+import GajiKaryawanPage from './pages/karyawan/GajiKaryawanPage.jsx'
+import PresensiKaryawanGajiPage from './pages/karyawan/PresensiKaryawanPage.jsx'
 import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage'
+import PemasukanAdminPage from './pages/admin/PemasukanAdminPage'
 import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage'
-
-// Fitur Absensi & Lokasi Kerja
-import LokasiKerjaPage from './pages/admin-absen/LokasiKerjaPage'
-import AbsensiPage from './pages/pekerja_absen/AbsensiPage'
-
-
-// Fitur Pengembang 2: Layout & Dashboard Admin & Pekerja Asli
+import LokasiKerjaPage from './pages/admin/LokasiKerjaPage'
 import AdminLayout from './layouts/AdminLayout.jsx'
 import DashboardAdmin from './pages/admin/DashboardAdmin.jsx'
 import PekerjaLayout from './layouts/PekerjaLayout.jsx'
-import DashboardPekerja from './pages/pekerja/DashboardPekerja.jsx'
-
-// Fitur Pengembang 2: Rekap Absensi Admin & Pekerja
+import DashboardPekerja from './pages/karyawan/DashboardPekerja.jsx'
 import RekapAbsensiAdmin from './pages/admin/RekapAbsensiAdmin.jsx'
-import RekapAbsensiPekerja from './pages/pekerja/RekapAbsensiPekerja.jsx'
-
-// Fitur Pengembang 2: Manajemen Karyawan, Pekerjaan, Penugasan & Profil
+import RekapAbsensiPekerja from './pages/karyawan/RekapAbsensiPekerja.jsx'
 import DataKaryawan from './pages/admin/DataKaryawan.jsx'
 import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
 import Penugasan from './pages/admin/Penugasan.jsx'
 import ProfilAdmin from './pages/admin/ProfilAdmin.jsx'
 import PengaturanAdmin from './pages/admin/PengaturanAdmin.jsx'
-import PekerjaLocalTest from './pages/pekerja/PekerjaLocalTest.jsx'
-import PekerjaanSaya from './pages/pekerja/PekerjaanSaya.jsx'
-import PekerjaanTersedia from './pages/pekerja/PekerjaanTersedia.jsx'
-import RiwayatPengajuan from './pages/pekerja/RiwayatPengajuan.jsx'
-import ProfilPekerja from './pages/pekerja/ProfilPekerja.jsx'
-import PengaturanPekerja from './pages/pekerja/PengaturanPekerja.jsx'
+import PekerjaLocalTest from './pages/karyawan/PekerjaLocalTest.jsx'
+import PekerjaanSaya from './pages/karyawan/PekerjaanSaya.jsx'
+import PekerjaanTersedia from './pages/karyawan/PekerjaanTersedia.jsx'
+import ProfilPekerja from './pages/karyawan/ProfilPekerja.jsx'
+import PengaturanPekerja from './pages/karyawan/PengaturanPekerja.jsx'
 
 import './index.css'
 import './App.css'
@@ -169,148 +156,6 @@ function LoginPage() {
           </form>
 
           <p className="login-footnote">Akses diberikan sesuai peran akun Anda.</p>
-
-          <div className="auth-switch">
-            Belum punya akun? <Link to="/register">Daftar sebagai Pekerja</Link>
-          </div>
-        </div>
-      </section>
-    </main>
-  )
-}
-
-function RegisterPage() {
-  const { user, signUp } = useAuth()
-  const navigate = useNavigate()
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [jabatan, setJabatan] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  if (user) return <Navigate to={roleHome(user.role)} replace />
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
-
-    if (password.length < 6) {
-      setError('Password minimal harus 6 karakter.')
-      return
-    }
-    if (password !== confirmPassword) {
-      setError('Konfirmasi password tidak cocok dengan password.')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const newUser = await signUp({
-        name: name.trim(),
-        email: email.trim(),
-        jabatan: jabatan.trim(),
-        password,
-      })
-      navigate(roleHome(newUser.role), { replace: true })
-    } catch (regError) {
-      setError(regError.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <main className="login-shell">
-      <section className="login-brand">
-        <div className="brand-mark" aria-hidden="true">PK</div>
-        <p className="eyebrow">PENDAFTARAN KARYAWAN</p>
-        <h1>Mulai catat kerja,<br />lebih terarah.</h1>
-        <p className="brand-description">
-          Daftarkan akun pekerja Anda untuk mulai mencatat absensi, jam kerja proyek, dan pengeluaran operasional.
-        </p>
-        <div className="brand-decoration" aria-hidden="true">
-          <span /><span /><span />
-        </div>
-      </section>
-
-      <section className="login-panel">
-        <div className="login-form-wrap">
-          <p className="eyebrow">GABUNG SEKARANG</p>
-          <h2>Daftar Akun Pekerja</h2>
-          <p className="muted">Isi data diri Anda untuk membuat akun baru.</p>
-
-          <form className="login-form" onSubmit={handleSubmit}>
-            {error && <div className="notice notice-error" role="alert">{error}</div>}
-            
-            <label htmlFor="reg-name">Nama Lengkap</label>
-            <input
-              id="reg-name"
-              name="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Contoh: Budi Santoso"
-              required
-            />
-
-            <label htmlFor="reg-email">Email</label>
-            <input
-              id="reg-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Contoh: budi@absensi.com"
-              required
-            />
-
-            <label htmlFor="reg-jabatan">Jabatan / Posisi</label>
-            <input
-              id="reg-jabatan"
-              name="jabatan"
-              type="text"
-              value={jabatan}
-              onChange={(e) => setJabatan(e.target.value)}
-              placeholder="Contoh: Teknisi Jaringan / Staff Lapangan"
-              required
-            />
-
-            <label htmlFor="reg-password">Password (min. 6 karakter)</label>
-            <input
-              id="reg-password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Masukkan password baru"
-              required
-            />
-
-            <label htmlFor="reg-confirm-password">Konfirmasi Password</label>
-            <input
-              id="reg-confirm-password"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Ulangi password"
-              required
-            />
-
-            <button className="button button-primary login-submit" type="submit" disabled={submitting}>
-              {submitting ? 'Mendaftarkan...' : 'Daftar Pekerja'}
-              {!submitting && <span aria-hidden="true">→</span>}
-            </button>
-          </form>
-
-          <div className="auth-switch">
-            Sudah punya akun? <Link to="/login">Masuk ke akun</Link>
-          </div>
         </div>
       </section>
     </main>
@@ -336,18 +181,17 @@ function AppLayout() {
           { to: '/admin/gaji', label: 'Penggajian Karyawan', icon: '▱' },
           { to: '/admin/kontribusi', label: 'Kontribusi Proyek', icon: '▱' },
           { to: '/admin/jam-kerja', label: 'Rekap Jam Kerja Tim', icon: '♧' },
-          { to: '/admin/pengeluaran', label: 'Pengeluaran & Kwitansi', icon: '🧾' },
+          { to: '/admin/pemasukan', label: 'Pemasukan & Kas Kantor', icon: '💼' },
+          { to: '/admin/pengeluaran', label: 'Pengeluaran & Kuitansi', icon: '🧾' },
           { to: '/admin/lokasi', label: 'Lokasi Kerja', icon: '📍' },
           { to: '/admin/profil', label: 'Profil Administrator', icon: '👤' },
           { to: '/admin/pengaturan', label: 'Pengaturan', icon: '⚙' },
         ]
       : [
           { to: '/karyawan/pekerjaan-tersedia', label: 'Pekerjaan Tersedia', icon: '🔍' },
-          { to: '/karyawan/pekerjaan-saya', label: 'Pekerjaan Saya', icon: '💼' },
-          { to: '/karyawan/riwayat-pengajuan', label: 'Riwayat Pengajuan', icon: '⏱' },
-          { to: '/karyawan/absensi', label: 'Presensi & Jam Kerja', icon: '⏱️' },
+          { to: '/karyawan/pekerjaan-saya', label: 'List Pekerjaan', icon: '💼' },
+          { to: '/karyawan/absensi', label: 'Absensi', icon: '⏱️' },
           { to: '/karyawan/gaji', label: 'Slip Gaji Pribadi', icon: '▱' },
-          { to: '/karyawan/proyek', label: 'Progres Proyek', icon: '▱' },
           { to: '/karyawan/pengeluaran', label: 'Pengeluaran Saya', icon: '🧾' },
           { to: '/karyawan/profil', label: 'Profil Saya', icon: '👤' },
         ]),
@@ -465,7 +309,7 @@ function KaryawanPage() {
       <div className="empty-state">
         <span className="empty-icon" aria-hidden="true">▤</span>
         <h2>Siap untuk pencatatan kerja</h2>
-        <p>Gunakan menu sidebar untuk mengakses <strong>Pengeluaran Saya</strong> (klaim nota) dan <strong>Presensi & Jam Kerja</strong>.</p>
+        <p>Gunakan menu sidebar untuk mengakses <strong>Pengeluaran Saya</strong> (klaim nota) dan <strong>Absensi</strong>.</p>
       </div>
     </section>
   )
@@ -598,6 +442,11 @@ function DashboardAdminPage() {
         if (target === 'Data Karyawan') navigate('/admin/karyawan')
         else if (target === 'Data Pekerjaan') navigate('/admin/pekerjaan')
         else if (target === 'Penugasan') navigate('/admin/penugasan')
+        else if (target === 'Penggajian Karyawan' || target === 'Gaji') navigate('/admin/gaji')
+        else if (target === 'Rekap Jam Kerja Tim') navigate('/admin/jam-kerja')
+        else if (target === 'Approval Presensi') navigate('/admin/approval-absensi')
+        else if (target === 'Approval Reimburse') navigate('/admin/approval-pengeluaran')
+        else if (target === 'Kontribusi Proyek') navigate('/admin/kontribusi')
         else if (target === 'Dashboard') navigate('/admin')
         else navigate(target)
       }}
@@ -620,12 +469,24 @@ function AdminLayoutWrapper() {
     activeItem = 'Data Pekerjaan'
   } else if (path.startsWith('/admin/penugasan')) {
     activeItem = 'Penugasan'
+  } else if (path.startsWith('/admin/gaji') || path.startsWith('/admin/detail-jam')) {
+    activeItem = 'Penggajian Karyawan'
+  } else if (path.startsWith('/admin/jam-kerja')) {
+    activeItem = 'Rekap Jam Kerja Tim'
+  } else if (path.startsWith('/admin/approval-absensi') || path.startsWith('/admin/verifikasi')) {
+    activeItem = 'Approval Presensi'
+  } else if (path.startsWith('/admin/approval-pengeluaran')) {
+    activeItem = 'Approval Reimburse'
+  } else if (path.startsWith('/admin/kontribusi')) {
+    activeItem = 'Kontribusi Proyek'
   } else if (path.startsWith('/admin/rekap-absensi')) {
     activeItem = 'Rekap Absensi'
   } else if (path.startsWith('/admin/pengguna')) {
     activeItem = 'Manajemen Pengguna'
+  } else if (path.startsWith('/admin/pemasukan')) {
+    activeItem = 'Pemasukan & Kas Kantor'
   } else if (path.startsWith('/admin/pengeluaran')) {
-    activeItem = 'Pengeluaran & Kwitansi'
+    activeItem = 'Pengeluaran & Kuitansi'
   } else if (path.startsWith('/admin/lokasi')) {
     activeItem = 'Lokasi Kerja'
   } else if (path.startsWith('/admin/profil')) {
@@ -639,9 +500,15 @@ function AdminLayoutWrapper() {
     else if (item === 'Data Karyawan') navigate('/admin/karyawan')
     else if (item === 'Data Pekerjaan') navigate('/admin/pekerjaan')
     else if (item === 'Penugasan') navigate('/admin/penugasan')
+    else if (item === 'Penggajian Karyawan') navigate('/admin/gaji')
+    else if (item === 'Rekap Jam Kerja Tim') navigate('/admin/jam-kerja')
+    else if (item === 'Approval Presensi') navigate('/admin/approval-absensi')
+    else if (item === 'Approval Reimburse') navigate('/admin/approval-pengeluaran')
+    else if (item === 'Kontribusi Proyek') navigate('/admin/kontribusi')
     else if (item === 'Rekap Absensi') navigate('/admin/rekap-absensi')
     else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
-    else if (item === 'Pengeluaran & Kwitansi') navigate('/admin/pengeluaran')
+    else if (item === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
+    else if (item === 'Pengeluaran & Kuitansi' || item === 'Pengeluaran & Kwitansi') navigate('/admin/pengeluaran')
     else if (item === 'Lokasi Kerja') navigate('/admin/lokasi')
     else if (item === 'Profil Administrator') navigate('/admin/profil')
     else if (item === 'Pengaturan') navigate('/admin/pengaturan')
@@ -668,31 +535,59 @@ function AdminLayoutWrapper() {
   )
 }
 
+function navigateWorkerTarget(navigate, target) {
+  if (target === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
+  else if (target === 'List Pekerjaan' || target === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
+  else if (target === 'Slip Gaji Pribadi') navigate('/karyawan/gaji')
+  else if (target === 'Absensi' || target === 'Rekap Absensi' || target === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
+  else if (target === 'Pengeluaran Saya') navigate('/karyawan/pengeluaran')
+  else if (target === 'Profil Saya') navigate('/karyawan/profil')
+  else if (target === 'Pengaturan') navigate('/karyawan/pengaturan')
+  else if (target === 'Dashboard') navigate('/karyawan')
+  else navigate(target)
+}
+
+function ProfilPekerjaPage({ mappedUser, onUpdateProfile }) {
+  const navigate = useNavigate()
+  return (
+    <ProfilPekerja
+      worker={mappedUser}
+      onUpdateWorker={onUpdateProfile}
+      onNavigate={(target) => navigateWorkerTarget(navigate, target)}
+    />
+  )
+}
+
+function PengaturanPekerjaPage({ mappedUser, onUpdateProfile, onChangePassword }) {
+  const navigate = useNavigate()
+  return (
+    <PengaturanPekerja
+      worker={mappedUser}
+      onUpdateProfile={onUpdateProfile}
+      onChangePassword={onChangePassword}
+      onNavigate={(target) => navigateWorkerTarget(navigate, target)}
+    />
+  )
+}
+
 function DashboardPekerjaPage({ mappedUser }) {
   const navigate = useNavigate()
   return (
     <DashboardPekerja
-      onNavigate={(target) => {
-        if (target === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
-        else if (target === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
-        else if (target === 'Riwayat Pengajuan') navigate('/karyawan/riwayat-pengajuan')
-        else if (target === 'Dashboard') navigate('/karyawan')
-        else navigate(target)
-      }}
+      onNavigate={(target) => navigateWorkerTarget(navigate, target)}
       workerId={mappedUser?.id_karyawan}
       workerName={mappedUser?.nama}
     />
   )
 }
 
-function RiwayatPengajuanPage() {
+function PekerjaanTersediaPage({ mappedUser }) {
   const navigate = useNavigate()
   return (
-    <RiwayatPengajuan
-      onNavigate={(target) => {
-        if (target === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
-        else if (target === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
-      }}
+    <PekerjaanTersedia
+      onNavigate={(target) => navigateWorkerTarget(navigate, target)}
+      workerId={mappedUser?.id_karyawan}
+      workerName={mappedUser?.nama}
     />
   )
 }
@@ -709,15 +604,13 @@ function PekerjaLayoutWrapper({ mappedUser }) {
   } else if (path.startsWith('/karyawan/pekerjaan-tersedia')) {
     activeItem = 'Pekerjaan Tersedia'
   } else if (path.startsWith('/karyawan/pekerjaan-saya')) {
-    activeItem = 'Pekerjaan Saya'
-  } else if (path.startsWith('/karyawan/riwayat-pengajuan')) {
-    activeItem = 'Riwayat Pengajuan'
-  } else if (path.startsWith('/karyawan/rekap-absensi')) {
-    activeItem = 'Rekap Absensi'
+    activeItem = 'List Pekerjaan'
+  } else if (path.startsWith('/karyawan/gaji')) {
+    activeItem = 'Slip Gaji Pribadi'
+  } else if (path.startsWith('/karyawan/rekap-absensi') || path.startsWith('/karyawan/absensi')) {
+    activeItem = 'Absensi'
   } else if (path.startsWith('/karyawan/pengeluaran')) {
     activeItem = 'Pengeluaran Saya'
-  } else if (path.startsWith('/karyawan/absensi')) {
-    activeItem = 'Presensi & Jam Kerja'
   } else if (path.startsWith('/karyawan/profil')) {
     activeItem = 'Profil Saya'
   } else if (path.startsWith('/karyawan/pengaturan')) {
@@ -727,11 +620,10 @@ function PekerjaLayoutWrapper({ mappedUser }) {
   function handleSelectMenuItem(item) {
     if (item === 'Dashboard') navigate('/karyawan')
     else if (item === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
-    else if (item === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
-    else if (item === 'Riwayat Pengajuan') navigate('/karyawan/riwayat-pengajuan')
-    else if (item === 'Rekap Absensi') navigate('/karyawan/rekap-absensi')
+    else if (item === 'List Pekerjaan' || item === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
+    else if (item === 'Slip Gaji Pribadi') navigate('/karyawan/gaji')
+    else if (item === 'Absensi' || item === 'Rekap Absensi' || item === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
     else if (item === 'Pengeluaran Saya') navigate('/karyawan/pengeluaran')
-    else if (item === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
     else if (item === 'Profil Saya') navigate('/karyawan/profil')
     else if (item === 'Pengaturan') navigate('/karyawan/pengaturan')
   }
@@ -751,6 +643,7 @@ function PekerjaLayoutWrapper({ mappedUser }) {
       onLogout={handleLogout}
       onSelectMenuItem={handleSelectMenuItem}
       workerName={mappedUser?.nama || user?.name || 'Pekerja'}
+      workerPhoto={mappedUser?.foto_profil || user?.foto_profil || ''}
     >
       <Outlet />
     </PekerjaLayout>
@@ -758,31 +651,35 @@ function PekerjaLayoutWrapper({ mappedUser }) {
 }
 
 function AppRoutes() {
-  const { user } = useAuth()
+  const { user, updateUserProfile, changeUserPassword } = useAuth()
   const location = useLocation()
   const mappedUser = user
     ? {
         ...user,
         id_karyawan:
-          Number.isInteger(Number(user.employeeId)) &&
-          Number(user.employeeId) > 0 &&
-          Number(user.employeeId) < 100000
-            ? Number(user.employeeId)
-            : Number.isInteger(Number(user.id)) &&
-              Number(user.id) > 0 &&
-              Number(user.id) < 100000
-              ? Number(user.id)
-              : 1,
-        id_user: user.id || 1,
-        nama: user.name || 'Pengguna',
-        peran: user.role,
+          Number.isInteger(Number(user.id_karyawan)) &&
+          Number(user.id_karyawan) > 0 &&
+          Number(user.id_karyawan) < 100000
+            ? Number(user.id_karyawan)
+            : Number.isInteger(Number(user.employeeId)) &&
+              Number(user.employeeId) > 0 &&
+              Number(user.employeeId) < 100000
+              ? Number(user.employeeId)
+              : Number.isInteger(Number(user.id)) &&
+                Number(user.id) > 0 &&
+                Number(user.id) < 100000
+                ? Number(user.id)
+                : 1,
+        id_user: user.id_user || user.id || 1,
+        nama: user.nama || user.name || 'Pengguna',
+        peran: user.peran || user.role,
       }
     : null
 
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route element={<ProtectedRoute />}>
         {/* Rute khusus Admin: Menggunakan AdminLayout asli tanpa tabrakan AppLayout */}
         <Route element={<ProtectedRoute roles={['admin']} />}>
@@ -819,6 +716,10 @@ function AppRoutes() {
               }
             />
             <Route
+              path="/admin/pemasukan"
+              element={<PemasukanAdminPage currentUser={mappedUser} />}
+            />
+            <Route
               path="/admin/pengeluaran"
               element={<PengeluaranAdminPage currentUser={mappedUser} />}
             />
@@ -835,7 +736,7 @@ function AppRoutes() {
             <Route path="/karyawan/dashboard" element={<DashboardPekerjaPage mappedUser={mappedUser} />} />
             <Route
               path="/karyawan/pekerjaan-tersedia"
-              element={<PekerjaanTersedia workerId={mappedUser?.id_karyawan} workerName={mappedUser?.nama} />}
+              element={<PekerjaanTersediaPage mappedUser={mappedUser} />}
             />
             <Route
               path="/karyawan/pekerjaan-saya"
@@ -848,7 +749,7 @@ function AppRoutes() {
             />
             <Route
               path="/karyawan/riwayat-pengajuan"
-              element={<RiwayatPengajuanPage />}
+              element={<Navigate to="/karyawan/pekerjaan-saya" replace />}
             />
             <Route
               path="/karyawan/rekap-absensi"
@@ -856,36 +757,36 @@ function AppRoutes() {
                 <RekapAbsensiPekerja
                   workerId={mappedUser?.id_karyawan}
                   workerName={mappedUser?.nama}
+                  defaultTab="rekap"
                 />
               }
             />
             <Route
               path="/karyawan/profil"
               element={
-                <ProfilPekerja
-                  worker={{
-                    id_karyawan: mappedUser?.id_karyawan,
-                    nama: mappedUser?.nama,
-                    email: mappedUser?.email,
-                    jabatan: mappedUser?.jabatan,
-                  }}
+                <ProfilPekerjaPage
+                  mappedUser={mappedUser}
+                  onUpdateProfile={updateUserProfile}
                 />
               }
             />
             <Route
               path="/karyawan/pengaturan"
               element={
-                <PengaturanPekerja
-                  worker={{
-                    id_karyawan: mappedUser?.id_karyawan,
-                    nama: mappedUser?.nama,
-                  }}
+                <PengaturanPekerjaPage
+                  mappedUser={mappedUser}
+                  onUpdateProfile={updateUserProfile}
+                  onChangePassword={changeUserPassword}
                 />
               }
             />
             <Route path="/karyawan/presensi" element={<PresensiKaryawanGajiPage currentUser={mappedUser} />} />
             <Route path="/karyawan/gaji" element={<GajiKaryawanPage currentUser={mappedUser} />} />
-            <Route path="/karyawan/proyek" element={<ProyekKaryawanPage currentUser={mappedUser} />} />
+            <Route path="/karyawan/proyek" element={<Navigate to="/karyawan/pekerjaan-saya" replace />} />
+            <Route
+              path="/karyawan/pemasukan"
+              element={<Navigate to="/karyawan/pengeluaran?tab=uang-kantor" replace />}
+            />
             <Route
               path="/karyawan/pengeluaran"
               element={<PengeluaranKaryawanPage currentUser={mappedUser} />}
@@ -893,9 +794,10 @@ function AppRoutes() {
             <Route
               path="/karyawan/absensi"
               element={
-                <AbsensiPage
+                <RekapAbsensiPekerja
                   workerId={mappedUser?.id_karyawan}
                   workerName={mappedUser?.nama}
+                  defaultTab="absen"
                 />
               }
             />
