@@ -27,7 +27,8 @@ if ($method === 'GET') {
     $id = intval($_GET['id_pekerjaan'] ?? 0);
 
     if ($action === 'tersedia') {
-        jsonResponse(true, "Daftar pekerjaan tersedia berhasil dimuat", fetchAvailableOpenJobs($pdo));
+        $workerId = intval($_GET['worker_id'] ?? 0);
+        jsonResponse(true, "Daftar pekerjaan tersedia berhasil dimuat", fetchAvailableOpenJobs($pdo, $workerId));
     }
 
     if ($id > 0) {

@@ -708,9 +708,12 @@ function ensurePekerjaanPenugasanSchema($pdo) {
 
     try {
         if (!$pdo->query("SHOW COLUMNS FROM pekerjaan LIKE 'metode_penentuan'")->fetch()) {
-            $pdo->exec("ALTER TABLE pekerjaan ADD COLUMN metode_penentuan ENUM('terbuka', 'langsung') NOT NULL DEFAULT 'terbuka' AFTER status");
+            $pdo->exec("ALTER TABLE pekerjaan ADD COLUMN metode_penentuan ENUM('terbuka', 'langsung', 'gabungan') NOT NULL DEFAULT 'terbuka' AFTER status");
             // Pekerjaan eksisting yang sudah memiliki penugasan ditandai sebagai penetapan langsung admin
             $pdo->exec("UPDATE pekerjaan p SET metode_penentuan = 'langsung' WHERE EXISTS (SELECT 1 FROM penugasan pn WHERE pn.id_pekerjaan = p.id_pekerjaan)");
+        } else {
+            // Pastikan tipe ENUM mencakup 'gabungan'
+            $pdo->exec("ALTER TABLE pekerjaan MODIFY COLUMN metode_penentuan ENUM('terbuka', 'langsung', 'gabungan') NOT NULL DEFAULT 'terbuka'");
         }
         if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'jenis_penugasan'")->fetch()) {
             $pdo->exec("ALTER TABLE penugasan ADD COLUMN jenis_penugasan ENUM('admin', 'mandiri') NOT NULL DEFAULT 'admin' AFTER peran_tugas");
@@ -725,23 +728,38 @@ function getJakartaTodayDate() {
 }
 
 // Ambil daftar pekerjaan terbuka yang tersedia untuk diambil mandiri oleh pekerja
-function fetchAvailableOpenJobs($pdo) {
+// Hanya pekerjaan yang dibuat Admin secara terbuka (tanpa penentuan pekerja langsung)
+// Pekerjaan yang sudah ditugaskan langsung oleh Admin TIDAK AKAN muncul di sini
+function fetchAvailableOpenJobs($pdo, $workerId = 0) {
     $today = getJakartaTodayDate();
+    $workerFilter = "";
+    $params = [$today];
+    if ($workerId > 0) {
+        $workerFilter = "AND NOT EXISTS (
+            SELECT 1 FROM penugasan pnx WHERE pnx.id_pekerjaan = p.id_pekerjaan AND pnx.id_karyawan = ?
+        )";
+        $params[] = $workerId;
+    }
+
     $stmt = $pdo->prepare("
         SELECT p.*,
-               0 AS total_pekerja,
-               '' AS nama_karyawan_list,
-               '' AS id_karyawan_list
+               (SELECT COUNT(DISTINCT pnx.id_karyawan) FROM penugasan pnx WHERE pnx.id_pekerjaan = p.id_pekerjaan) AS total_pekerja,
+               (SELECT GROUP_CONCAT(k.nama ORDER BY pnx.id_penugasan ASC SEPARATOR ', ')
+                FROM penugasan pnx JOIN karyawan k ON pnx.id_karyawan = k.id_karyawan
+                WHERE pnx.id_pekerjaan = p.id_pekerjaan) AS nama_karyawan_list,
+               (SELECT GROUP_CONCAT(pnx.id_karyawan ORDER BY pnx.id_penugasan ASC SEPARATOR ',')
+                FROM penugasan pnx WHERE pnx.id_pekerjaan = p.id_pekerjaan) AS id_karyawan_list
         FROM pekerjaan p
-        WHERE p.metode_penentuan = 'terbuka'
+        WHERE p.metode_penentuan IN ('terbuka', 'gabungan')
           AND p.status <> 'selesai'
           AND (p.target_selesai IS NULL OR p.target_selesai >= ?)
           AND NOT EXISTS (
-              SELECT 1 FROM penugasan pnx WHERE pnx.id_pekerjaan = p.id_pekerjaan
+              SELECT 1 FROM penugasan pnx WHERE pnx.id_pekerjaan = p.id_pekerjaan AND p.metode_penentuan = 'terbuka'
           )
+          $workerFilter
         ORDER BY p.id_pekerjaan DESC
     ");
-    $stmt->execute([$today]);
+    $stmt->execute($params);
     return $stmt->fetchAll();
 }
 

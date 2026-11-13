@@ -2473,11 +2473,12 @@ function mapRestPathToPhp(path) {
   if (path.startsWith('/karyawan/')) {
     return `/pekerja.php?id_karyawan=${path.replace('/karyawan/', '')}`;
   }
+  if (path === '/pekerjaan/tersedia' || path.startsWith('/pekerjaan/tersedia?')) {
+    const query = path.includes('?') ? '&' + path.substring(path.indexOf('?') + 1) : '';
+    return '/pekerjaan.php?action=tersedia' + query;
+  }
   if (path === '/pekerjaan' || path.startsWith('/pekerjaan?')) {
     return '/pekerjaan.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
-  }
-  if (path === '/pekerjaan/tersedia') {
-    return '/pekerjaan.php?action=tersedia';
   }
   if (path.startsWith('/pekerjaan/')) {
     return `/pekerjaan.php?id_pekerjaan=${path.replace('/pekerjaan/', '')}`;
@@ -2577,14 +2578,20 @@ function handleLocalApiFallback(path, method, body) {
     return item;
   }
 
-  if (path === '/pekerjaan/tersedia') {
+  if (path === '/pekerjaan/tersedia' || path.startsWith('/pekerjaan/tersedia?')) {
+    const workerIdParam = path.includes('worker_id=') ? Number(path.split('worker_id=')[1].split('&')[0]) : null;
     const takenIds = new Set((db.penugasan || []).map(t => Number(t.id_pekerjaan)));
+    const myTakenIds = workerIdParam 
+      ? new Set((db.penugasan || []).filter(t => Number(t.id_karyawan) === workerIdParam).map(t => Number(t.id_pekerjaan)))
+      : new Set();
+
     return (db.pekerjaan || [])
       .filter(p =>
-        (p.metode_penentuan ?? 'terbuka') === 'terbuka' &&
+        (p.metode_penentuan ?? 'terbuka') !== 'langsung' &&
         p.status !== 'selesai' &&
         (!p.target_selesai || p.target_selesai >= today) &&
-        !takenIds.has(Number(p.id_pekerjaan))
+        !myTakenIds.has(Number(p.id_pekerjaan)) &&
+        ((p.metode_penentuan ?? 'terbuka') !== 'terbuka' || !takenIds.has(Number(p.id_pekerjaan)))
       )
       .map(p => enrichLocalJob(db, p));
   }

@@ -153,7 +153,7 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
   useEffect(() => {
     let isMounted = true
 
-    Promise.all([getPekerjaanSaya(workerId, workerName), getPekerjaanTersedia()])
+    Promise.all([getPekerjaanSaya(workerId, workerName), getPekerjaanTersedia(workerId)])
       .then(([myWork, unassignedJobs]) => {
         if (isMounted) {
           setStore({

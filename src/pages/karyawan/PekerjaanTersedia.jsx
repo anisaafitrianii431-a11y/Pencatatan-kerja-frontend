@@ -163,6 +163,10 @@ function WorkCard({ job, onOpen, onClaim }) {
             <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
               Gabungan Admin &amp; Pekerja
             </span>
+          ) : job.metode_penentuan === 'langsung' ? (
+            <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-600/20">
+              Penugasan Admin
+            </span>
           ) : (
             <span className="inline-flex rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/20">
               Pekerja Memilih Sendiri
@@ -298,6 +302,10 @@ function WorkDetails({ job, onClose, onClaim }) {
             {job.metode_penentuan === 'gabungan' ? (
               <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
                 Gabungan Admin &amp; Pekerja
+              </span>
+            ) : job.metode_penentuan === 'langsung' ? (
+              <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-600/20">
+                Penugasan Admin
               </span>
             ) : (
               <span className="inline-flex rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/20">

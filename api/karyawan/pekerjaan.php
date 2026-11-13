@@ -29,7 +29,8 @@ if ($method === 'GET') {
 
     // 1. Daftar pekerjaan terbuka yang tersedia untuk diambil mandiri oleh pekerja
     if ($action === 'tersedia') {
-        jsonResponse(true, "Daftar pekerjaan tersedia berhasil dimuat", fetchAvailableOpenJobs($pdo));
+        $workerId = intval($_GET['worker_id'] ?? $kId);
+        jsonResponse(true, "Daftar pekerjaan tersedia berhasil dimuat", fetchAvailableOpenJobs($pdo, $workerId));
     }
 
     // 2. Detail pekerjaan tunggal (jika diminta berdasarkan id_pekerjaan)
