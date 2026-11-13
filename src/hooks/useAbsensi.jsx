@@ -1,5 +1,7 @@
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { absensiAwal, hitungDurasi } from '../data/mockData';
+import { AbsensiService } from '../services/api';
+import { createAbsensi, checkoutAbsensi } from '../services/absensiApi';
 
 const AbsensiContext = createContext(null);
 
@@ -18,36 +20,80 @@ export function useAbsensi() {
   return context;
 }
 
+function loadInitialAbsensiList() {
+  try {
+    const raw = localStorage.getItem('jam_kerja_db');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.absensi) && parsed.absensi.length > 0) {
+        const seen = new Set(parsed.absensi.map((a) => Number(a.id_absensi)));
+        const merged = [...parsed.absensi];
+        absensiAwal.forEach((a) => {
+          if (!seen.has(Number(a.id_absensi))) {
+            merged.push(a);
+          }
+        });
+        return merged;
+      }
+    }
+  } catch (err) {
+    console.error('Gagal membaca data absensi awal:', err);
+  }
+  return absensiAwal;
+}
+
 /**
  * useAbsensi — Custom hook untuk seluruh logika absensi
  *
- * Menyimpan state absensi di memori (nanti diganti dengan API call).
- * Eksposes:
- *  - absensiList       : semua record absensi (array)
- *  - absenMasuk(...)   : tambah record baru dengan jam_masuk sekarang
- *  - absenPulang(...)  : update jam_pulang record yang masih aktif
- *  - getSesiAktif(...) : cek apakah karyawan punya sesi belum pulang
- *  - getRiwayatByKaryawan(...) : filter riwayat per karyawan
- *  - hitungDurasi      : fungsi kalkulasi durasi (re-export dari mockData)
+ * Menyimpan data absensi secara permanen (localStorage & backend REST API).
+ * Data langsung tersinkronisasi dengan Dashboard Admin dan Rekap Absensi Admin.
  */
 function useAbsensiState() {
-  const [absensiList, setAbsensiList] = useState(absensiAwal);
-  const [nextId, setNextId] = useState(
-    absensiAwal.reduce((max, a) => Math.max(max, a.id_absensi), 0) + 1
-  );
+  const [absensiList, setAbsensiList] = useState(loadInitialAbsensiList);
+  const [nextId, setNextId] = useState(() => {
+    const initial = loadInitialAbsensiList();
+    return initial.reduce((max, a) => Math.max(max, Number(a.id_absensi) || 0), 0) + 1;
+  });
 
-  // Ambil tanggal hari ini format YYYY-MM-DD
+  // Sinkronisasi bila ada update dari tab/komponen lain
+  useEffect(() => {
+    function handleStorageSync() {
+      try {
+        const raw = localStorage.getItem('jam_kerja_db');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.absensi)) {
+            setAbsensiList(parsed.absensi);
+          }
+        }
+      } catch {}
+    }
+
+    window.addEventListener('storage', handleStorageSync);
+    window.addEventListener('absensi_updated', handleStorageSync);
+    return () => {
+      window.removeEventListener('storage', handleStorageSync);
+      window.removeEventListener('absensi_updated', handleStorageSync);
+    };
+  }, []);
+
+  // Ambil tanggal hari ini format YYYY-MM-DD (sesuai waktu Jakarta/lokal)
   function getTanggalHariIni() {
-    return new Date().toLocaleDateString('sv-SE'); // 'sv-SE' → ISO format
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
   }
 
-  // Ambil jam sekarang format HH:MM
+  // Ambil jam sekarang format HH:mm
   function getJamSekarang() {
     return new Date().toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-    });
+    }).replace('.', ':');
   }
 
   /**
@@ -56,73 +102,177 @@ function useAbsensiState() {
    */
   const getSesiAktif = useCallback(
     (id_karyawan, id_pekerjaan) => {
-      return absensiList.find(
-        a =>
-          a.id_karyawan === id_karyawan &&
-          a.id_pekerjaan === id_pekerjaan &&
-          a.jam_pulang === null
-      ) || null;
+      const kId = Number(id_karyawan);
+      const pId = Number(id_pekerjaan);
+      return (
+        absensiList.find(
+          (a) =>
+            Number(a.id_karyawan) === kId &&
+            Number(a.id_pekerjaan) === pId &&
+            a.jam_pulang === null
+        ) || null
+      );
     },
     [absensiList]
   );
 
   /**
-   * Absen Masuk — membuat baris baru di absensi
+   * Absen Masuk — membuat baris baru di absensi & tersimpan permanen
    * @param {number} id_karyawan
    * @param {number} id_pekerjaan
    * @param {object} bukti - { foto: string (dataURL), lokasi: { lat, lng, alamat } }
    */
   const absenMasuk = useCallback(
     (id_karyawan, id_pekerjaan, bukti = {}) => {
+      const kId = Number(id_karyawan);
+      const pId = Number(id_pekerjaan);
+      const tgl = getTanggalHariIni();
+
       // Cegah double absen masuk (cek sesi aktif dulu)
       const sesiAda = absensiList.find(
-        a =>
-          a.id_karyawan === id_karyawan &&
-          a.id_pekerjaan === id_pekerjaan &&
+        (a) =>
+          Number(a.id_karyawan) === kId &&
+          Number(a.id_pekerjaan) === pId &&
+          a.tanggal === tgl &&
           a.jam_pulang === null
       );
-      if (sesiAda) return { sukses: false, pesan: 'Sudah ada sesi aktif yang belum absen pulang.' };
+      if (sesiAda) return { sukses: false, pesan: 'Sudah ada sesi aktif yang belum absen pulang hari ini.' };
+
+      const jamMasuk = getJamSekarang();
+      const titikLokasi = bukti.lokasi ? `${bukti.lokasi.lat}, ${bukti.lokasi.lng}` : '';
+      const fotoData = bukti.foto ?? null;
 
       const record = {
         id_absensi: nextId,
-        id_pekerjaan,
-        id_karyawan,
-        tanggal: getTanggalHariIni(),
-        jam_masuk: getJamSekarang(),
+        id_pekerjaan: pId,
+        id_karyawan: kId,
+        tanggal: tgl,
+        jam_masuk: jamMasuk,
         jam_pulang: null,
         status_verifikasi: 'menunggu',
-        foto_masuk: bukti.foto ?? null,
+        catatan: bukti.catatan || '',
+        titik_lokasi: titikLokasi,
+        foto_lokasi: fotoData,
+        foto_masuk: fotoData,
         lokasi_masuk: bukti.lokasi ?? null,
         foto_pulang: null,
         lokasi_pulang: null,
       };
 
-      setAbsensiList(prev => [...prev, record]);
-      setNextId(id => id + 1);
+      // 1. Simpan ke React State
+      setAbsensiList((prev) => [record, ...prev.filter((x) => x.id_absensi !== record.id_absensi)]);
+      setNextId((id) => id + 1);
+
+      // 2. Simpan permanen ke localStorage jam_kerja_db agar Admin langsung terbaca
+      try {
+        const raw = localStorage.getItem('jam_kerja_db');
+        const db = raw ? JSON.parse(raw) : { absensi: [] };
+        if (!Array.isArray(db.absensi)) db.absensi = [];
+        db.absensi = [record, ...db.absensi.filter((x) => Number(x.id_absensi) !== Number(record.id_absensi))];
+        localStorage.setItem('jam_kerja_db', JSON.stringify(db));
+      } catch (err) {
+        console.error('Gagal menyimpan absensi ke jam_kerja_db:', err);
+      }
+
+      // 3. Notifikasi update untuk komponen Admin & Dashboard
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('absensi_updated'));
+
+      // 4. Sinkronisasi asinkron ke backend PHP & MySQL
+      createAbsensi({
+        id_pekerjaan: pId,
+        id_karyawan: kId,
+        tanggal: tgl,
+        jam_masuk: jamMasuk,
+        status_verifikasi: 'menunggu',
+        latitude: bukti.lokasi?.lat ?? null,
+        longitude: bukti.lokasi?.lng ?? null,
+        alamat: bukti.lokasi?.alamat ?? null,
+        foto_masuk: fotoData,
+      }).catch((err) => {
+        console.warn('Backend createAbsensi error:', err?.message || err);
+      });
+
+      AbsensiService.absenMasuk({
+        id_pekerjaan: pId,
+        id_karyawan: kId,
+        tanggal: tgl,
+        jam_masuk: jamMasuk,
+        catatan: bukti.catatan || '',
+        titik_lokasi: titikLokasi,
+        foto_lokasi: fotoData,
+      }).catch((err) => {
+        console.warn('Backend sync absenMasuk:', err?.message || err);
+      });
+
       return { sukses: true, record };
     },
     [absensiList, nextId]
   );
 
   /**
-   * Absen Pulang — mengisi jam_pulang pada sesi aktif
+   * Absen Pulang — mengisi jam_pulang pada sesi aktif & tersimpan permanen
    * @param {number} id_absensi
    * @param {object} bukti - { foto: string (dataURL), lokasi: { lat, lng, alamat } }
    */
   const absenPulang = useCallback(
     (id_absensi, bukti = {}) => {
-      setAbsensiList(prev =>
-        prev.map(a =>
-          a.id_absensi === id_absensi
+      const targetId = Number(id_absensi);
+      const jamPulang = getJamSekarang();
+      const fotoData = bukti.foto ?? null;
+      const lokasiData = bukti.lokasi ?? null;
+
+      // 1. Update React State
+      setAbsensiList((prev) =>
+        prev.map((a) =>
+          Number(a.id_absensi) === targetId
             ? {
                 ...a,
-                jam_pulang: getJamSekarang(),
-                foto_pulang: bukti.foto ?? null,
-                lokasi_pulang: bukti.lokasi ?? null,
+                jam_pulang: jamPulang,
+                foto_pulang: fotoData,
+                lokasi_pulang: lokasiData,
               }
             : a
         )
       );
+
+      // 2. Update permanen di localStorage jam_kerja_db
+      try {
+        const raw = localStorage.getItem('jam_kerja_db');
+        if (raw) {
+          const db = JSON.parse(raw);
+          if (Array.isArray(db.absensi)) {
+            const idx = db.absensi.findIndex((a) => Number(a.id_absensi) === targetId);
+            if (idx !== -1) {
+              db.absensi[idx].jam_pulang = jamPulang;
+              db.absensi[idx].foto_pulang = fotoData;
+              db.absensi[idx].lokasi_pulang = lokasiData;
+              localStorage.setItem('jam_kerja_db', JSON.stringify(db));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Gagal update absenPulang di jam_kerja_db:', err);
+      }
+
+      // 3. Notifikasi update
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('absensi_updated'));
+
+      // 4. Sinkronisasi asinkron ke backend
+      checkoutAbsensi(targetId, jamPulang, {
+        latitude: lokasiData?.lat ?? null,
+        longitude: lokasiData?.lng ?? null,
+        alamat: lokasiData?.alamat ?? null,
+        foto_pulang: fotoData,
+      }).catch((err) => {
+        console.warn('Backend checkoutAbsensi error:', err?.message || err);
+      });
+
+      AbsensiService.absenPulang(targetId, jamPulang).catch((err) => {
+        console.warn('Backend sync absenPulang:', err?.message || err);
+      });
+
       return { sukses: true };
     },
     []
@@ -133,11 +283,11 @@ function useAbsensiState() {
    */
   const getRiwayatByKaryawan = useCallback(
     (id_karyawan) => {
+      const kId = Number(id_karyawan);
       return absensiList
-        .filter(a => a.id_karyawan === id_karyawan)
+        .filter((a) => Number(a.id_karyawan) === kId)
         .sort((a, b) => {
-          // Urutkan terbaru dulu
-          if (b.tanggal !== a.tanggal) return b.tanggal.localeCompare(a.tanggal);
+          if (b.tanggal !== a.tanggal) return (b.tanggal || '').localeCompare(a.tanggal || '');
           return (b.jam_masuk || '').localeCompare(a.jam_masuk || '');
         });
     },

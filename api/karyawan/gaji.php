@@ -1,32 +1,39 @@
 <?php
 // ==========================================================
-// BACKEND KHUSUS KARYAWAN: LIHAT SLIP GAJI & RINCIAN PER PEKERJAAN
+// API KARYAWAN: LIHAT SLIP GAJI BULANAN PRIBADI
+// Karyawan hanya dapat melihat slip gajinya sendiri yang sudah ditetapkan
 // ==========================================================
+
 require_once __DIR__ . '/../config/database.php';
 
-// Otorisasi: Wajib Login Karyawan & Hanya Akses Data Milik Sendiri
 $currentUser = requireLogin();
-ensureGajiSchema($pdo);
-ensureAbsensiSchema($pdo);
-ensurePekerjaanPenugasanSchema($pdo);
-
-$kId = intval($currentUser['id_karyawan'] ?? 0);
-if ($kId <= 0) {
-    jsonResponse(false, "Profil pekerja untuk akun ini belum terhubung.", null, 403);
-}
-
 $method = $_SERVER['REQUEST_METHOD'];
+$kId = intval($currentUser['id_karyawan'] ?? 0);
 $action = $_GET['action'] ?? '';
 
+// Formula SQL Durasi Kerja (Mendukung Shift Malam)
+$sqlDurasi = "
+    CASE 
+        WHEN a.jam_pulang >= a.jam_masuk 
+            THEN (TIME_TO_SEC(TIMEDIFF(a.jam_pulang, a.jam_masuk)) / 3600)
+        ELSE 
+            ((TIME_TO_SEC(TIMEDIFF(a.jam_pulang, a.jam_masuk)) + 86400) / 3600)
+    END
+";
+
 if ($method === 'GET') {
-    $periode = $_GET['periode'] ?? getJakartaCurrentPeriode();
-    $id_pekerjaan = isset($_GET['id_pekerjaan']) ? intval($_GET['id_pekerjaan']) : 0;
+    $periode = $_GET['periode'] ?? date('Y-m');
+
+    if ($kId <= 0) {
+        jsonResponse(false, "Akun tidak terhubung dengan data karyawan", null, 403);
+    }
 
     // 1. Riwayat semua slip gaji bulanan milik karyawan yang sedang login
     if ($action === 'riwayat') {
         $sqlHistory = "
             SELECT g.*,
                    k.nama AS nama_karyawan,
+                   k.kode_karyawan,
                    k.jabatan,
                    k.tarif_per_jam
             FROM gaji g
@@ -36,74 +43,86 @@ if ($method === 'GET') {
         ";
         $stmtH = $pdo->prepare($sqlHistory);
         $stmtH->execute([$kId]);
-        $rows = $stmtH->fetchAll();
-
-        foreach ($rows as &$r) {
-            $projectsMap = fetchGajiEmployeeProjectsMap($pdo, $r['periode'], $kId);
-            $r['id_pekerjaan_list'] = $projectsMap[$kId]['id_pekerjaan_list'] ?? '';
-            $r['nama_pekerjaan'] = $projectsMap[$kId]['nama_pekerjaan'] ?? '';
-        }
-        unset($r);
+        $rows = $stmtH->fetchAll(PDO::FETCH_ASSOC);
 
         jsonResponse(true, "Riwayat slip gaji pribadi berhasil dimuat", $rows);
     }
 
-    // 2. Detail slip gaji & rincian per data pekerjaan (absensi sah + reimbursement pribadi)
-    if ($action === 'detail') {
-        $stmtSlip = $pdo->prepare("
-            SELECT g.*,
-                   k.nama AS nama_karyawan,
-                   k.jabatan,
-                   k.tarif_per_jam
-            FROM gaji g
-            JOIN karyawan k ON g.id_karyawan = k.id_karyawan
-            WHERE g.id_karyawan = ? AND g.periode = ?
-            ORDER BY g.id_gaji DESC
-            LIMIT 1
-        ");
-        $stmtSlip->execute([$kId, $periode]);
-        $slipRow = $stmtSlip->fetch() ?: null;
+    if ($action === 'detail' || $action === 'slip') {
+        $id_gaji = intval($_GET['id_gaji'] ?? 0);
 
-        $tarifOverride = $slipRow ? floatval($slipRow['tarif']) : null;
-        $breakdown = fetchGajiJobBreakdown($pdo, $kId, $periode, $tarifOverride, $id_pekerjaan);
-
-        $projectsMap = fetchGajiEmployeeProjectsMap($pdo, $periode, $kId);
-        if ($slipRow) {
-            $slipRow['id_pekerjaan_list'] = $projectsMap[$kId]['id_pekerjaan_list'] ?? '';
-            $slipRow['nama_pekerjaan'] = $projectsMap[$kId]['nama_pekerjaan'] ?? '';
+        $whereG = "WHERE g.id_karyawan = ?";
+        $paramsG = [$kId];
+        if ($id_gaji > 0) {
+            $whereG .= " AND g.id_gaji = ?";
+            $paramsG[] = $id_gaji;
+        } else {
+            $whereG .= " AND g.periode = ?";
+            $paramsG[] = $periode;
         }
 
-        $breakdown['slip'] = $slipRow;
-        $breakdown['periode'] = $periode;
+        $stmtG = $pdo->prepare("
+            SELECT g.*,
+                   k.nama AS nama_karyawan, k.kode_karyawan, k.jabatan, k.nomor_hp, k.email
+            FROM gaji g
+            JOIN karyawan k ON g.id_karyawan = k.id_karyawan
+            $whereG
+            LIMIT 1
+        ");
+        $stmtG->execute($paramsG);
+        $gaji = $stmtG->fetch(PDO::FETCH_ASSOC);
 
-        jsonResponse(true, "Rincian slip gaji berdasarkan data pekerjaan berhasil dimuat", $breakdown);
+        if (!$gaji) {
+            jsonResponse(false, "Slip gaji tidak ditemukan", null, 404);
+        }
+
+        // Riwayat pembayaran
+        $stmtPay = $pdo->prepare("
+            SELECT id_pembayaran, tanggal_bayar, nominal_bayar, metode_pembayaran, nomor_referensi, bukti_pembayaran, catatan
+            FROM pembayaran_gaji
+            WHERE id_gaji = ?
+            ORDER BY id_pembayaran ASC
+        ");
+        $stmtPay->execute([$gaji['id_gaji']]);
+        $pembayaranList = $stmtPay->fetchAll(PDO::FETCH_ASSOC);
+
+        // Presensi disetujui
+        $stmtAbsensi = $pdo->prepare("
+            SELECT a.id_absensi, a.tanggal, a.jam_masuk, a.jam_pulang,
+                   p.nama_pekerjaan,
+                   ROUND($sqlDurasi, 2) AS durasi_jam
+            FROM absensi a
+            LEFT JOIN pekerjaan p ON a.id_pekerjaan = p.id_pekerjaan
+            WHERE a.id_karyawan = ?
+              AND DATE_FORMAT(a.tanggal, '%Y-%m') = ?
+              AND a.status_verifikasi = 'disetujui'
+              AND a.jam_pulang IS NOT NULL
+            ORDER BY a.tanggal ASC, a.jam_masuk ASC
+        ");
+        $stmtAbsensi->execute([$kId, $gaji['periode']]);
+        $absensiList = $stmtAbsensi->fetchAll(PDO::FETCH_ASSOC);
+
+        jsonResponse(true, "Slip gaji berhasil dimuat", [
+            'gaji' => $gaji,
+            'pembayaran' => $pembayaranList,
+            'absensi' => $absensiList
+        ]);
     }
 
-    // 3. Default GET: slip gaji periode tertentu milik karyawan yang sedang login
-    $sql = "
+    // Default: Slip gaji pribadi untuk periode tertentu
+    $stmt = $pdo->prepare("
         SELECT g.*,
-               k.nama AS nama_karyawan,
-               k.jabatan,
-               k.tarif_per_jam
+               k.nama AS nama_karyawan, k.kode_karyawan, k.jabatan
         FROM gaji g
         JOIN karyawan k ON g.id_karyawan = k.id_karyawan
         WHERE g.id_karyawan = ? AND g.periode = ?
         ORDER BY g.id_gaji DESC
-    ";
-    $stmt = $pdo->prepare($sql);
+    ");
     $stmt->execute([$kId, $periode]);
-    $data = $stmt->fetchAll();
+    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $projectsMap = fetchGajiEmployeeProjectsMap($pdo, $periode, $kId);
-    foreach ($data as &$row) {
-        $row['id_pekerjaan_list'] = $projectsMap[$kId]['id_pekerjaan_list'] ?? '';
-        $row['nama_pekerjaan'] = $projectsMap[$kId]['nama_pekerjaan'] ?? '';
-    }
-    unset($row);
-
-    jsonResponse(true, "Data slip gaji periode $periode berhasil dimuat (Karyawan)", $data);
+    jsonResponse(true, "Data slip gaji periode $periode berhasil dimuat", $data);
 
 } else {
-    // Karyawan tidak diizinkan menghitung atau mengubah status bayar gaji
-    jsonResponse(false, "Akses ditolak. Perhitungan dan pembayaran gaji hanya dapat dilakukan oleh Administrator.", null, 403);
+    jsonResponse(false, "Akses ditolak. Operasi ini hanya untuk Administrator.", null, 403);
 }

@@ -1412,9 +1412,9 @@ dialog::backdrop {
   border-color: #10b981;
 }
 
-/* =========================================================
-   PRINT & PDF DOCUMENT STYLES (SLIP GAJI & REKAP BULANAN)
-   ========================================================= */
+/* ==========================================================================
+   OFFICIAL CORPORATE REPORT & SLIP PRINT STYLES (A4 DOCUMENT)
+   ========================================================================== */
 @media screen {
   .print-only {
     display: none !important;
@@ -1424,34 +1424,52 @@ dialog::backdrop {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm;
+    margin: 10mm 12mm 12mm 12mm;
   }
 
   html,
-  body {
+  body,
+  #root,
+  .worker-theme,
+  .admin-theme,
+  .min-h-screen,
+  main {
     background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
+  /* Sembunyikan elemen navigasi dan kontrol layar */
+  aside,
+  nav,
+  header,
   .no-print,
+  button,
+  input,
+  select,
+  .screen-only,
   .worker-theme aside,
   .admin-theme aside,
   .worker-theme header,
-  .admin-theme header {
+  .admin-theme header,
+  .admin-theme > div > div:first-child,
+  .fixed,
+  .sticky {
     display: none !important;
   }
 
-  .worker-theme,
-  .admin-theme {
-    background: #ffffff !important;
-    min-height: auto !important;
-    overflow: visible !important;
-  }
-
   .worker-theme > div,
-  .admin-theme > div {
+  .admin-theme > div,
+  .lg\:ml-72 {
     margin-left: 0 !important;
     min-height: auto !important;
   }
@@ -1461,19 +1479,43 @@ dialog::backdrop {
     padding: 0 !important;
   }
 
+  /* Tampilkan kontainer cetak resmi */
   .print-only {
     display: block !important;
+    width: 100% !important;
   }
 
+  /* Hindari pemotongan tabel atau tanda tangan di tengah halaman */
   .print-avoid-break {
-    break-inside: avoid;
-    page-break-inside: avoid;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .table-wrapper,
   .overflow-x-auto {
     overflow: visible !important;
     max-height: none !important;
+  }
+
+  /* Penyesuaian tipografi cetak tabel */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10pt !important;
+  }
+
+  th, td {
+    padding: 4pt 6pt !important;
+    border-color: #94a3b8 !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* Modal slip print mode (Admin Slip Gaji Modal) */

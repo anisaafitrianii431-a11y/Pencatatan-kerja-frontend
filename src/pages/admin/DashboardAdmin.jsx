@@ -173,11 +173,24 @@ function StatusBadge({ status }) {
   )
 }
 
-function StatisticsCard({ label, value, sublabel, icon, tone, isLoading, onClick }) {
+function StatisticsCard({
+  label,
+  value,
+  sublabel,
+  icon,
+  tone,
+  isLoading,
+  onClick,
+  extra,
+}) {
   return (
     <article
       onClick={onClick}
-      className={`flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition hover:border-slate-300 ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : ''}`}
+      className={`flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition ${
+        onClick
+          ? 'cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-[0.99]'
+          : 'hover:border-slate-300'
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -196,12 +209,17 @@ function StatisticsCard({ label, value, sublabel, icon, tone, isLoading, onClick
         {sublabel && (
           <p className="mt-1 text-[11px] text-slate-400 truncate">{sublabel}</p>
         )}
+        {extra && (
+          <div className="mt-2.5 pt-2 border-t border-slate-100 text-[10px] space-y-0.5 text-slate-500">
+            {extra}
+          </div>
+        )}
       </div>
     </article>
   )
 }
 
-function WorkStatusDonutChart({ counts, total }) {
+function WorkStatusDonutChart({ counts, total, onSelectStatus }) {
   const radius = 48
   const strokeWidth = 14
   const circumference = 2 * Math.PI * radius
@@ -270,26 +288,38 @@ function WorkStatusDonutChart({ counts, total }) {
                 }`}
                 strokeDashoffset={-segment.offset}
                 strokeWidth={strokeWidth}
-                className="transition-all duration-500 ease-out"
+                onClick={() => onSelectStatus && onSelectStatus(segment.key)}
+                className="transition-all duration-500 ease-out cursor-pointer hover:opacity-80"
               />
             ))}
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <button
+          type="button"
+          onClick={() => onSelectStatus && onSelectStatus('')}
+          className="absolute inset-0 flex flex-col items-center justify-center text-center cursor-pointer hover:scale-105 transition rounded-full"
+          title="Klik untuk melihat semua status pekerjaan"
+        >
           <span className="text-2xl font-bold tracking-tight text-slate-900">
             {total}
           </span>
           <span className="text-[11px] font-medium text-slate-400">
             Total Proyek
           </span>
-        </div>
+        </button>
       </div>
 
       {/* Legend */}
-      <ul className="w-full max-w-xs space-y-3">
+      <ul className="w-full max-w-xs space-y-2">
         {segments.map((segment) => (
           <li
             key={segment.key}
-            className="flex items-center justify-between gap-3 text-xs"
+            onClick={() => onSelectStatus && onSelectStatus(segment.key)}
+            className={`flex items-center justify-between gap-3 text-xs p-1.5 rounded-lg transition ${
+              onSelectStatus
+                ? 'cursor-pointer hover:bg-slate-100/80 active:scale-[0.99]'
+                : ''
+            }`}
+            title={`Klik untuk memfilter proyek status ${segment.label}`}
           >
             <span className="flex items-center gap-2 text-slate-600 font-medium">
               <span
@@ -310,7 +340,7 @@ function WorkStatusDonutChart({ counts, total }) {
   )
 }
 
-function WeeklyAttendanceBarChart({ attendanceList = [] }) {
+function WeeklyAttendanceBarChart({ attendanceList = [], onSelectDate }) {
   const days = useMemo(() => {
     const result = []
     const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
@@ -367,10 +397,12 @@ function WeeklyAttendanceBarChart({ attendanceList = [] }) {
           return (
             <div
               key={day.date}
-              className="flex flex-1 flex-col items-center gap-1.5 h-full justify-end"
+              onClick={() => onSelectDate && onSelectDate(day.date)}
+              className="flex flex-1 flex-col items-center gap-1.5 h-full justify-end cursor-pointer group"
+              title={`${day.shortDate} (${day.dayName}): ${day.count} presensi • Klik untuk buka Rekap Absensi`}
             >
               <span
-                className={`text-[11px] font-bold ${
+                className={`text-[11px] font-bold transition group-hover:scale-110 ${
                   day.count > 0 ? 'text-slate-700' : 'text-slate-300'
                 }`}
               >
@@ -380,14 +412,13 @@ function WeeklyAttendanceBarChart({ attendanceList = [] }) {
               <div className="w-full max-w-[28px] rounded-t-md bg-slate-100 h-24 flex items-end">
                 <div
                   style={{ height: `${heightPercent}%` }}
-                  className={`w-full rounded-t-md transition-all duration-500 ${
+                  className={`w-full rounded-t-md transition-all duration-300 group-hover:opacity-80 ${
                     day.isToday
-                      ? 'bg-blue-600 shadow-sm shadow-blue-500/20'
+                      ? 'bg-blue-600 shadow-sm shadow-blue-500/20 ring-2 ring-blue-400/30'
                       : day.count > 0
                         ? 'bg-blue-400'
                         : 'bg-slate-200'
                   }`}
-                  title={`${day.shortDate}: ${day.count} presensi`}
                 />
               </div>
 
@@ -468,10 +499,15 @@ function DeadlineWarningSection({ jobs = [], onNavigate }) {
             return (
               <div
                 key={job.id_pekerjaan}
-                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between first:pt-0 last:pb-0"
+                onClick={() =>
+                  onNavigate &&
+                  onNavigate(`/admin/pekerjaan?highlight=${job.id_pekerjaan}`)
+                }
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50/80 p-2 rounded-xl transition"
+                title={`Klik untuk membuka detail proyek: ${job.nama_pekerjaan}`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">
+                  <p className="truncate text-sm font-semibold text-slate-900 hover:text-blue-600">
                     {job.nama_pekerjaan}
                   </p>
                   <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
@@ -499,43 +535,54 @@ function DeadlineWarningSection({ jobs = [], onNavigate }) {
   )
 }
 
-function FinancialSummaryCard({ expenses = [], payrolls = [] }) {
+function FinancialSummaryCard({ expenses = [], payrolls = [], summaryData = null, onNavigate }) {
   const stats = useMemo(() => {
-    const uangKantor = expenses
-      .filter(
-        (p) =>
-          p.jenis_dana === 'kantor' && p.status_verifikasi === 'disetujui',
-      )
-      .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
+    let uangKantor = 0
+    let uangPribadi = 0
+    let pendingExpenses = 0
+    let totalPengeluaran = 0
 
-    const uangPribadi = expenses
-      .filter(
-        (p) =>
-          p.jenis_dana === 'pribadi' && p.status_verifikasi === 'disetujui',
-      )
-      .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
+    if (summaryData && typeof summaryData.total_pengeluaran_disetujui === 'number') {
+      totalPengeluaran = summaryData.total_pengeluaran_disetujui
+      uangKantor = summaryData.uang_kantor_disetujui || 0
+      uangPribadi = summaryData.uang_pribadi_disetujui || 0
+      pendingExpenses = summaryData.pending_count || 0
+    } else {
+      uangKantor = expenses
+        .filter(
+          (p) =>
+            p.jenis_dana === 'kantor' && p.status_verifikasi === 'disetujui',
+        )
+        .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
 
-    const pendingExpenses = expenses.filter(
-      (p) => p.status_verifikasi === 'menunggu',
-    ).length
+      uangPribadi = expenses
+        .filter(
+          (p) =>
+            p.jenis_dana === 'pribadi' && p.status_verifikasi === 'disetujui',
+        )
+        .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
 
-    const totalPengeluaran = uangKantor + uangPribadi
+      pendingExpenses = expenses.filter(
+        (p) => p.status_verifikasi === 'menunggu',
+      ).length
 
-    const gajiDibayar = payrolls
-      .filter((g) => g.status_bayar === 'sudah')
-      .reduce(
-        (sum, g) => sum + (Number(g.total_dibayar || g.total_upah) || 0),
-        0,
-      )
+      totalPengeluaran = uangKantor + uangPribadi
+    }
 
-    const gajiBelumDibayar = payrolls
-      .filter((g) => g.status_bayar === 'belum')
-      .reduce(
-        (sum, g) => sum + (Number(g.total_dibayar || g.total_upah) || 0),
-        0,
-      )
+    const gajiDibayar = payrolls.reduce(
+      (sum, g) => sum + (Number(g.total_dibayar) || (g.status_bayar === 'sudah' ? Number(g.gaji_bersih || g.total_upah || 0) : 0)),
+      0,
+    )
 
-    const totalGaji = gajiDibayar + gajiBelumDibayar
+    const gajiBelumDibayar = payrolls.reduce(
+      (sum, g) => sum + (Number(g.sisa_pembayaran !== undefined ? g.sisa_pembayaran : (g.status_bayar !== 'sudah' ? (g.gaji_bersih || g.total_upah || 0) : 0))),
+      0,
+    )
+
+    const totalGaji = payrolls.reduce(
+      (sum, g) => sum + (Number(g.gaji_bersih || g.total_upah || 0)),
+      0,
+    )
     const activePeriod = payrolls[0]?.periode || 'Periode Aktif'
 
     return {
@@ -548,19 +595,25 @@ function FinancialSummaryCard({ expenses = [], payrolls = [] }) {
       totalGaji,
       activePeriod,
     }
-  }, [expenses, payrolls])
+  }, [expenses, payrolls, summaryData])
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         {/* Kolom Pengeluaran Operasional */}
-        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 space-y-2.5">
+        <div
+          onClick={() => onNavigate && onNavigate('Pengeluaran & Kwitansi')}
+          className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 space-y-2.5 cursor-pointer hover:border-amber-300 hover:bg-amber-50/30 transition group"
+          title="Klik untuk membuka menu Pengeluaran & Kwitansi"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 group-hover:text-amber-700">
               <Icon name="banknote" className="h-4 w-4 text-amber-600" />
               Operasional Proyek
             </span>
-            <span className="text-[11px] text-slate-400">Disetujui</span>
+            <span className="text-[11px] font-semibold text-blue-600 group-hover:underline">
+              Kelola →
+            </span>
           </div>
 
           <div>
@@ -592,14 +645,18 @@ function FinancialSummaryCard({ expenses = [], payrolls = [] }) {
         </div>
 
         {/* Kolom Penggajian */}
-        <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 space-y-2.5">
+        <div
+          onClick={() => onNavigate && onNavigate('Gaji')}
+          className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 space-y-2.5 cursor-pointer hover:border-purple-300 hover:bg-purple-50/30 transition group"
+          title="Klik untuk membuka menu Penggajian Karyawan"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 group-hover:text-purple-700">
               <Icon name="wallet" className="h-4 w-4 text-purple-600" />
               Penggajian Karyawan
             </span>
-            <span className="text-[11px] text-slate-400">
-              {stats.activePeriod}
+            <span className="text-[11px] font-semibold text-blue-600 group-hover:underline">
+              Kelola →
             </span>
           </div>
 
@@ -628,15 +685,16 @@ function FinancialSummaryCard({ expenses = [], payrolls = [] }) {
     </div>
   )
 }
-
 function DashboardAdmin({ onNavigate = () => {} }) {
   const [store, setStore] = useState({
     employees: [],
     jobs: [],
     assignments: [],
     expenses: [],
+    summaryExpenses: null,
     attendances: [],
     payrolls: [],
+    kalkulasiGaji: [],
     isLoading: true,
     error: '',
   })
@@ -646,8 +704,10 @@ function DashboardAdmin({ onNavigate = () => {} }) {
     jobs,
     assignments,
     expenses,
+    summaryExpenses,
     attendances,
     payrolls,
+    kalkulasiGaji,
     isLoading,
     error,
   } = store
@@ -666,15 +726,19 @@ function DashboardAdmin({ onNavigate = () => {} }) {
           loadedJobs,
           loadedAssignments,
           loadedExpenses,
+          loadedSummaryExpenses,
           loadedAttendances,
           loadedPayrolls,
+          loadedKalkulasiGaji,
         ] = await Promise.all([
           getKaryawan().catch(() => []),
           getPekerjaan().catch(() => []),
           getPenugasan().catch(() => []),
           PengeluaranService.getAll().catch(() => []),
+          PengeluaranService.getSummary().catch(() => null),
           AbsensiService.getAll().catch(() => []),
           GajiService.getByPeriode(currentPeriod).catch(() => []),
+          GajiService.getKalkulasi(currentPeriod).catch(() => []),
         ])
 
         if (isMounted) {
@@ -685,10 +749,12 @@ function DashboardAdmin({ onNavigate = () => {} }) {
               ? loadedAssignments
               : [],
             expenses: Array.isArray(loadedExpenses) ? loadedExpenses : [],
+            summaryExpenses: loadedSummaryExpenses,
             attendances: Array.isArray(loadedAttendances)
               ? loadedAttendances
               : [],
             payrolls: Array.isArray(loadedPayrolls) ? loadedPayrolls : [],
+            kalkulasiGaji: Array.isArray(loadedKalkulasiGaji) ? loadedKalkulasiGaji : [],
             isLoading: false,
             error: '',
           })
@@ -706,8 +772,27 @@ function DashboardAdmin({ onNavigate = () => {} }) {
 
     loadDashboardData()
 
+    function handleSyncEvent() {
+      loadDashboardData()
+    }
+
+    window.addEventListener('storage', handleSyncEvent)
+    window.addEventListener('absensi_updated', handleSyncEvent)
+    window.addEventListener('pengeluaran_updated', handleSyncEvent)
+    window.addEventListener('gaji_updated', handleSyncEvent)
+    window.addEventListener('pekerjaan_updated', handleSyncEvent)
+    window.addEventListener('karyawan_updated', handleSyncEvent)
+    window.addEventListener('penugasan_updated', handleSyncEvent)
+
     return () => {
       isMounted = false
+      window.removeEventListener('storage', handleSyncEvent)
+      window.removeEventListener('absensi_updated', handleSyncEvent)
+      window.removeEventListener('pengeluaran_updated', handleSyncEvent)
+      window.removeEventListener('gaji_updated', handleSyncEvent)
+      window.removeEventListener('pekerjaan_updated', handleSyncEvent)
+      window.removeEventListener('karyawan_updated', handleSyncEvent)
+      window.removeEventListener('penugasan_updated', handleSyncEvent)
     }
   }, [today])
 
@@ -738,66 +823,144 @@ function DashboardAdmin({ onNavigate = () => {} }) {
     return attendances.filter((a) => a.tanggal === today).length
   }, [attendances, today])
 
-  // Financial summary
+  // Financial summary: Pengeluaran
   const totalExpensesAmount = useMemo(() => {
+    if (summaryExpenses && typeof summaryExpenses.total_pengeluaran_disetujui === 'number') {
+      return summaryExpenses.total_pengeluaran_disetujui
+    }
     return expenses
       .filter((p) => p.status_verifikasi === 'disetujui')
-      .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
-  }, [expenses])
+      .reduce((sum, p) => sum + (Number(p.nominal_disetujui || p.nominal) || 0), 0)
+  }, [expenses, summaryExpenses])
 
-  const totalPayrollAmount = useMemo(() => {
-    return payrolls.reduce(
-      (sum, g) => sum + (Number(g.total_dibayar || g.total_upah) || 0),
+  const expensesKantorAmount = useMemo(() => {
+    if (summaryExpenses && typeof summaryExpenses.uang_kantor_disetujui === 'number') {
+      return summaryExpenses.uang_kantor_disetujui
+    }
+    return expenses
+      .filter((p) => p.jenis_dana === 'kantor' && p.status_verifikasi === 'disetujui')
+      .reduce((sum, p) => sum + (Number(p.nominal) || 0), 0)
+  }, [expenses, summaryExpenses])
+
+  const expensesPribadiAmount = useMemo(() => {
+    if (summaryExpenses && typeof summaryExpenses.uang_pribadi_disetujui === 'number') {
+      return summaryExpenses.uang_pribadi_disetujui
+    }
+    return expenses
+      .filter((p) => p.jenis_dana === 'pribadi' && p.status_verifikasi === 'disetujui')
+      .reduce((sum, p) => sum + (Number(p.nominal_disetujui || p.nominal) || 0), 0)
+  }, [expenses, summaryExpenses])
+
+  const pendingExpensesCount = useMemo(() => {
+    if (summaryExpenses && typeof summaryExpenses.pending_count === 'number') {
+      return summaryExpenses.pending_count
+    }
+    return expenses.filter((p) => p.status_verifikasi === 'menunggu').length
+  }, [expenses, summaryExpenses])
+
+  // Financial summary: Penggajian
+  const payrollStats = useMemo(() => {
+    const listToUse = payrolls.length > 0 ? payrolls : kalkulasiGaji
+
+    const totalGaji = listToUse.reduce(
+      (sum, g) => sum + (Number(g.gaji_bersih !== undefined ? g.gaji_bersih : g.total_upah) || 0),
       0,
     )
-  }, [payrolls])
+    const sudahDibayar = listToUse.reduce(
+      (sum, g) => sum + (Number(g.total_dibayar) || (g.status_bayar === 'sudah' ? Number(g.gaji_bersih || g.total_upah || 0) : 0)),
+      0,
+    )
+    const belumDibayar = listToUse.reduce(
+      (sum, g) => sum + (Number(g.sisa_pembayaran !== undefined ? g.sisa_pembayaran : (g.status_bayar !== 'sudah' ? (g.gaji_bersih || g.total_upah || 0) : 0))),
+      0,
+    )
+    const activePeriod = listToUse[0]?.periode || today.slice(0, 7)
+
+    return { totalGaji, sudahDibayar, belumDibayar, activePeriod }
+  }, [payrolls, kalkulasiGaji, today])
 
   // 6 Kartu Statistik Utama
   const statCards = [
     {
       label: 'Total Karyawan',
       value: employees.length,
-      sublabel: `${employees.length} terdaftar`,
+      sublabel: `${employees.filter((e) => e.status !== 'nonaktif').length} aktif • Klik kelola`,
       icon: 'employees',
       tone: 'bg-blue-50 text-blue-600 ring-1 ring-blue-600/10',
+      onClick: () => onNavigate('Data Karyawan'),
     },
     {
       label: 'Total Pekerjaan',
       value: jobs.length,
-      sublabel: `${jobStatusCounts[STATUS_PEKERJAAN.BERJALAN] || 0} sedang berjalan`,
+      sublabel: `${jobStatusCounts[STATUS_PEKERJAAN.BERJALAN] || 0} sedang berjalan • Klik kelola`,
       icon: 'work',
       tone: 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-600/10',
+      onClick: () => onNavigate('Data Pekerjaan'),
     },
     {
       label: 'Total Penugasan',
       value: assignments.length,
-      sublabel: `${assignments.length} penugasan teknisi`,
+      sublabel: `${assignments.length} penugasan teknisi • Klik kelola`,
       icon: 'assignments',
       tone: 'bg-violet-50 text-violet-600 ring-1 ring-violet-600/10',
+      onClick: () => onNavigate('Penugasan'),
     },
     {
       label: 'Kehadiran Hari Ini',
       value: todayAttendanceCount,
       sublabel:
         todayAttendanceCount > 0
-          ? `${todayAttendanceCount} hadir hari ini`
-          : 'Belum ada presensi hari ini',
+          ? `${todayAttendanceCount} hadir hari ini • Klik rekap`
+          : 'Belum ada presensi • Klik rekap',
       icon: 'calendar-check',
       tone: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/10',
+      onClick: () => onNavigate('Rekap Absensi'),
     },
     {
       label: 'Total Pengeluaran',
       value: formatCurrency(totalExpensesAmount),
-      sublabel: 'Biaya disetujui',
+      sublabel: 'Biaya disetujui • Klik kelola',
       icon: 'banknote',
       tone: 'bg-amber-50 text-amber-600 ring-1 ring-amber-600/10',
+      onClick: () => onNavigate('Pengeluaran & Kwitansi'),
+      extra: (
+        <div className="space-y-0.5">
+          <div className="flex justify-between">
+            <span>Uang Kantor:</span>
+            <span className="font-semibold text-slate-700">{formatCurrency(expensesKantorAmount)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Uang Pribadi:</span>
+            <span className="font-semibold text-slate-700">{formatCurrency(expensesPribadiAmount)}</span>
+          </div>
+          {pendingExpensesCount > 0 && (
+            <div className="flex justify-between text-amber-600 font-semibold">
+              <span>Menunggu:</span>
+              <span>{pendingExpensesCount} nota</span>
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       label: 'Total Gaji',
-      value: formatCurrency(totalPayrollAmount),
-      sublabel: `${payrolls[0]?.periode || 'Bulan ini'}`,
+      value: formatCurrency(payrollStats.totalGaji),
+      sublabel: `Periode ${payrollStats.activePeriod} • Klik kelola`,
       icon: 'wallet',
       tone: 'bg-purple-50 text-purple-600 ring-1 ring-purple-600/10',
+      onClick: () => onNavigate('Gaji'),
+      extra: (
+        <div className="space-y-0.5">
+          <div className="flex justify-between">
+            <span>Sudah Dibayar:</span>
+            <span className="font-semibold text-emerald-600">{formatCurrency(payrollStats.sudahDibayar)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Sisa Kewajiban:</span>
+            <span className="font-semibold text-slate-700">{formatCurrency(payrollStats.belumDibayar)}</span>
+          </div>
+        </div>
+      ),
     },
   ]
 
@@ -820,6 +983,7 @@ function DashboardAdmin({ onNavigate = () => {} }) {
         badge: 'Penugasan',
         badgeColor: 'bg-blue-50 text-blue-700 ring-blue-700/10',
         icon: 'assignments',
+        target: 'Penugasan',
       })
     })
 
@@ -836,6 +1000,7 @@ function DashboardAdmin({ onNavigate = () => {} }) {
         badge: 'Pekerjaan',
         badgeColor: 'bg-indigo-50 text-indigo-700 ring-indigo-700/10',
         icon: 'work',
+        target: `/admin/pekerjaan?highlight=${j.id_pekerjaan}`,
       })
     })
 
@@ -845,13 +1010,14 @@ function DashboardAdmin({ onNavigate = () => {} }) {
         id: `exp-${e.id_pengeluaran}`,
         title: 'Pengajuan Biaya Operasional',
         description: `${e.keterangan || 'Nota operasional'} (${formatCurrency(
-          e.nominal,
+          e.nominal_disetujui || e.nominal,
         )})`,
         date: e.tanggal || '',
         timestamp: Number(e.id_pengeluaran) || 0,
         badge: 'Pengeluaran',
         badgeColor: 'bg-amber-50 text-amber-700 ring-amber-700/10',
         icon: 'banknote',
+        target: 'Pengeluaran & Kwitansi',
       })
     })
 
@@ -868,6 +1034,7 @@ function DashboardAdmin({ onNavigate = () => {} }) {
         badge: 'Presensi',
         badgeColor: 'bg-emerald-50 text-emerald-700 ring-emerald-700/10',
         icon: 'calendar',
+        target: `/admin/rekap-absensi?tanggal=${att.tanggal}`,
       })
     })
 
@@ -994,6 +1161,8 @@ function DashboardAdmin({ onNavigate = () => {} }) {
             icon={card.icon}
             tone={card.tone}
             isLoading={isLoading}
+            onClick={card.onClick}
+            extra={card.extra}
           />
         ))}
       </section>
@@ -1032,6 +1201,13 @@ function DashboardAdmin({ onNavigate = () => {} }) {
               <WorkStatusDonutChart
                 counts={jobStatusCounts}
                 total={jobs.length}
+                onSelectStatus={(status) => {
+                  if (status) {
+                    onNavigate(`/admin/pekerjaan?status=${status}`)
+                  } else {
+                    onNavigate('Data Pekerjaan')
+                  }
+                }}
               />
             )}
           </div>
@@ -1062,7 +1238,10 @@ function DashboardAdmin({ onNavigate = () => {} }) {
                 <p className="text-xs text-slate-400">Memuat data presensi...</p>
               </div>
             ) : (
-              <WeeklyAttendanceBarChart attendanceList={attendances} />
+              <WeeklyAttendanceBarChart
+                attendanceList={attendances}
+                onSelectDate={(date) => onNavigate(`/admin/rekap-absensi?tanggal=${date}`)}
+              />
             )}
           </div>
         </section>
@@ -1137,7 +1316,9 @@ function DashboardAdmin({ onNavigate = () => {} }) {
             ) : (
               <FinancialSummaryCard
                 expenses={expenses}
-                payrolls={payrolls}
+                payrolls={payrolls.length > 0 ? payrolls : kalkulasiGaji}
+                summaryData={summaryExpenses}
+                onNavigate={onNavigate}
               />
             )}
           </div>
@@ -1184,7 +1365,9 @@ function DashboardAdmin({ onNavigate = () => {} }) {
                 {recentActivities.map((act) => (
                   <article
                     key={act.id}
-                    className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                    onClick={() => onNavigate && onNavigate(act.target || 'Dashboard')}
+                    className="flex items-start gap-3 py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50/80 p-2 rounded-xl transition"
+                    title={`Klik untuk membuka menu ${act.badge}`}
                   >
                     <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                       <Icon name={act.icon} className="h-4 w-4" />
@@ -1261,10 +1444,12 @@ function DashboardAdmin({ onNavigate = () => {} }) {
                 {latestJobs.map((job) => (
                   <div
                     key={job.id_pekerjaan}
-                    className="py-2.5 first:pt-0 last:pb-0"
+                    onClick={() => onNavigate && onNavigate(`/admin/pekerjaan?highlight=${job.id_pekerjaan}`)}
+                    className="py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50/80 p-2 rounded-xl transition"
+                    title={`Klik untuk membuka detail proyek: ${job.nama_pekerjaan}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="truncate text-xs font-bold text-slate-900">
+                      <p className="truncate text-xs font-bold text-slate-900 hover:text-blue-600">
                         {job.nama_pekerjaan}
                       </p>
                       <StatusBadge status={job.status} />

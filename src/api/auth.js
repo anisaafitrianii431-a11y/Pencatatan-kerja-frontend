@@ -158,12 +158,16 @@ export async function login(credentials) {
       throw error
     }
 
-    const email = (credentials.email || '').toLowerCase().trim()
+    const rawId = (credentials.identifier || credentials.username || credentials.email || '').trim()
+    const email = rawId.toLowerCase()
     const password = credentials.password || ''
 
-    // Cek apakah email terdaftar di pendaftaran lokal
+    // Cek apakah identifier terdaftar di pendaftaran lokal
     const registered = getRegisteredUsers().find(
-      (u) => (u.email || '').toLowerCase() === email
+      (u) =>
+        (u.email || '').toLowerCase() === email ||
+        (u.kode_karyawan || '').toUpperCase() === rawId.toUpperCase() ||
+        (u.username || '').toUpperCase() === rawId.toUpperCase()
     )
     if (registered) {
       if (password && registered.password && registered.password !== password) {
@@ -177,7 +181,7 @@ export async function login(credentials) {
         id: registered.id || 2,
         employeeId: safeEmployeeId,
         email: registered.email,
-        name: registered.name || registered.nama || registered.email.split('@')[0],
+        name: registered.name || registered.nama || registered.email?.split('@')[0] || rawId,
         jabatan: registered.jabatan || 'Pekerja',
         role: registered.role || 'karyawan',
       }
@@ -193,16 +197,18 @@ export async function login(credentials) {
     }
 
     // Jika backend API belum aktif/offline/404, aktifkan fallback demo mode
-    const isAdmin = email.includes('admin')
+    const isAdmin = rawId.toLowerCase().includes('admin')
     const role = isAdmin ? 'admin' : 'karyawan'
     const name = isAdmin
       ? 'Administrator'
-      : (email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1))
+      : (rawId.includes('@')
+          ? (rawId.split('@')[0].charAt(0).toUpperCase() + rawId.split('@')[0].slice(1))
+          : rawId.toUpperCase())
 
     const demoUser = {
       id: isAdmin ? 1 : 2,
       employeeId: isAdmin ? null : 1,
-      email: credentials.email,
+      email: credentials.email || (isAdmin ? 'admin@jamkerja.com' : `${rawId.toLowerCase()}@jamkerja.com`),
       name,
       role,
     }

@@ -304,32 +304,32 @@ if ($action === 'register') {
 
 // 4. LOGIN PENGGUNA (K-02 & K-08)
 if ($method === 'POST') {
-    $email = trim($body['email'] ?? '');
+    $identifier = trim($body['email'] ?? $body['username'] ?? $body['identifier'] ?? '');
     $password = trim($body['kata_sandi'] ?? $body['password'] ?? '');
 
-    if (empty($email) || empty($password)) {
-        jsonResponse(false, "Email dan kata sandi wajib diisi.", null, 400);
+    if (empty($identifier) || empty($password)) {
+        jsonResponse(false, "ID Karyawan / Email dan kata sandi wajib diisi.", null, 400);
     }
 
     ensureKaryawanProfileSchema($pdo);
     $stmt = $pdo->prepare("
-        SELECT u.id_user, u.id_karyawan, u.email, u.kata_sandi, u.peran, u.aktif,
-               k.nama, k.jabatan, k.tarif_per_jam,
+        SELECT u.id_user, u.id_karyawan, u.email, u.username, u.kata_sandi, u.peran, u.aktif,
+               k.nama, k.jabatan, k.tarif_per_jam, k.kode_karyawan,
                k.no_hp, k.alamat, k.foto_profil, k.kontak_darurat, k.nama_bank, k.no_rekening
         FROM `user` u
         LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
-        WHERE u.email = ?
+        WHERE u.email = :id1 OR u.username = :id2 OR k.kode_karyawan = :id3
         LIMIT 1
     ");
-    $stmt->execute([$email]);
+    $stmt->execute(['id1' => $identifier, 'id2' => $identifier, 'id3' => $identifier]);
     $user = $stmt->fetch();
 
     // K-08: Pesan umum untuk mencegah enumeration user
-    $genericErrorMsg = "Email atau kata sandi yang Anda masukkan salah.";
+    $genericErrorMsg = "ID Karyawan / Email atau kata sandi yang Anda masukkan salah.";
 
     if (!$user) {
         // Auto-seed admin jika akun admin default belum terbuat di MySQL
-        if ($email === 'admin@jamkerja.com' && in_array($password, ['admin123', 'admin'])) {
+        if (($identifier === 'admin@jamkerja.com' || $identifier === 'admin') && in_array($password, ['admin123', 'admin'])) {
             try {
                 $newHash = password_hash('admin123', PASSWORD_BCRYPT);
                 $stmtIns = $pdo->prepare("INSERT INTO `user` (id_user, email, kata_sandi, peran, aktif) VALUES (1, 'admin@jamkerja.com', ?, 'admin', 1) ON DUPLICATE KEY UPDATE kata_sandi = ?, aktif = 1");

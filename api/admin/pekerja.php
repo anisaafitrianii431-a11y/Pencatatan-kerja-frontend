@@ -16,7 +16,7 @@ function fetchKaryawanAdminSql($whereClause = '') {
                u.id_user, u.email, u.peran, IFNULL(u.aktif, 1) AS aktif,
                (SELECT COUNT(*) FROM penugasan pn WHERE pn.id_karyawan = k.id_karyawan) AS total_pekerjaan_aktif,
                (
-                   SELECT GROUP_CONCAT(CONCAT(p.id_pekerjaan, '::', p.nama_pekerjaan, '::', IFNULL(p.lokasi, ''), '::', IFNULL(pn.peran_tugas, 'Pelaksana')) SEPARATOR '||')
+                   SELECT GROUP_CONCAT(CONCAT(p.id_pekerjaan, '::', p.nama_pekerjaan, '::', IFNULL(p.lokasi, ''), '::', IFNULL(pn.catatan_admin, 'Pelaksana')) SEPARATOR '||')
                    FROM penugasan pn
                    JOIN pekerjaan p ON pn.id_pekerjaan = p.id_pekerjaan
                    WHERE pn.id_karyawan = k.id_karyawan

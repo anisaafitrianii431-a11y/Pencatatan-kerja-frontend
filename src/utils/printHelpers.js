@@ -6,11 +6,11 @@
 
 export const COMPANY_INFO = {
   name: 'PAM-TECHNO (CV. PUTRA ANUGRAH MANDIRI)',
-  brand: 'PAM-TECHNO',
-  tagline: 'General Contractor, Mechanical & Electrical Engineering, IT Infrastructure',
-  address: '',
-  contact: '',
-  city: '',
+  brand: 'CV. PUTRA ANUGRAH MANDIRI',
+  tagline: 'General Contractor, Electrical & IT Infrastructure Services',
+  address: 'Jl. Wonosari Km. 8, Bantul, Daerah Istimewa Yogyakarta',
+  contact: 'Telp: (0274) 435-889 | Email: admin@putraanugrah.co.id',
+  city: 'Yogyakarta',
 };
 
 /**

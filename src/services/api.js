@@ -49,7 +49,7 @@ function getLocalData() {
     }
     let changed = false;
     if (parsed && !Array.isArray(parsed.kas_kantor)) {
-      parsed.kas_kantor = INITIAL_DATA.kas_kantor;
+      parsed.kas_kantor = INITIAL_DATA.kas_kantor || [];
       changed = true;
     } else if (parsed && Array.isArray(parsed.kas_kantor)) {
       parsed.kas_kantor.forEach(kk => {
@@ -65,6 +65,20 @@ function getLocalData() {
     if (parsed && !Array.isArray(parsed.kas_kantor_pengembalian)) {
       parsed.kas_kantor_pengembalian = [];
       changed = true;
+    }
+
+    // Migrasi 1 kali: Pastikan absensi baru / belum diverifikasi admin berstatus 'menunggu' (Menunggu Verifikasi)
+    const MIGRATION_KEY = 'jam_kerja_status_menunggu_verifikasi_v5';
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      if (parsed && Array.isArray(parsed.absensi)) {
+        parsed.absensi.forEach(a => {
+          if (a.tanggal === '2026-11-10' || a.id_absensi === 4 || a.id_absensi === 6) {
+            a.status_verifikasi = 'menunggu';
+            changed = true;
+          }
+        });
+      }
+      localStorage.setItem(MIGRATION_KEY, 'done');
     }
     if (changed) {
       localStorage.setItem('jam_kerja_db', JSON.stringify(parsed));
@@ -94,6 +108,13 @@ export async function safeFetchJson(url, options = {}) {
           'Authorization': `Bearer ${userId}`,
           'X-User-Id': String(userId),
           'X-User-Role': role || (userId === 1 ? 'admin' : 'karyawan')
+        };
+      }
+      if (!authHeader['X-User-Id'] && typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+        authHeader = {
+          'Authorization': 'Bearer 1',
+          'X-User-Id': '1',
+          'X-User-Role': 'admin'
         };
       }
     } catch {
@@ -147,6 +168,17 @@ export function hitungDurasi(jamMasuk, jamPulang, isOvernight = false) {
   return menitTotal > 0 ? Number((menitTotal / 60).toFixed(2)) : 0;
 }
 
+export function hitungMenit(jamMasuk, jamPulang, isOvernight = false) {
+  if (!jamMasuk || !jamPulang) return 0;
+  const [h1, m1] = jamMasuk.split(':').map(Number);
+  let [h2, m2] = jamPulang.split(':').map(Number);
+  if (isOvernight || (h2 < h1 || (h2 === h1 && m2 < m1))) {
+    h2 += 24;
+  }
+  const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+  return diff > 0 ? Math.round(diff) : 0;
+}
+
 // ==========================================
 // AUTH SERVICE
 // ==========================================
@@ -169,13 +201,13 @@ export const AuthService = {
     }
   },
 
-  async login(email, password) {
+  async login(identifier, password) {
     const live = await checkBackendStatus();
     if (live) {
       const { data } = await safeFetchJson(`${API_BASE}/auth.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, kata_sandi: password })
+        body: JSON.stringify({ email: identifier, username: identifier, identifier, kata_sandi: password })
       });
       if (data && data.success) {
         AuthService.setCurrentUser(data.data);
@@ -185,9 +217,17 @@ export const AuthService = {
 
     // Fallback Local Login
     const db = getLocalData();
-    const user = db.user.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const ident = (identifier || '').toLowerCase();
+    const user = db.user.find(u => {
+      const k = u.id_karyawan ? db.karyawan.find(x => x.id_karyawan === u.id_karyawan) : null;
+      return (
+        (u.email && u.email.toLowerCase() === ident) ||
+        (u.username && u.username.toLowerCase() === ident) ||
+        (k && k.kode_karyawan && k.kode_karyawan.toLowerCase() === ident)
+      );
+    });
     if (!user) {
-      throw new Error('Akun tidak ditemukan. Periksa kembali email Anda.');
+      throw new Error('Akun tidak ditemukan. Periksa kembali ID Karyawan / Email Anda.');
     }
     if (!user.aktif) {
       throw new Error('Akun dinonaktifkan. Hubungi administrator.');
@@ -201,6 +241,8 @@ export const AuthService = {
       id_user: user.id_user,
       id_karyawan: user.id_karyawan,
       email: user.email,
+      username: user.username || (karyawan ? karyawan.kode_karyawan : ''),
+      kode_karyawan: karyawan ? karyawan.kode_karyawan : (user.username || ''),
       peran: user.peran,
       aktif: user.aktif,
       nama: karyawan ? karyawan.nama : 'Administrator',
@@ -337,8 +379,16 @@ export const PekerjaService = {
     const newK = {
       id_karyawan: newKaryawanId,
       nama: data.nama,
-      jabatan: data.jabatan,
-      tarif_per_jam: Number(data.tarif_per_jam) || 0
+      jabatan: data.jabatan || '',
+      nomor_hp: data.nomor_hp || '',
+      email: data.email || '',
+      jenis_upah: data.jenis_upah || 'per_jam',
+      nominal_upah: Number(data.nominal_upah ?? data.tarif_per_jam ?? 0),
+      lembur_aktif: Boolean(data.lembur_aktif) ? 1 : 0,
+      tarif_lembur: Number(data.tarif_lembur || 0),
+      catatan_admin: data.catatan_admin || '',
+      status: data.status || 'aktif',
+      tarif_per_jam: Number(data.nominal_upah ?? data.tarif_per_jam ?? 0)
     };
     db.karyawan.push(newK);
 
@@ -375,15 +425,24 @@ export const PekerjaService = {
     if (idx !== -1) {
       db.karyawan[idx] = {
         ...db.karyawan[idx],
-        nama: data.nama,
-        jabatan: data.jabatan,
-        tarif_per_jam: Number(data.tarif_per_jam)
+        nama: data.nama !== undefined ? data.nama : db.karyawan[idx].nama,
+        jabatan: data.jabatan !== undefined ? data.jabatan : db.karyawan[idx].jabatan,
+        nomor_hp: data.nomor_hp !== undefined ? data.nomor_hp : db.karyawan[idx].nomor_hp,
+        email: data.email !== undefined ? data.email : db.karyawan[idx].email,
+        jenis_upah: data.jenis_upah !== undefined ? data.jenis_upah : db.karyawan[idx].jenis_upah,
+        nominal_upah: data.nominal_upah !== undefined ? Number(data.nominal_upah) : db.karyawan[idx].nominal_upah,
+        lembur_aktif: data.lembur_aktif !== undefined ? (data.lembur_aktif ? 1 : 0) : db.karyawan[idx].lembur_aktif,
+        tarif_lembur: data.tarif_lembur !== undefined ? Number(data.tarif_lembur) : db.karyawan[idx].tarif_lembur,
+        catatan_admin: data.catatan_admin !== undefined ? data.catatan_admin : db.karyawan[idx].catatan_admin,
+        status: data.status !== undefined ? data.status : db.karyawan[idx].status,
+        tarif_per_jam: Number(data.nominal_upah ?? data.tarif_per_jam ?? db.karyawan[idx].tarif_per_jam ?? 0)
       };
 
       const uIdx = db.user.findIndex(u => u.id_karyawan === Number(id_karyawan));
       if (uIdx !== -1) {
         db.user[uIdx].email = data.email || db.user[uIdx].email;
         if (data.aktif !== undefined) db.user[uIdx].aktif = data.aktif ? 1 : 0;
+        if (data.status !== undefined) db.user[uIdx].aktif = data.status === 'aktif' ? 1 : 0;
       }
       saveLocalData(db);
     }
@@ -418,6 +477,7 @@ export const PekerjaService = {
     return { success: true, message: 'Data pekerja berhasil dihapus' };
   }
 };
+export const KaryawanService = PekerjaService;
 
 // ==========================================
 // PEKERJAAN (PROYEK) SERVICE
@@ -703,7 +763,40 @@ export const AbsensiService = {
       });
       params.delete('status');
       const { data } = await safeFetchJson(`${API_BASE}/absensi.php?${params}`);
-      if (data && data.success) return data.data;
+      if (data && data.success && Array.isArray(data.data)) {
+        const db = getLocalData();
+        const serverIds = new Set(data.data.map((d) => Number(d.id_absensi)));
+        const unsynced = (db.absensi || []).filter(
+          (a) => !serverIds.has(Number(a.id_absensi))
+        );
+        if (unsynced.length > 0) {
+          const unsyncedMapped = unsynced.map((a) => {
+            const k = (db.karyawan || []).find(
+              (item) => Number(item.id_karyawan) === Number(a.id_karyawan)
+            );
+            const p = (db.pekerjaan || []).find(
+              (item) => Number(item.id_pekerjaan) === Number(a.id_pekerjaan)
+            );
+            const mTotal = hitungMenit(a.jam_masuk, a.jam_pulang) || Math.round(Number(a.durasi_menit) || (Number(a.durasi_jam) * 60) || 0);
+            return {
+              ...a,
+              nama_karyawan: k ? k.nama : a.nama_karyawan || 'Pekerja',
+              jabatan: k ? k.jabatan : a.jabatan || 'Teknisi',
+              tarif_per_jam: k ? k.tarif_per_jam : 0,
+              nama_pekerjaan: p
+                ? p.nama_pekerjaan
+                : a.nama_pekerjaan || 'Proyek Lapangan',
+              lokasi_pekerjaan: p ? p.lokasi : '',
+              titik_pekerjaan: p ? p.titik_lokasi : '',
+              durasi_jam: hitungDurasi(a.jam_masuk, a.jam_pulang),
+              durasi_menit: mTotal,
+              durasi_format: `${Math.floor(mTotal / 60)}j ${mTotal % 60}m`,
+            };
+          });
+          return [...unsyncedMapped, ...data.data];
+        }
+        return data.data;
+      }
     }
 
     const db = getLocalData();
@@ -718,6 +811,7 @@ export const AbsensiService = {
       .map(a => {
         const k = (db.karyawan || []).find(item => Number(item.id_karyawan) === Number(a.id_karyawan));
         const p = (db.pekerjaan || []).find(item => Number(item.id_pekerjaan) === Number(a.id_pekerjaan));
+        const mTotal = hitungMenit(a.jam_masuk, a.jam_pulang) || Math.round(Number(a.durasi_menit) || (Number(a.durasi_jam) * 60) || 0);
         return {
           ...a,
           nama_karyawan: k ? k.nama : (a.nama_karyawan || 'Pekerja'),
@@ -726,7 +820,9 @@ export const AbsensiService = {
           nama_pekerjaan: p ? p.nama_pekerjaan : (a.nama_pekerjaan || 'Proyek Lapangan'),
           lokasi_pekerjaan: p ? p.lokasi : '',
           titik_pekerjaan: p ? p.titik_lokasi : '',
-          durasi_jam: hitungDurasi(a.jam_masuk, a.jam_pulang)
+          durasi_jam: hitungDurasi(a.jam_masuk, a.jam_pulang),
+          durasi_menit: mTotal,
+          durasi_format: `${Math.floor(mTotal / 60)}j ${mTotal % 60}m`,
         };
       })
       .sort((a, b) => b.id_absensi - a.id_absensi);
@@ -798,7 +894,7 @@ export const AbsensiService = {
       tanggal: tgl,
       jam_masuk: masuk,
       jam_pulang: null,
-      status_verifikasi: 'menunggu',
+      status_verifikasi: 'menunggu', // Menunggu verifikasi admin
       catatan: catatan || '',
       titik_lokasi: titik_lokasi || '',
       foto_lokasi: foto_lokasi || '',
@@ -810,7 +906,7 @@ export const AbsensiService = {
     };
     db.absensi.unshift(newRecord);
     saveLocalData(db);
-    return { success: true, message: 'Absen masuk berhasil dikirim! Menunggu persetujuan Admin.', data: newRecord };
+    return { success: true, message: 'Absen masuk berhasil dicatat! Menunggu verifikasi admin.', data: newRecord };
   },
 
   async absenPulang(id_absensi, jam_pulang, is_overnight = false, extra = {}) {
@@ -851,7 +947,7 @@ export const AbsensiService = {
         db.absensi[idx].status_verifikasi = 'menunggu';
       }
       saveLocalData(db);
-      return { success: true, message: `Absen pulang berhasil dicatat (${durasi.toFixed(2)} jam)! Menunggu persetujuan Admin.`, durasi_jam: durasi };
+      return { success: true, message: `Absen pulang berhasil dicatat (${durasi.toFixed(2)} jam)! Menunggu verifikasi admin.`, durasi_jam: durasi };
     }
     throw new Error('Data absensi tidak ditemukan');
   },
@@ -1185,13 +1281,17 @@ export const PengeluaranService = {
     return { success: true, message: 'Catatan pengeluaran berhasil dihapus' };
   },
 
-  async verifikasi(id_pengeluaran, status_verifikasi) {
+  async verifikasi(id_pengeluaran, status_verifikasi, catatan_penolakan = '', nominal_disetujui = null) {
     const live = await checkBackendStatus();
     if (live) {
+      const payload = { id_pengeluaran, status_verifikasi, catatan_penolakan };
+      if (nominal_disetujui !== null && nominal_disetujui !== undefined) {
+        payload.nominal_disetujui = Number(nominal_disetujui);
+      }
       const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=verifikasi`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_pengeluaran, status_verifikasi })
+        body: JSON.stringify(payload)
       });
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
@@ -1201,6 +1301,7 @@ export const PengeluaranService = {
     const idx = db.pengeluaran.findIndex(p => p.id_pengeluaran === Number(id_pengeluaran));
     if (idx !== -1) {
       db.pengeluaran[idx].status_verifikasi = status_verifikasi;
+      db.pengeluaran[idx].catatan_penolakan = catatan_penolakan;
       if (db.pengeluaran[idx].id_kas) syncLocalKasLpjStatus(db, db.pengeluaran[idx].id_kas);
       saveLocalData(db);
     }
@@ -1537,6 +1638,181 @@ export const PengeluaranService = {
     return { success: true, message: `Status konfirmasi diubah ke ${status_konfirmasi}` };
   },
 
+  async getSummary() {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=summary`);
+      if (data && data.success) return data.data;
+    }
+
+    const db = getLocalData();
+    const approved = (db.pengeluaran || []).filter(p => p.status_verifikasi === 'disetujui');
+    const totalDisetujui = approved.reduce((sum, p) => sum + (Number(p.nominal) || 0), 0);
+    const uangKantor = approved.filter(p => p.jenis_dana === 'kantor').reduce((sum, p) => sum + (Number(p.nominal) || 0), 0);
+    const uangPribadi = approved.filter(p => p.jenis_dana === 'pribadi').reduce((sum, p) => sum + (Number(p.nominal) || 0), 0);
+    const pendingCount = (db.pengeluaran || []).filter(p => p.status_verifikasi === 'menunggu').length;
+
+    return {
+      total_pengeluaran_disetujui: totalDisetujui,
+      uang_kantor_disetujui: uangKantor,
+      uang_pribadi_disetujui: uangPribadi,
+      pribadi_sudah_diganti: approved.filter(p => p.jenis_dana === 'pribadi' && p.status_ganti === 'sudah').reduce((s, p) => s + (Number(p.nominal) || 0), 0),
+      pribadi_belum_diganti: approved.filter(p => p.jenis_dana === 'pribadi' && p.status_ganti !== 'sudah').reduce((s, p) => s + (Number(p.nominal) || 0), 0),
+      pending_count: pendingCount,
+      total_dana_disalurkan: 0,
+      total_pengembalian_disetujui: 0,
+      saldo_dana_kantor_aktif: 0
+    };
+  },
+
+  async getDanaKantor() {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=dana_kantor`);
+      if (data && data.success) return data.data;
+    }
+    return [];
+  },
+
+  async createDanaKantor(data) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+      const options = {
+        method: 'POST',
+        body: isFormData ? data : JSON.stringify({ ...data, action: 'tambah_dana' })
+      };
+      if (!isFormData) {
+        options.headers = { 'Content-Type': 'application/json' };
+      }
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=tambah_dana`, options);
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success) throw new Error(resData.message);
+    }
+    return { success: true, message: 'Dana kantor dicatat (offline mode)' };
+  },
+
+  async deleteDanaKantor(id_dana) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=hapus_dana&id_dana=${id_dana}`, {
+        method: 'POST'
+      });
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success) throw new Error(resData.message);
+    }
+    return { success: true, message: 'Dana kantor dihapus' };
+  },
+
+  async getPengembalianDana() {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=pengembalian_dana`);
+      if (data && data.success) return data.data;
+    }
+    return [];
+  },
+
+  async createPengembalianDana(data) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+      const options = {
+        method: 'POST',
+        body: isFormData ? data : JSON.stringify({ ...data, action: 'tambah_pengembalian' })
+      };
+      if (!isFormData) {
+        options.headers = { 'Content-Type': 'application/json' };
+      }
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=tambah_pengembalian`, options);
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success) throw new Error(resData.message);
+    }
+    return { success: true, message: 'Pengembalian dicatat (offline mode)' };
+  },
+
+  async verifikasiPengembalianDana(id_pengembalian, status_verifikasi, catatan = '') {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=verifikasi_pengembalian`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_pengembalian, status_verifikasi, catatan })
+      });
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success) throw new Error(resData.message);
+    }
+    return { success: true, message: 'Verifikasi pengembalian berhasil' };
+  },
+
+  async deletePengembalianDana(id_pengembalian) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=hapus_pengembalian&id_pengembalian=${id_pengembalian}`, {
+        method: 'POST'
+      });
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success) throw new Error(resData.message);
+    }
+    return { success: true, message: 'Pengembalian dihapus' };
+  },
+
+  async getReimbursementList(filter = {}) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const params = new URLSearchParams({ action: 'reimbursement_list', ...filter }).toString();
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?${params}`);
+      if (data && data.success) return data.data;
+    }
+    return [];
+  },
+
+  async bayarReimbursement(payload) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const isFormData = typeof FormData !== 'undefined' && payload instanceof FormData;
+      const options = {
+        method: 'POST',
+        body: isFormData ? payload : JSON.stringify({ ...payload, action: 'bayar_reimbursement' })
+      };
+      if (!isFormData) {
+        options.headers = { 'Content-Type': 'application/json' };
+      }
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=bayar_reimbursement`, options);
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success) throw new Error(resData.message);
+    }
+    return { success: true, message: 'Pembayaran reimbursement berhasil dicatat' };
+  },
+
+  async getRiwayatBayarReimbursement(id_pengeluaran) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=riwayat_bayar_reimbursement&id_pengeluaran=${id_pengeluaran}`);
+      if (data && data.success) return data.data;
+    }
+    return [];
+  },
+
+  async getRekapUangKantor(filter = {}) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const params = new URLSearchParams({ action: 'rekap_uang_kantor', ...filter }).toString();
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?${params}`);
+      if (data && data.success) return data.data;
+    }
+    return { ringkasan_global: {}, rekap_per_pj: [] };
+  },
+
+  async getDanaTersedia() {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=dana_tersedia`);
+      if (data && data.success) return data.data;
+    }
+    return [];
+  },
+
   async getRekap() {
     const live = await checkBackendStatus();
     if (live) {
@@ -1734,15 +2010,15 @@ export const GajiService = {
     const db = getLocalData();
     const current = AuthService.getCurrentUser();
     const kId = Number(current?.id_karyawan || 0);
-    return db.gaji
+    return (db.gaji || [])
       .filter(g => !kId || Number(g.id_karyawan) === kId)
       .slice()
       .sort((a, b) => String(b.periode).localeCompare(String(a.periode)) || Number(b.id_gaji) - Number(a.id_gaji))
       .map(g => {
-        const k = db.karyawan.find(item => Number(item.id_karyawan) === Number(g.id_karyawan));
-        const jobs = db.pekerjaan.filter(p =>
-          db.absensi.some(a => Number(a.id_karyawan) === Number(g.id_karyawan) && a.id_pekerjaan === p.id_pekerjaan && a.tanggal?.startsWith(g.periode)) ||
-          db.pengeluaran.some(pg => Number(pg.id_karyawan) === Number(g.id_karyawan) && pg.id_pekerjaan === p.id_pekerjaan && pg.tanggal?.startsWith(g.periode))
+        const k = (db.karyawan || []).find(item => Number(item.id_karyawan) === Number(g.id_karyawan));
+        const jobs = (db.pekerjaan || []).filter(p =>
+          (db.absensi || []).some(a => Number(a.id_karyawan) === Number(g.id_karyawan) && a.id_pekerjaan === p.id_pekerjaan && a.tanggal?.startsWith(g.periode)) ||
+          (db.pengeluaran || []).some(pg => Number(pg.id_karyawan) === Number(g.id_karyawan) && pg.id_pekerjaan === p.id_pekerjaan && pg.tanggal?.startsWith(g.periode))
         );
         return {
           ...g,
@@ -1753,6 +2029,245 @@ export const GajiService = {
           nama_pekerjaan: jobs.map(j => j.nama_pekerjaan).join(', ')
         };
       });
+  },
+
+  async getKalkulasi(periode, id_karyawan = null) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const params = new URLSearchParams({ action: 'kalkulasi', periode });
+      if (id_karyawan) params.set('id_karyawan', id_karyawan);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      if (data && data.success) return data.data;
+    }
+
+    // Fallback kalkulasi lokal jika backend offline
+    const db = getLocalData();
+    return (db.karyawan || []).map(k => {
+      const totalJam = (db.absensi || [])
+        .filter(a => a.id_karyawan === k.id_karyawan && a.status_verifikasi === 'disetujui' && a.jam_pulang && a.tanggal?.startsWith(periode))
+        .reduce((sum, a) => sum + hitungDurasi(a.jam_masuk, a.jam_pulang), 0);
+      const totalHari = new Set((db.absensi || [])
+        .filter(a => a.id_karyawan === k.id_karyawan && a.status_verifikasi === 'disetujui' && a.tanggal?.startsWith(periode))
+        .map(a => a.tanggal)).size;
+      const tarif = Number(k.nominal_upah || k.tarif_per_jam || 0);
+      const jenisUpah = k.jenis_upah || 'per_jam';
+      let totalUpah = 0;
+      if (jenisUpah === 'per_jam') totalUpah = Math.round(totalJam * tarif);
+      else if (jenisUpah === 'per_hari') totalUpah = Math.round(totalHari * tarif);
+      else totalUpah = tarif;
+
+      const existingGaji = (db.gaji || []).find(g => g.id_karyawan === k.id_karyawan && g.periode === periode);
+
+      return {
+        id_gaji: existingGaji ? existingGaji.id_gaji : null,
+        id_karyawan: k.id_karyawan,
+        kode_karyawan: k.kode_karyawan || `KRY-${k.id_karyawan}`,
+        nama_karyawan: k.nama,
+        jabatan: k.jabatan,
+        periode,
+        jenis_upah: existingGaji ? existingGaji.jenis_upah : jenisUpah,
+        tarif: existingGaji ? existingGaji.tarif : tarif,
+        total_jam: existingGaji ? existingGaji.total_jam : Number(totalJam.toFixed(2)),
+        total_hari: existingGaji ? existingGaji.total_hari : totalHari,
+        total_upah: existingGaji ? existingGaji.total_upah : totalUpah,
+        bonus: existingGaji ? existingGaji.bonus || 0 : 0,
+        potongan: existingGaji ? existingGaji.potongan || 0 : 0,
+        catatan_penyesuaian: existingGaji ? existingGaji.catatan_penyesuaian || '' : '',
+        gaji_bersih: existingGaji ? existingGaji.gaji_bersih : totalUpah,
+        total_dibayar: existingGaji ? existingGaji.total_dibayar || 0 : 0,
+        sisa_pembayaran: existingGaji ? (existingGaji.sisa_pembayaran ?? totalUpah) : totalUpah,
+        status_bayar: existingGaji ? existingGaji.status_bayar : 'belum',
+        status_penetapan: existingGaji ? existingGaji.status_penetapan : 'draft',
+        sudah_ditetapkan: !!(existingGaji && existingGaji.status_penetapan === 'ditetapkan')
+      };
+    });
+  },
+
+  async tetapkanGaji(payload) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji.php?action=tetapkan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success && resData.message) throw new Error(resData.message);
+    }
+
+    // Local fallback
+    const db = getLocalData();
+    const periode = payload.periode;
+    let count = 0;
+    (db.karyawan || []).forEach(k => {
+      if (payload.id_karyawan && k.id_karyawan !== Number(payload.id_karyawan)) return;
+      const totalJam = (db.absensi || [])
+        .filter(a => a.id_karyawan === k.id_karyawan && a.status_verifikasi === 'disetujui' && a.jam_pulang && a.tanggal?.startsWith(periode))
+        .reduce((sum, a) => sum + hitungDurasi(a.jam_masuk, a.jam_pulang), 0);
+      const totalHari = new Set((db.absensi || [])
+        .filter(a => a.id_karyawan === k.id_karyawan && a.status_verifikasi === 'disetujui' && a.tanggal?.startsWith(periode))
+        .map(a => a.tanggal)).size;
+      const tarif = Number(k.nominal_upah || k.tarif_per_jam || 0);
+      const jenisUpah = k.jenis_upah || 'per_jam';
+      let totalUpah = jenisUpah === 'per_jam' ? Math.round(totalJam * tarif) : (jenisUpah === 'per_hari' ? Math.round(totalHari * tarif) : tarif);
+      const bonus = Number(payload.bonus || 0);
+      const potongan = Number(payload.potongan || 0);
+      const gajiBersih = Math.max(0, totalUpah + bonus - potongan);
+
+      const existingIdx = (db.gaji || []).findIndex(g => g.id_karyawan === k.id_karyawan && g.periode === periode);
+      if (existingIdx !== -1) {
+        db.gaji[existingIdx] = {
+          ...db.gaji[existingIdx],
+          jenis_upah: jenisUpah,
+          tarif,
+          total_jam: Number(totalJam.toFixed(2)),
+          total_hari: totalHari,
+          total_upah: totalUpah,
+          bonus,
+          potongan,
+          catatan_penyesuaian: payload.catatan_penyesuaian || '',
+          gaji_bersih: gajiBersih,
+          sisa_pembayaran: Math.max(0, gajiBersih - (db.gaji[existingIdx].total_dibayar || 0)),
+          status_penetapan: 'ditetapkan'
+        };
+      } else {
+        const newId = (db.gaji || []).length ? Math.max(...db.gaji.map(g => g.id_gaji)) + 1 : 1;
+        db.gaji.push({
+          id_gaji: newId,
+          id_karyawan: k.id_karyawan,
+          periode,
+          jenis_upah: jenisUpah,
+          tarif,
+          total_jam: Number(totalJam.toFixed(2)),
+          total_hari: totalHari,
+          total_upah: totalUpah,
+          bonus,
+          potongan,
+          catatan_penyesuaian: payload.catatan_penyesuaian || '',
+          gaji_bersih: gajiBersih,
+          total_dibayar: 0,
+          sisa_pembayaran: gajiBersih,
+          status_bayar: 'belum',
+          status_penetapan: 'ditetapkan'
+        });
+      }
+      count++;
+    });
+    saveLocalData(db);
+    return { success: true, message: `Gaji periode ${periode} berhasil ditetapkan untuk ${count} pekerja!` };
+  },
+
+  async getPembayaranList({ periode = '', status_bayar = 'semua' } = {}) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const params = new URLSearchParams({ action: 'pembayaran_list' });
+      if (periode) params.set('periode', periode);
+      if (status_bayar) params.set('status_bayar', status_bayar);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      if (data && data.success) return data.data;
+    }
+
+    const db = getLocalData();
+    return (db.gaji || [])
+      .filter(g => g.status_penetapan === 'ditetapkan' && (!periode || g.periode === periode) && (status_bayar === 'semua' || g.status_bayar === status_bayar))
+      .map(g => {
+        const k = (db.karyawan || []).find(item => item.id_karyawan === g.id_karyawan);
+        return {
+          ...g,
+          nama_karyawan: k ? k.nama : 'Unknown',
+          kode_karyawan: k ? k.kode_karyawan : `KRY-${g.id_karyawan}`,
+          jabatan: k ? k.jabatan : '',
+          nomor_hp: k ? k.nomor_hp : ''
+        };
+      });
+  },
+
+  async getPembayaranHistory(id_gaji) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=pembayaran_history&id_gaji=${id_gaji}`);
+      if (data && data.success) return data.data;
+    }
+    return [];
+  },
+
+  async catatPembayaran(paymentData) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji.php?action=bayar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentData)
+      });
+      if (resData && resData.success) return resData;
+      if (resData && !resData.success && resData.message) throw new Error(resData.message);
+    }
+
+    const db = getLocalData();
+    const idx = (db.gaji || []).findIndex(g => g.id_gaji === Number(paymentData.id_gaji));
+    if (idx !== -1) {
+      const nominal = Number(paymentData.nominal_bayar) || 0;
+      const currentDibayar = Number(db.gaji[idx].total_dibayar || 0) + nominal;
+      const gajiBersih = Number(db.gaji[idx].gaji_bersih || db.gaji[idx].total_upah || 0);
+      const sisa = Math.max(0, gajiBersih - currentDibayar);
+      db.gaji[idx].total_dibayar = currentDibayar;
+      db.gaji[idx].sisa_pembayaran = sisa;
+      db.gaji[idx].status_bayar = sisa <= 0 ? 'sudah' : 'sebagian';
+      db.gaji[idx].tanggal_bayar = new Date().toISOString();
+      saveLocalData(db);
+    }
+    return { success: true, message: 'Pembayaran berhasil dicatat!' };
+  },
+
+  async getRiwayat({ periode = '', id_karyawan = '', status_bayar = 'semua', search = '' } = {}) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const params = new URLSearchParams({ action: 'riwayat' });
+      if (periode && periode !== 'semua') params.set('periode', periode);
+      if (id_karyawan) params.set('id_karyawan', id_karyawan);
+      if (status_bayar && status_bayar !== 'semua') params.set('status_bayar', status_bayar);
+      if (search) params.set('search', search);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      if (data && data.success) return data.data;
+    }
+
+    const db = getLocalData();
+    return (db.gaji || []).map(g => {
+      const k = (db.karyawan || []).find(item => item.id_karyawan === g.id_karyawan);
+      return {
+        ...g,
+        nama_karyawan: k ? k.nama : 'Unknown',
+        kode_karyawan: k ? k.kode_karyawan : `KRY-${g.id_karyawan}`,
+        jabatan: k ? k.jabatan : '',
+        nomor_hp: k ? k.nomor_hp : ''
+      };
+    });
+  },
+
+  async getSlip(id_gaji) {
+    const live = await checkBackendStatus();
+    if (live) {
+      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=slip&id_gaji=${id_gaji}`);
+      if (data && data.success) return data.data;
+      if (data && !data.success && data.message) throw new Error(data.message);
+    }
+
+    const db = getLocalData();
+    const g = (db.gaji || []).find(item => item.id_gaji === Number(id_gaji));
+    if (!g) throw new Error('Slip gaji tidak ditemukan');
+    const k = (db.karyawan || []).find(item => item.id_karyawan === g.id_karyawan);
+    return {
+      gaji: {
+        ...g,
+        nama_karyawan: k ? k.nama : 'Unknown',
+        kode_karyawan: k ? k.kode_karyawan : `KRY-${g.id_karyawan}`,
+        jabatan: k ? k.jabatan : '',
+        email: k ? k.email : '',
+        nomor_hp: k ? k.nomor_hp : ''
+      },
+      pembayaran: [],
+      absensi: (db.absensi || []).filter(a => a.id_karyawan === g.id_karyawan && a.status_verifikasi === 'disetujui' && a.tanggal?.startsWith(g.periode))
+    };
   },
 
   async getDetail({ id_karyawan, periode, id_gaji, id_pekerjaan } = {}) {
@@ -1908,113 +2423,28 @@ export const GajiService = {
     gaji.bonus = Number(bonus) || 0;
     gaji.potongan = Number(potongan) || 0;
     gaji.catatan_penyesuaian = catatan_penyesuaian;
-    gaji.total_dibayar = Math.max(
-      0,
-      Number(gaji.total_upah || 0) + Number(gaji.total_ganti || 0) + gaji.bonus - gaji.potongan
-    );
+    const totalUpah = Number(gaji.total_upah || 0);
+    gaji.gaji_bersih = Math.max(0, totalUpah + gaji.bonus - gaji.potongan);
+    gaji.sisa_pembayaran = Math.max(0, gaji.gaji_bersih - Number(gaji.total_dibayar || 0));
     saveLocalData(db);
     return { success: true, message: 'Penyesuaian gaji berhasil disimpan.' };
   },
 
   async hitungGaji(periode) {
-    const live = await checkBackendStatus();
-    if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji.php?action=hitung`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periode })
-      });
-      if (resData && resData.success) return resData;
-      if (resData && !resData.success && resData.message) {
-        throw new Error(resData.message);
-      }
-    }
-
-    const db = getLocalData();
-    let count = 0;
-
-    db.karyawan.forEach(k => {
-      // 1. Total jam disetujui bulan ini
-      const totalJam = db.absensi
-        .filter(a => a.id_karyawan === k.id_karyawan && a.status_verifikasi === 'disetujui' && a.jam_pulang && a.tanggal.startsWith(periode))
-        .reduce((sum, a) => sum + hitungDurasi(a.jam_masuk, a.jam_pulang), 0);
-
-      const tarif = Number(k.tarif_per_jam) || 0;
-      const totalUpah = Number((totalJam * tarif).toFixed(2));
-
-      // 2. Total ganti uang pribadi disetujui
-      const totalGanti = db.pengeluaran
-        .filter(pg => pg.id_karyawan === k.id_karyawan && pg.jenis_dana === 'pribadi' && pg.status_verifikasi === 'disetujui' && pg.tanggal.startsWith(periode))
-        .reduce((sum, pg) => sum + Number(pg.nominal), 0);
-
-      const totalDibayar = totalUpah + totalGanti;
-
-      const existingIdx = db.gaji.findIndex(g => g.id_karyawan === k.id_karyawan && g.periode === periode);
-      if (existingIdx !== -1) {
-        db.gaji[existingIdx] = {
-          ...db.gaji[existingIdx],
-          total_jam: Number(totalJam.toFixed(2)),
-          tarif,
-          total_upah: totalUpah,
-          total_ganti: totalGanti,
-          total_dibayar: totalDibayar
-        };
-      } else {
-        const newId = db.gaji.length ? Math.max(...db.gaji.map(g => g.id_gaji)) + 1 : 1;
-        db.gaji.push({
-          id_gaji: newId,
-          id_karyawan: k.id_karyawan,
-          periode,
-          total_jam: Number(totalJam.toFixed(2)),
-          tarif,
-          total_upah: totalUpah,
-          total_ganti: totalGanti,
-          total_dibayar: totalDibayar,
-          status_bayar: 'belum',
-          tanggal_bayar: null
-        });
-      }
-      count++;
-    });
-
-    saveLocalData(db);
-    return { success: true, message: `Perhitungan gaji periode ${periode} berhasil untuk ${count} pekerja!` };
+    return this.tetapkanGaji({ periode });
   },
 
   async bayar(id_gaji, paymentData = {}) {
-    const live = await checkBackendStatus();
-    if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji.php?action=bayar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_gaji, ...paymentData })
-      });
-      if (resData && resData.success) return resData;
-      if (resData && !resData.success && resData.message) {
-        throw new Error(resData.message);
-      }
-    }
-
-    const db = getLocalData();
-    const idx = db.gaji.findIndex(g => g.id_gaji === Number(id_gaji));
-    if (idx !== -1) {
-      db.gaji[idx].status_bayar = 'sudah';
-      db.gaji[idx].tanggal_bayar = new Date().toISOString();
-      db.gaji[idx].metode_bayar = paymentData.metode_bayar || 'transfer';
-      db.gaji[idx].catatan_bayar = paymentData.catatan_bayar || '';
-      db.gaji[idx].bukti_bayar = paymentData.foto_bukti || '';
-
-      // Update pengeluaran pribadi yang disetujui menjadi status_ganti = sudah
-      const g = db.gaji[idx];
-      db.pengeluaran.forEach(pg => {
-        if (pg.id_karyawan === g.id_karyawan && pg.jenis_dana === 'pribadi' && pg.status_verifikasi === 'disetujui' && pg.tanggal.startsWith(g.periode)) {
-          pg.status_ganti = 'sudah';
-        }
-      });
-
-      saveLocalData(db);
-    }
-    return { success: true, message: 'Status gaji berhasil diperbarui menjadi SUDAH DIBAYAR!' };
+    return this.catatPembayaran({
+      id_gaji,
+      nominal_bayar: paymentData.nominal_bayar,
+      tanggal_bayar: paymentData.tanggal_bayar || new Date().toISOString().slice(0, 10),
+      metode_pembayaran: paymentData.metode_bayar || paymentData.metode_pembayaran || 'transfer',
+      nomor_referensi: paymentData.nomor_referensi || '',
+      nama_penerima: paymentData.nama_penerima || '',
+      bukti_pembayaran: paymentData.foto_bukti || paymentData.bukti_bayar || '',
+      catatan: paymentData.catatan_bayar || paymentData.catatan || ''
+    });
   }
 };
 

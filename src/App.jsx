@@ -25,6 +25,7 @@ import DashboardPekerja from './pages/karyawan/DashboardPekerja.jsx'
 import RekapAbsensiAdmin from './pages/admin/RekapAbsensiAdmin.jsx'
 import RekapAbsensiPekerja from './pages/karyawan/RekapAbsensiPekerja.jsx'
 import DataKaryawan from './pages/admin/DataKaryawan.jsx'
+import ManajemenPengguna from './pages/admin/ManajemenPengguna.jsx'
 import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
 import Penugasan from './pages/admin/Penugasan.jsx'
 import ProfilAdmin from './pages/admin/ProfilAdmin.jsx'
@@ -83,7 +84,7 @@ function LoginPage() {
   const { user, signIn } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -95,9 +96,23 @@ function LoginPage() {
     setError('')
     setSubmitting(true)
     try {
-      const authenticatedUser = await signIn({ email: email.trim(), password })
+      const cleanId = identifier.trim()
+      const authenticatedUser = await signIn({
+        identifier: cleanId,
+        email: cleanId,
+        username: cleanId,
+        password,
+      })
       const requestedPath = location.state?.from?.pathname
-      navigate(requestedPath || roleHome(authenticatedUser.role), { replace: true })
+      let targetPath = roleHome(authenticatedUser.role)
+      if (requestedPath && !requestedPath.startsWith('/login') && !requestedPath.startsWith('/register')) {
+        if (authenticatedUser.role === 'admin' && requestedPath.startsWith('/admin')) {
+          targetPath = requestedPath
+        } else if (authenticatedUser.role !== 'admin' && requestedPath.startsWith('/karyawan')) {
+          targetPath = requestedPath
+        }
+      }
+      navigate(targetPath, { replace: true })
     } catch (loginError) {
       setError(loginError.message)
     } finally {
@@ -110,9 +125,9 @@ function LoginPage() {
       <section className="login-brand">
         <div className="brand-mark" aria-hidden="true">PK</div>
         <p className="eyebrow">PENCATATAN KERJA</p>
-        <h1>Kerja tercatat,<br />lebih terarah.</h1>
+        <h1>Kelola pekerjaan,<br />lebih mudah dan terarah.</h1>
         <p className="brand-description">
-          Masuk untuk mengakses ruang kerja sesuai peran dan tanggung jawab Anda.
+          Sistem pencatatan kerja untuk membantu pengelolaan data karyawan, pekerjaan, penugasan, absensi, pengeluaran, dan penggajian secara terintegrasi.
         </p>
         <div className="brand-decoration" aria-hidden="true">
           <span /><span /><span />
@@ -122,20 +137,20 @@ function LoginPage() {
       <section className="login-panel">
         <div className="login-form-wrap">
           <p className="eyebrow">SELAMAT DATANG</p>
-          <h2>Masuk ke akun</h2>
-          <p className="muted">Gunakan akun yang terdaftar untuk melanjutkan.</p>
+          <h2>Masuk ke akun Anda</h2>
+          <p className="muted">Silakan masuk menggunakan akun yang telah terdaftar untuk mengakses sistem sesuai dengan hak akses Anda.</p>
 
           <form className="login-form" onSubmit={handleSubmit}>
             {error && <div className="notice notice-error" role="alert">{error}</div>}
-            <label htmlFor="email">Email</label>
+            <label htmlFor="identifier">Email atau ID Karyawan</label>
             <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Masukkan email"
+              id="identifier"
+              name="identifier"
+              type="text"
+              autoComplete="username"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder="Masukkan email atau ID Karyawan"
               required
             />
             <label htmlFor="password">Password</label>
@@ -146,7 +161,7 @@ function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Masukkan password"
+              placeholder="Masukkan password Anda"
               required
             />
             <button className="button button-primary login-submit" type="submit" disabled={submitting}>
@@ -155,7 +170,145 @@ function LoginPage() {
             </button>
           </form>
 
-          <p className="login-footnote">Akses diberikan sesuai peran akun Anda.</p>
+          <p className="login-footnote">Akses sistem disesuaikan secara otomatis berdasarkan peran akun Anda.</p>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function RegisterPage() {
+  const { user, signUp } = useAuth()
+  const navigate = useNavigate()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [jabatan, setJabatan] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  if (user) return <Navigate to={roleHome(user.role)} replace />
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
+
+    if (password.length < 6) {
+      setError('Password minimal harus 6 karakter.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Konfirmasi password tidak cocok dengan password.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const newUser = await signUp({
+        name: name.trim(),
+        email: email.trim(),
+        jabatan: jabatan.trim(),
+        password,
+      })
+      navigate(roleHome(newUser.role), { replace: true })
+    } catch (regError) {
+      setError(regError.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-brand">
+        <div className="brand-mark" aria-hidden="true">PK</div>
+        <p className="eyebrow">PENDAFTARAN KARYAWAN</p>
+        <h1>Mulai catat kerja,<br />lebih terarah.</h1>
+        <p className="brand-description">
+          Daftarkan akun pekerja Anda untuk mulai mencatat absensi, jam kerja proyek, dan pengeluaran operasional.
+        </p>
+        <div className="brand-decoration" aria-hidden="true">
+          <span /><span /><span />
+        </div>
+      </section>
+
+      <section className="login-panel">
+        <div className="login-form-wrap">
+          <p className="eyebrow">GABUNG SEKARANG</p>
+          <h2>Daftar Akun Pekerja</h2>
+          <p className="muted">Isi data diri Anda untuk membuat akun baru.</p>
+
+          <form className="login-form" onSubmit={handleSubmit}>
+            {error && <div className="notice notice-error" role="alert">{error}</div>}
+            
+            <label htmlFor="reg-name">Nama Lengkap</label>
+            <input
+              id="reg-name"
+              name="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Contoh: Budi Santoso"
+              required
+            />
+
+            <label htmlFor="reg-email">Email</label>
+            <input
+              id="reg-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Contoh: budi@absensi.com"
+              required
+            />
+
+            <label htmlFor="reg-jabatan">Jabatan / Posisi</label>
+            <input
+              id="reg-jabatan"
+              name="jabatan"
+              type="text"
+              value={jabatan}
+              onChange={(e) => setJabatan(e.target.value)}
+              placeholder="Contoh: Teknisi Jaringan / Staff Lapangan"
+              required
+            />
+
+            <label htmlFor="reg-password">Password (min. 6 karakter)</label>
+            <input
+              id="reg-password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Masukkan password baru"
+              required
+            />
+
+            <label htmlFor="reg-confirm-password">Konfirmasi Password</label>
+            <input
+              id="reg-confirm-password"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Ulangi password"
+              required
+            />
+
+            <button className="button button-primary login-submit" type="submit" disabled={submitting}>
+              {submitting ? 'Mendaftarkan...' : 'Daftar Pekerja'}
+              {!submitting && <span aria-hidden="true">→</span>}
+            </button>
+          </form>
+
+          <div className="auth-switch">
+            Sudah punya akun? <Link to="/login">Masuk ke akun</Link>
+          </div>
         </div>
       </section>
     </main>
@@ -169,10 +322,10 @@ function AppLayout() {
   const [loggingOut, setLoggingOut] = useState(false)
   const [switchingAccount, setSwitchingAccount] = useState(false)
   const links = [
-    { to: '/dashboard', label: 'Dashboard', icon: '▦' },
+    { to: roleHome(user.role), label: 'Dashboard', icon: '▦' },
     ...(user.role === 'admin'
       ? [
-          { to: '/admin', label: 'Manajemen Pengguna', icon: '👥' },
+          { to: '/admin/pengguna', label: 'Manajemen Pengguna', icon: '👥' },
           { to: '/admin/karyawan', label: 'Data Karyawan', icon: '👔' },
           { to: '/admin/pekerjaan', label: 'Data Pekerjaan', icon: '💼' },
           { to: '/admin/penugasan', label: 'Penugasan', icon: '📋' },
@@ -226,7 +379,7 @@ function AppLayout() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <Link className="sidebar-brand" to="/dashboard">
+        <Link className="sidebar-brand" to={roleHome(user.role)}>
           <span className="brand-mark brand-mark-small">PK</span>
           <span><strong>RuangKerja</strong><small>Pencatatan kerja</small></span>
         </Link>
@@ -316,122 +469,7 @@ function KaryawanPage() {
 }
 
 function AdminPage() {
-  const { user } = useAuth()
-  const [usersList, setUsersList] = useState(() => {
-    try {
-      const reg = JSON.parse(localStorage.getItem('ruangkerja_registered_users')) || []
-      const defaultUsers = [
-        { id: 1, email: 'admin@gmail.com', name: 'Administrator', role: 'admin', jabatan: 'System Admin', aktif: 1 },
-        { id: 2, email: 'admin@jamkerja.com', name: 'Super Admin', role: 'admin', jabatan: 'Project Manager', aktif: 1 },
-        { id: 3, email: 'budi@jamkerja.com', name: 'Budi Santoso', role: 'karyawan', jabatan: 'Teknisi Jaringan Senior', aktif: 1 },
-        { id: 4, email: 'siti@jamkerja.com', name: 'Siti Rahma', role: 'karyawan', jabatan: 'Sistem Analis', aktif: 1 },
-        { id: 5, email: 'karyawan@gmail.com', name: 'Karyawan Demo', role: 'karyawan', jabatan: 'Staff Lapangan', aktif: 1 },
-      ]
-      const merged = [...defaultUsers]
-      reg.forEach((r) => {
-        if (!merged.some((m) => m.email.toLowerCase() === r.email.toLowerCase())) {
-          merged.push({
-            id: r.id || Date.now(),
-            email: r.email,
-            name: r.name || r.nama || r.email.split('@')[0],
-            role: r.role || 'karyawan',
-            jabatan: r.jabatan || 'Karyawan',
-            aktif: 1,
-          })
-        }
-      })
-      return merged
-    } catch {
-      return []
-    }
-  })
-
-  function toggleAktif(id) {
-    const updated = usersList.map((u) => (u.id === id ? { ...u, aktif: u.aktif ? 0 : 1 } : u))
-    setUsersList(updated)
-  }
-
-  const adminCount = usersList.filter((u) => u.role === 'admin').length
-  const karyawanCount = usersList.filter((u) => isWorkerRole(u.role)).length
-  const totalCount = usersList.length
-
-  return (
-    <section>
-      <p className="eyebrow">ADMINISTRASI SISTEM</p>
-      <h1 className="page-title">Manajemen Pengguna</h1>
-      <p className="page-intro">
-        Kelola akun pengguna, peran akun, dan kontrol izin akses aktif/nonaktif.
-      </p>
-
-      {/* Ringkasan Statistik Pengguna */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <span className="stat-label">Total Akun Terdaftar</span>
-          <div className="stat-value">{totalCount}</div>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Admin Terdaftar</span>
-          <div className="stat-value" style={{ color: '#2a6cb8' }}>{adminCount}</div>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Pekerja Terdaftar</span>
-          <div className="stat-value" style={{ color: '#1e7a46' }}>{karyawanCount}</div>
-        </div>
-      </div>
-
-      {/* Tabel Pengguna */}
-      <div className="data-card">
-        <div className="data-header">
-          <h3>Daftar Pengguna Sistem</h3>
-          <span className="badge badge-info">{totalCount} Pengguna</span>
-        </div>
-
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Nama Lengkap</th>
-                <th>Email</th>
-                <th>Jabatan / Posisi</th>
-                <th>Peran Akun</th>
-                <th>Status Akun</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usersList.map((u) => (
-                <tr key={u.id}>
-                  <td><strong>{u.name}</strong></td>
-                  <td>{u.email}</td>
-                  <td>{u.jabatan || '-'}</td>
-                  <td>
-                    <span className={`badge ${u.role === 'admin' ? 'badge-info' : 'badge-warning'}`}>
-                      {u.role === 'admin' ? '👑 Admin' : '👤 Pekerja'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${u.aktif ? 'badge-success' : 'badge-danger'}`}>
-                      {u.aktif ? '● Aktif' : '○ Nonaktif'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className={`button button-sm ${u.aktif ? 'button-secondary' : 'button-primary'}`}
-                      style={{ padding: '4px 10px', fontSize: '11px', minHeight: '28px' }}
-                      type="button"
-                      onClick={() => toggleAktif(u.id)}
-                    >
-                      {u.aktif ? 'Nonaktifkan' : 'Aktifkan'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  )
+  return <ManajemenPengguna />
 }
 
 function DashboardAdminPage() {
@@ -442,7 +480,12 @@ function DashboardAdminPage() {
         if (target === 'Data Karyawan') navigate('/admin/karyawan')
         else if (target === 'Data Pekerjaan') navigate('/admin/pekerjaan')
         else if (target === 'Penugasan') navigate('/admin/penugasan')
-        else if (target === 'Penggajian Karyawan' || target === 'Gaji') navigate('/admin/gaji')
+        else if (target === 'Rekap Absensi') navigate('/admin/rekap-absensi')
+        else if (target === 'Gaji' || target === 'Penggajian' || target === 'Penggajian Karyawan') navigate('/admin/gaji')
+        else if (target === 'Pengeluaran & Kwitansi' || target === 'Pengeluaran & Kuitansi' || target === 'Pengeluaran') navigate('/admin/pengeluaran')
+        else if (target === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
+        else if (target === 'Manajemen Pengguna') navigate('/admin/pengguna')
+        else if (target === 'Lokasi Kerja') navigate('/admin/lokasi')
         else if (target === 'Rekap Jam Kerja Tim') navigate('/admin/jam-kerja')
         else if (target === 'Approval Presensi') navigate('/admin/approval-absensi')
         else if (target === 'Approval Reimburse') navigate('/admin/approval-pengeluaran')
@@ -481,6 +524,8 @@ function AdminLayoutWrapper() {
     activeItem = 'Kontribusi Proyek'
   } else if (path.startsWith('/admin/rekap-absensi')) {
     activeItem = 'Rekap Absensi'
+  } else if (path.startsWith('/admin/gaji')) {
+    activeItem = 'Gaji'
   } else if (path.startsWith('/admin/pengguna')) {
     activeItem = 'Manajemen Pengguna'
   } else if (path.startsWith('/admin/pemasukan')) {
@@ -506,6 +551,7 @@ function AdminLayoutWrapper() {
     else if (item === 'Approval Reimburse') navigate('/admin/approval-pengeluaran')
     else if (item === 'Kontribusi Proyek') navigate('/admin/kontribusi')
     else if (item === 'Rekap Absensi') navigate('/admin/rekap-absensi')
+    else if (item === 'Gaji' || item === 'Penggajian') navigate('/admin/gaji')
     else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
     else if (item === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
     else if (item === 'Pengeluaran & Kuitansi' || item === 'Pengeluaran & Kwitansi') navigate('/admin/pengeluaran')
@@ -592,6 +638,17 @@ function PekerjaanTersediaPage({ mappedUser }) {
   )
 }
 
+function RiwayatPengajuanPage({ mappedUser }) {
+  const navigate = useNavigate()
+  return (
+    <RiwayatPengajuan
+      workerId={mappedUser?.id_karyawan}
+      workerName={mappedUser?.nama}
+      onNavigate={(target) => navigateWorkerTarget(navigate, target)}
+    />
+  )
+}
+
 function PekerjaLayoutWrapper({ mappedUser }) {
   const { user, signOut } = useAuth()
   const location = useLocation()
@@ -621,7 +678,7 @@ function PekerjaLayoutWrapper({ mappedUser }) {
     if (item === 'Dashboard') navigate('/karyawan')
     else if (item === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
     else if (item === 'List Pekerjaan' || item === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
-    else if (item === 'Slip Gaji Pribadi') navigate('/karyawan/gaji')
+    else if (item === 'Slip Gaji Pribadi' || item === 'Gaji Saya' || item === 'Gaji' || item === 'Slip Gaji') navigate('/karyawan/gaji')
     else if (item === 'Absensi' || item === 'Rekap Absensi' || item === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
     else if (item === 'Pengeluaran Saya') navigate('/karyawan/pengeluaran')
     else if (item === 'Profil Saya') navigate('/karyawan/profil')
@@ -690,7 +747,7 @@ function AppRoutes() {
             <Route path="/admin/pekerjaan" element={<DataPekerjaan />} />
             <Route path="/admin/penugasan" element={<Penugasan />} />
             <Route path="/admin/rekap-absensi" element={<RekapAbsensiAdmin />} />
-            <Route path="/admin/pengguna" element={<AdminPage />} />
+            <Route path="/admin/pengguna" element={<ManajemenPengguna />} />
             <Route
               path="/admin/approval-absensi"
               element={<VerifikasiAbsensiAdminPage currentUser={mappedUser} />}
