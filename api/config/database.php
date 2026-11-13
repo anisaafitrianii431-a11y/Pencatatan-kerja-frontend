@@ -149,6 +149,141 @@ function ensureKaryawanProfileSchema($pdo) {
         if (!$pdo->query("SHOW COLUMNS FROM `user` LIKE 'username'")->fetch()) {
             $pdo->exec("ALTER TABLE `user` ADD COLUMN username VARCHAR(50) DEFAULT NULL AFTER email");
         }
+        if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'catatan_admin'")->fetch()) {
+            $pdo->exec("ALTER TABLE penugasan ADD COLUMN catatan_admin VARCHAR(255) DEFAULT NULL AFTER peran_tugas");
+        }
+
+        // Pastikan tabel modul keuangan & kwitansi terpadu tersedia
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS dana_kantor (
+                id_dana INT AUTO_INCREMENT PRIMARY KEY,
+                nomor_transaksi VARCHAR(50) DEFAULT NULL,
+                jenis_transaksi ENUM('pemasukan_kas', 'penyaluran_dana') NOT NULL DEFAULT 'penyaluran_dana',
+                tanggal DATE NOT NULL,
+                sumber_dana VARCHAR(100) DEFAULT NULL,
+                pemberi_dana VARCHAR(100) DEFAULT NULL,
+                penerima_dana VARCHAR(100) DEFAULT NULL,
+                id_penanggung_jawab INT DEFAULT NULL,
+                id_pekerjaan INT DEFAULT NULL,
+                nominal DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+                tujuan_penggunaan TEXT DEFAULT NULL,
+                keterangan TEXT DEFAULT NULL,
+                bukti_transaksi VARCHAR(255) DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX (id_penanggung_jawab),
+                INDEX (id_pekerjaan)
+            ) ENGINE=InnoDB;
+        ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS pengembalian_dana (
+                id_pengembalian INT AUTO_INCREMENT PRIMARY KEY,
+                nomor_transaksi VARCHAR(50) DEFAULT NULL,
+                id_dana INT DEFAULT NULL,
+                id_karyawan INT DEFAULT NULL,
+                id_penanggung_jawab INT DEFAULT NULL,
+                tanggal DATE NOT NULL,
+                nominal DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+                penerima_pengembalian VARCHAR(100) DEFAULT NULL,
+                keterangan TEXT DEFAULT NULL,
+                bukti_pengembalian VARCHAR(255) DEFAULT NULL,
+                status_verifikasi ENUM('menunggu', 'disetujui', 'ditolak') NOT NULL DEFAULT 'menunggu',
+                catatan TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX (id_dana),
+                INDEX (id_karyawan),
+                INDEX (id_penanggung_jawab)
+            ) ENGINE=InnoDB;
+        ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS pembayaran_reimbursement (
+                id_pembayaran INT AUTO_INCREMENT PRIMARY KEY,
+                id_pengeluaran INT NOT NULL,
+                tanggal_bayar DATE NOT NULL,
+                nominal_bayar DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+                metode_pembayaran VARCHAR(50) DEFAULT 'transfer',
+                nomor_referensi VARCHAR(100) DEFAULT NULL,
+                nama_penerima VARCHAR(100) DEFAULT NULL,
+                nama_pembayar VARCHAR(100) DEFAULT NULL,
+                bukti_pembayaran VARCHAR(255) DEFAULT NULL,
+                catatan TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX (id_pengeluaran)
+            ) ENGINE=InnoDB;
+        ");
+
+        $pengeluaranCols = [
+            'nomor_transaksi' => "ALTER TABLE pengeluaran ADD COLUMN nomor_transaksi VARCHAR(50) DEFAULT NULL AFTER id_pengeluaran",
+            'nominal_disetujui' => "ALTER TABLE pengeluaran ADD COLUMN nominal_disetujui DECIMAL(14, 2) DEFAULT NULL AFTER nominal",
+            'total_dibayar' => "ALTER TABLE pengeluaran ADD COLUMN total_dibayar DECIMAL(14, 2) NOT NULL DEFAULT 0.00 AFTER nominal_disetujui",
+            'sisa_pembayaran' => "ALTER TABLE pengeluaran ADD COLUMN sisa_pembayaran DECIMAL(14, 2) NOT NULL DEFAULT 0.00 AFTER total_dibayar",
+            'kategori' => "ALTER TABLE pengeluaran ADD COLUMN kategori VARCHAR(100) DEFAULT NULL AFTER sisa_pembayaran",
+            'id_dana' => "ALTER TABLE pengeluaran ADD COLUMN id_dana INT DEFAULT NULL AFTER jenis_dana",
+            'id_penanggung_jawab' => "ALTER TABLE pengeluaran ADD COLUMN id_penanggung_jawab INT DEFAULT NULL AFTER id_dana",
+            'catatan_penolakan' => "ALTER TABLE pengeluaran ADD COLUMN catatan_penolakan TEXT DEFAULT NULL AFTER status_verifikasi",
+            'status_reimbursement' => "ALTER TABLE pengeluaran ADD COLUMN status_reimbursement ENUM('belum', 'sebagian', 'lunas') DEFAULT 'belum' AFTER status_ganti",
+        ];
+
+        foreach ($pengeluaranCols as $col => $sql) {
+            if (!$pdo->query("SHOW COLUMNS FROM pengeluaran LIKE '{$col}'")->fetch()) {
+                $pdo->exec($sql);
+            }
+        }
+
+        // Pastikan kolom baru karyawan tersedia untuk sistem penggajian
+        $karyawanCols = [
+            'nomor_hp' => "ALTER TABLE karyawan ADD COLUMN nomor_hp VARCHAR(30) DEFAULT NULL AFTER no_hp",
+            'email' => "ALTER TABLE karyawan ADD COLUMN email VARCHAR(100) DEFAULT NULL AFTER nomor_hp",
+            'status' => "ALTER TABLE karyawan ADD COLUMN status ENUM('aktif', 'nonaktif') DEFAULT 'aktif' AFTER tarif_per_jam",
+            'jenis_upah' => "ALTER TABLE karyawan ADD COLUMN jenis_upah ENUM('per_jam', 'per_hari', 'per_bulan') DEFAULT 'per_jam' AFTER status",
+            'nominal_upah' => "ALTER TABLE karyawan ADD COLUMN nominal_upah DECIMAL(12, 2) DEFAULT 0.00 AFTER jenis_upah",
+            'tarif_lembur' => "ALTER TABLE karyawan ADD COLUMN tarif_lembur DECIMAL(12, 2) DEFAULT 0.00 AFTER nominal_upah",
+            'lembur_aktif' => "ALTER TABLE karyawan ADD COLUMN lembur_aktif TINYINT(1) DEFAULT 0 AFTER tarif_lembur",
+        ];
+        foreach ($karyawanCols as $col => $sql) {
+            if (!$pdo->query("SHOW COLUMNS FROM karyawan LIKE '{$col}'")->fetch()) {
+                $pdo->exec($sql);
+            }
+        }
+
+        // Pastikan tabel pembayaran gaji tersedia
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS pembayaran_gaji (
+                id_pembayaran INT AUTO_INCREMENT PRIMARY KEY,
+                id_gaji INT NOT NULL,
+                tanggal_bayar DATE NOT NULL,
+                nominal_bayar DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+                metode_pembayaran VARCHAR(50) DEFAULT 'transfer',
+                nomor_referensi VARCHAR(100) DEFAULT NULL,
+                nama_penerima VARCHAR(100) DEFAULT NULL,
+                nama_pembayar VARCHAR(100) DEFAULT NULL,
+                bukti_pembayaran VARCHAR(255) DEFAULT NULL,
+                catatan TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX (id_gaji)
+            ) ENGINE=InnoDB;
+        ");
+
+        // Pastikan kolom baru tabel gaji tersedia
+        $gajiCols = [
+            'jenis_upah' => "ALTER TABLE gaji ADD COLUMN jenis_upah ENUM('per_jam', 'per_hari', 'per_bulan') DEFAULT 'per_jam' AFTER periode",
+            'total_hari' => "ALTER TABLE gaji ADD COLUMN total_hari INT DEFAULT 0 AFTER total_jam",
+            'bonus' => "ALTER TABLE gaji ADD COLUMN bonus DECIMAL(12, 2) DEFAULT 0.00 AFTER total_ganti",
+            'potongan' => "ALTER TABLE gaji ADD COLUMN potongan DECIMAL(12, 2) DEFAULT 0.00 AFTER bonus",
+            'catatan_penyesuaian' => "ALTER TABLE gaji ADD COLUMN catatan_penyesuaian TEXT DEFAULT NULL AFTER potongan",
+            'total_dibayar' => "ALTER TABLE gaji ADD COLUMN total_dibayar DECIMAL(12, 2) DEFAULT 0.00 AFTER gaji_bersih",
+            'sisa_pembayaran' => "ALTER TABLE gaji ADD COLUMN sisa_pembayaran DECIMAL(12, 2) DEFAULT 0.00 AFTER total_dibayar",
+            'status_penetapan' => "ALTER TABLE gaji ADD COLUMN status_penetapan ENUM('draft', 'ditetapkan') DEFAULT 'draft' AFTER status_bayar",
+            'tanggal_ditetapkan' => "ALTER TABLE gaji ADD COLUMN tanggal_ditetapkan DATETIME DEFAULT NULL AFTER status_penetapan",
+            'ditetapkan_oleh' => "ALTER TABLE gaji ADD COLUMN ditetapkan_oleh VARCHAR(100) DEFAULT NULL AFTER tanggal_ditetapkan",
+            'tanggal_bayar' => "ALTER TABLE gaji ADD COLUMN tanggal_bayar DATETIME DEFAULT NULL AFTER ditetapkan_oleh",
+        ];
+        foreach ($gajiCols as $col => $sql) {
+            if (!$pdo->query("SHOW COLUMNS FROM gaji LIKE '{$col}'")->fetch()) {
+                $pdo->exec($sql);
+            }
+        }
     } catch (Exception $e) {
         error_log("Karyawan profile schema migration error: " . $e->getMessage());
     }
