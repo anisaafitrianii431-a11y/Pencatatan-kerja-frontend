@@ -1038,7 +1038,6 @@ export default function GajiAdminPage({ currentUser }) {
         </div>
       )}
 
-<<<<<<< HEAD
       {/* Pengesahan Rekapitulasi Penggajian Bulanan (Khusus Cetak Rekap) */}
       <div className="print-only">
         <PrintSignatures 
@@ -1047,7 +1046,7 @@ export default function GajiAdminPage({ currentUser }) {
           type="3-col"
         />
       </div>
-=======
+
       {/* ============================================================== */}
       {/* TAB 2: PEMBAYARAN GAJI                                         */}
       {/* ============================================================== */}
@@ -1071,7 +1070,6 @@ export default function GajiAdminPage({ currentUser }) {
                 Hanya menampilkan gaji yang telah berstatus Ditetapkan oleh Admin. Pembayaran dapat dilakukan penuh atau sebagian (bertahap). Status gaji tidak akan berubah menjadi Sudah Dibayar sampai seluruh sisa pembayaran lunas dan transaksi dicatat.
               </p>
             </div>
->>>>>>> 155e110 (update admin)
 
             <div className="flex items-center gap-2.5 shrink-0">
               <button
