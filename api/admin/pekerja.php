@@ -24,7 +24,7 @@ function fetchKaryawanAdminSql($whereClause = '') {
         FROM karyawan k
         LEFT JOIN `user` u ON k.id_karyawan = u.id_karyawan
         {$whereClause}
-        ORDER BY k.id_karyawan ASC
+        ORDER BY k.id_karyawan DESC
     ";
 }
 

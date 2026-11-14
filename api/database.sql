@@ -55,11 +55,19 @@ CREATE TABLE pekerjaan (
     nama_pekerjaan VARCHAR(150) NOT NULL,
     deskripsi TEXT DEFAULT NULL,
     lokasi VARCHAR(150) DEFAULT NULL,
+    metode_lokasi ENUM('titik', 'wfh') NOT NULL DEFAULT 'titik' COMMENT 'Metode verifikasi lokasi absensi',
     titik_lokasi VARCHAR(100) DEFAULT NULL COMMENT 'Koordinat titik lokasi kerja',
     tanggal_mulai DATE DEFAULT NULL,
     target_selesai DATE DEFAULT NULL,
     status ENUM('belum_mulai', 'berjalan', 'selesai') NOT NULL DEFAULT 'belum_mulai',
     metode_penentuan ENUM('terbuka', 'langsung') NOT NULL DEFAULT 'terbuka',
+    jenis_upah ENUM('per_jam', 'per_hari', 'per_bulan') NOT NULL DEFAULT 'per_jam',
+    nominal_upah DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    latitude DECIMAL(10, 7) DEFAULT NULL,
+    longitude DECIMAL(10, 7) DEFAULT NULL,
+    radius_meter INT NOT NULL DEFAULT 100,
+    kuota_pekerja INT DEFAULT NULL,
+    status_pengambilan ENUM('terbuka', 'ditutup') NOT NULL DEFAULT 'terbuka',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

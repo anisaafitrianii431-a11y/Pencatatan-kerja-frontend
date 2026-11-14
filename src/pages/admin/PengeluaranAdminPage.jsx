@@ -508,6 +508,16 @@ export default function PengeluaranAdminPage({ currentUser }) {
     }
   };
 
+  const openPengembalianTab = async () => {
+    setSubSectionB('pengembalian');
+    try {
+      const rows = await PengeluaranService.getPengembalianDana();
+      setPengembalianList(rows || []);
+    } catch (err) {
+      setErrorMsg(err.message || 'Gagal memuat pengajuan pengembalian sisa uang kantor.');
+    }
+  };
+
   const handleDeletePengembalian = async (id_pengembalian) => {
     if (!window.confirm('Hapus catatan pengembalian dana ini?')) return;
     try {
@@ -1564,7 +1574,7 @@ export default function PengeluaranAdminPage({ currentUser }) {
                   </button>
 
                   <button
-                    onClick={() => setSubSectionB('pengembalian')}
+                    onClick={openPengembalianTab}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                       subSectionB === 'pengembalian'
                         ? 'bg-blue-50 text-blue-700 border border-blue-200'

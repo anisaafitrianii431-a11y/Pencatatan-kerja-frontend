@@ -137,19 +137,17 @@ if ($method === 'GET') {
             jsonResponse(false, "Pekerjaan wajib dipilih terlebih dahulu.", null, 400);
         }
 
-        $stmtJob = $pdo->prepare("SELECT id_pekerjaan, status, titik_lokasi, lokasi, nama_pekerjaan FROM pekerjaan WHERE id_pekerjaan = ?");
+        $stmtJob = $pdo->prepare("SELECT id_pekerjaan, status, metode_lokasi, titik_lokasi, latitude, longitude, radius_meter, lokasi, nama_pekerjaan FROM pekerjaan WHERE id_pekerjaan = ?");
         $stmtJob->execute([$id_pekerjaan]);
         $jobData = $stmtJob->fetch();
         if (!$jobData) {
             jsonResponse(false, "Data pekerjaan tidak ditemukan dalam sistem.", null, 404);
         }
+        if (empty(trim((string) ($jobData['titik_lokasi'] ?? ''))) && $jobData['latitude'] !== null && $jobData['longitude'] !== null) {
+            $jobData['titik_lokasi'] = sprintf('%.7F, %.7F', floatval($jobData['latitude']), floatval($jobData['longitude']));
+        }
         if ($jobData['status'] === 'selesai') {
             jsonResponse(false, "Pekerjaan ini sudah berstatus selesai dan tidak dapat menerima absensi baru.", null, 422);
-        }
-        if ($jobData['status'] === 'belum_mulai') {
-            // Aktifkan otomatis pekerjaan menjadi 'berjalan' saat karyawan ditugaskan melakukan absensi
-            $pdo->prepare("UPDATE pekerjaan SET status = 'berjalan' WHERE id_pekerjaan = ?")->execute([$id_pekerjaan]);
-            $jobData['status'] = 'berjalan';
         }
         if ($jobData['status'] !== 'berjalan') {
             jsonResponse(false, "Absensi terkunci: pekerjaan harus berstatus Sedang Berjalan.", null, 422);
@@ -191,12 +189,27 @@ if ($method === 'GET') {
         }
         $normalizedCoord = sprintf('%.6f, %.6f', $parsedCoord[0], $parsedCoord[1]);
 
+        $radiusMeter = max(1, intval($jobData['radius_meter'] ?? 100));
+        $metodeLokasi = ($jobData['metode_lokasi'] ?? 'titik') === 'wfh' ? 'wfh' : 'titik';
+        $jarakMasuk = null;
+        if ($metodeLokasi === 'titik') {
+            if (!parseCoordinates($jobData['titik_lokasi'] ?? '')) {
+                jsonResponse(false, "Absensi terkunci: Admin belum menetapkan titik GPS pekerjaan.", null, 422);
+            }
+            $jarakMasuk = calculateDistanceMeters($normalizedCoord, $jobData['titik_lokasi']);
+            if ($jarakMasuk === null || $jarakMasuk > $radiusMeter) {
+                jsonResponse(false, "Absensi ditolak: posisi Anda berjarak {$jarakMasuk} m dari titik pekerjaan. Anda harus berada dalam radius {$radiusMeter} m.", [
+                    'jarak_masuk' => $jarakMasuk,
+                    'radius_meter' => $radiusMeter,
+                    'titik_pekerjaan' => $jobData['titik_lokasi'],
+                ], 422);
+            }
+        }
+
         $fotoSaved = storeAbsensiPhoto($fotoInput, 'foto_lokasi', 'absensi_masuk_');
         if (!$fotoSaved) {
             jsonResponse(false, "Foto kamera langsung di lokasi pekerjaan wajib diambil untuk bukti absensi.", null, 400);
         }
-
-        $jarakMasuk = calculateDistanceMeters($normalizedCoord, $jobData['titik_lokasi'] ?? '');
 
         $stmt = $pdo->prepare("
             INSERT INTO absensi (id_pekerjaan, id_karyawan, tanggal, jam_masuk, status_verifikasi, catatan, titik_lokasi, foto_lokasi, jarak_masuk)
@@ -205,12 +218,9 @@ if ($method === 'GET') {
         $stmt->execute([$id_pekerjaan, $kId, $tanggal, $jam_masuk, $catatan, $normalizedCoord, $fotoSaved, $jarakMasuk]);
         $newId = intval($pdo->lastInsertId());
 
-        $radiusNote = '';
-        if ($jarakMasuk !== null) {
-            $radiusNote = $jarakMasuk <= 150
-                ? " Posisi GPS Anda sesuai titik lokasi pekerjaan ({$jarakMasuk} m)."
-                : " Catatan: posisi GPS berjarak {$jarakMasuk} m dari titik pekerjaan (> 150 m) dan akan ditinjau Admin.";
-        }
+        $radiusNote = $metodeLokasi === 'wfh'
+            ? " Pekerjaan menggunakan mode WFH; GPS tetap dicatat tanpa pembatasan radius."
+            : " Posisi GPS sesuai titik lokasi pekerjaan ({$jarakMasuk} m dari batas {$radiusMeter} m).";
 
         jsonResponse(true, "Absen masuk berhasil dikirim dengan foto kamera langsung & GPS! Menunggu persetujuan Admin.{$radiusNote}", [
             "id_absensi" => $newId,
@@ -221,7 +231,9 @@ if ($method === 'GET') {
             "titik_lokasi" => $normalizedCoord,
             "foto_lokasi" => $fotoSaved,
             "jarak_masuk" => $jarakMasuk,
-            "sesuai_titik_masuk" => $jarakMasuk !== null ? ($jarakMasuk <= 150) : null,
+            "sesuai_titik_masuk" => $metodeLokasi === 'wfh' ? null : $jarakMasuk <= $radiusMeter,
+            "radius_meter" => $radiusMeter,
+            "metode_lokasi" => $metodeLokasi,
             "status_verifikasi" => "menunggu",
             "waktu_sumber" => $ntpTime['source'],
             "ntp_server" => $ntpTime['ntp_server'],
@@ -246,16 +258,8 @@ if ($method === 'GET') {
         }
         $normalizedCoord = sprintf('%.6f, %.6f', $parsedCoord[0], $parsedCoord[1]);
 
-        $fotoSaved = storeAbsensiPhoto($fotoInput, 'foto_pulang', 'absensi_pulang_');
-        if (!$fotoSaved) {
-            $fotoSaved = storeAbsensiPhoto($fotoInput, 'foto_lokasi', 'absensi_pulang_');
-        }
-        if (!$fotoSaved) {
-            jsonResponse(false, "Foto kamera langsung saat absen pulang wajib diambil.", null, 400);
-        }
-
         $stmtCek = $pdo->prepare("
-            SELECT a.*, p.titik_lokasi AS titik_pekerjaan
+            SELECT a.*, p.metode_lokasi, p.titik_lokasi AS titik_pekerjaan, p.latitude AS latitude_pekerjaan, p.longitude AS longitude_pekerjaan, p.radius_meter
             FROM absensi a
             JOIN pekerjaan p ON a.id_pekerjaan = p.id_pekerjaan
             WHERE a.id_absensi = ? AND a.id_karyawan = ?
@@ -266,8 +270,36 @@ if ($method === 'GET') {
         if (!$row) {
             jsonResponse(false, "Data absensi tidak ditemukan atau bukan milik Anda.", null, 404);
         }
+        if (empty(trim((string) ($row['titik_pekerjaan'] ?? ''))) && $row['latitude_pekerjaan'] !== null && $row['longitude_pekerjaan'] !== null) {
+            $row['titik_pekerjaan'] = sprintf('%.7F, %.7F', floatval($row['latitude_pekerjaan']), floatval($row['longitude_pekerjaan']));
+        }
         if (!empty($row['jam_pulang'])) {
             jsonResponse(false, "Sesi absensi ini sudah mencatat jam pulang.", null, 409);
+        }
+
+        $radiusPulang = max(1, intval($row['radius_meter'] ?? 100));
+        $metodeLokasiPulang = ($row['metode_lokasi'] ?? 'titik') === 'wfh' ? 'wfh' : 'titik';
+        $jarakPulang = null;
+        if ($metodeLokasiPulang === 'titik') {
+            if (!parseCoordinates($row['titik_pekerjaan'] ?? '')) {
+                jsonResponse(false, "Absensi pulang terkunci: Admin belum menetapkan titik GPS pekerjaan.", null, 422);
+            }
+            $jarakPulang = calculateDistanceMeters($normalizedCoord, $row['titik_pekerjaan']);
+            if ($jarakPulang === null || $jarakPulang > $radiusPulang) {
+                jsonResponse(false, "Absensi pulang ditolak: posisi Anda berjarak {$jarakPulang} m dari titik pekerjaan. Anda harus berada dalam radius {$radiusPulang} m.", [
+                    'jarak_pulang' => $jarakPulang,
+                    'radius_meter' => $radiusPulang,
+                    'titik_pekerjaan' => $row['titik_pekerjaan'],
+                ], 422);
+            }
+        }
+
+        $fotoSaved = storeAbsensiPhoto($fotoInput, 'foto_pulang', 'absensi_pulang_');
+        if (!$fotoSaved) {
+            $fotoSaved = storeAbsensiPhoto($fotoInput, 'foto_lokasi', 'absensi_pulang_');
+        }
+        if (!$fotoSaved) {
+            jsonResponse(false, "Foto kamera langsung saat absen pulang wajib diambil.", null, 400);
         }
 
         $jamMasukSec = strtotime($row['jam_masuk']);
@@ -287,8 +319,6 @@ if ($method === 'GET') {
         }
         $durasiJam = round(max(0, $durasiDetik) / 3600, 2);
         $durasiMenit = intval(floor(max(0, $durasiDetik) / 60));
-        $jarakPulang = calculateDistanceMeters($normalizedCoord, $row['titik_pekerjaan'] ?? '');
-
         $stmtUpdate = $pdo->prepare("
             UPDATE absensi
             SET jam_pulang = ?,
@@ -309,7 +339,9 @@ if ($method === 'GET') {
             "titik_pulang" => $normalizedCoord,
             "foto_pulang" => $fotoSaved,
             "jarak_pulang" => $jarakPulang,
-            "sesuai_titik_pulang" => $jarakPulang !== null ? ($jarakPulang <= 150) : null,
+            "sesuai_titik_pulang" => $metodeLokasiPulang === 'wfh' ? null : $jarakPulang <= $radiusPulang,
+            "radius_meter" => $radiusPulang,
+            "metode_lokasi" => $metodeLokasiPulang,
             "status_verifikasi" => $row['status_verifikasi'] === 'ditolak' ? 'ditolak' : 'menunggu',
             "waktu_sumber" => $ntpTime['source'],
             "ntp_server" => $ntpTime['ntp_server'],

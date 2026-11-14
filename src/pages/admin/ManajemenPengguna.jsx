@@ -320,7 +320,7 @@ function ManajemenPengguna() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [sortOrder, setSortOrder] = useState('asc')
+  const [sortOrder, setSortOrder] = useState('terbaru')
   const [page, setPage] = useState(1)
 
   async function loadUsers() {
@@ -366,10 +366,9 @@ function ManajemenPengguna() {
 
         return matchesSearch && matchesRole && matchesStatus
       })
-      .sort((a, b) =>
-        a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }) *
-        (sortOrder === 'asc' ? 1 : -1),
-      )
+      .sort((a, b) => sortOrder === 'terbaru'
+        ? Number(b.id_user) - Number(a.id_user)
+        : a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }) * (sortOrder === 'asc' ? 1 : -1))
   }, [users, search, roleFilter, statusFilter, sortOrder])
 
   // Statistics
@@ -754,9 +753,7 @@ function ManajemenPengguna() {
                 <th className="px-3.5 py-3.5" scope="col">
                   <button
                     type="button"
-                    onClick={() =>
-                      setSortOrder((order) => (order === 'asc' ? 'desc' : 'asc'))
-                    }
+                    onClick={() => setSortOrder((order) => order === 'terbaru' ? 'asc' : order === 'asc' ? 'desc' : 'terbaru')}
                     className="inline-flex items-center gap-1.5 hover:text-slate-900 transition font-bold"
                   >
                     <span>Nama Pengguna</span>

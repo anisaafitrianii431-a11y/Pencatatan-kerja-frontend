@@ -114,14 +114,16 @@ if ($method === 'GET') {
     // ==========================================
     // DANA KANTOR TERSEDIA UNTUK PEKERJA
     // ==========================================
-    if ($action === 'dana_tersedia') {
+    if (in_array($action, ['dana_tersedia', 'kas_tersedia'], true)) {
         $stmt = $pdo->query("
             SELECT d.*, 
                    k.nama AS nama_penanggung_jawab,
                    k.kode_karyawan AS kode_pj,
-                   k.jabatan AS jabatan_pj
+                   k.jabatan AS jabatan_pj,
+                   p.nama_pekerjaan
             FROM dana_kantor d
             JOIN karyawan k ON d.id_penanggung_jawab = k.id_karyawan
+            LEFT JOIN pekerjaan p ON d.id_pekerjaan = p.id_pekerjaan
             ORDER BY d.tanggal DESC, d.id_dana DESC
         ");
         $allDana = $stmt->fetchAll();
@@ -132,10 +134,19 @@ if ($method === 'GET') {
 
             $qUsed = $pdo->prepare("
                 SELECT IFNULL(SUM(nominal), 0) FROM pengeluaran 
-                WHERE jenis_dana = 'kantor' AND status_verifikasi = 'disetujui' AND (id_dana = ? OR (id_dana IS NULL AND id_penanggung_jawab = ?))
+                WHERE jenis_dana = 'kantor' AND status_verifikasi = 'disetujui'
+                  AND (id_dana = ? OR (id_dana IS NULL AND id_penanggung_jawab = ? AND id_pekerjaan <=> ?))
             ");
-            $qUsed->execute([$idDana, $idPj]);
+            $qUsed->execute([$idDana, $idPj, $d['id_pekerjaan']]);
             $used = floatval($qUsed->fetchColumn());
+
+            $qPending = $pdo->prepare("
+                SELECT IFNULL(SUM(nominal), 0) FROM pengeluaran
+                WHERE jenis_dana = 'kantor' AND status_verifikasi = 'menunggu'
+                  AND (id_dana = ? OR (id_dana IS NULL AND id_penanggung_jawab = ? AND id_pekerjaan <=> ?))
+            ");
+            $qPending->execute([$idDana, $idPj, $d['id_pekerjaan']]);
+            $pending = floatval($qPending->fetchColumn());
 
             $qReturned = $pdo->prepare("
                 SELECT IFNULL(SUM(nominal), 0) FROM pengembalian_dana 
@@ -144,23 +155,58 @@ if ($method === 'GET') {
             $qReturned->execute([$idDana]);
             $returned = floatval($qReturned->fetchColumn());
 
+            $qPendingReturn = $pdo->prepare("
+                SELECT IFNULL(SUM(nominal), 0) FROM pengembalian_dana
+                WHERE status_verifikasi = 'menunggu' AND id_dana = ? AND id_penanggung_jawab = ?
+            ");
+            $qPendingReturn->execute([$idDana, $idPj]);
+            $pendingReturn = floatval($qPendingReturn->fetchColumn());
+
             $sisa = max(0, floatval($d['nominal']) - $used - $returned);
             $result[] = array_merge($d, [
+                'id_kas'     => $idDana,
+                'id_karyawan'=> $idPj,
+                'nominal_masuk' => floatval($d['nominal']),
                 'nominal'    => floatval($d['nominal']),
                 'terpakai'   => $used,
                 'dikembalikan'=> $returned,
-                'sisa_dana'  => $sisa
+                'sisa_dana'  => $sisa,
+                'total_terpakai_disetujui' => $used,
+                'total_terpakai_menunggu' => $pending,
+                'total_dikembalikan' => $returned,
+                'menunggu_konfirmasi_kembali' => $pendingReturn,
+                'sisa_resmi' => $sisa,
+                'sisa_tersedia' => max(0, floatval($d['nominal']) - $used - $pending - $returned - $pendingReturn),
+                'status_verifikasi' => 'disetujui',
+                'status_lpj' => ($sisa <= 0 && $pending <= 0 && $pendingReturn <= 0) ? 'selesai' : 'berjalan',
+                'nama_pekerjaan' => $d['nama_pekerjaan'] ?: 'Dana Umum'
             ]);
         }
-        jsonResponse(true, "Daftar dana kantor tersedia", $result);
+        $kasSaya = array_values(array_filter($result, function ($item) use ($kId) {
+            return (int)$item['id_karyawan'] === $kId;
+        }));
+        $stmtReturns = $pdo->prepare("SELECT pd.*, pd.id_dana AS id_kas FROM pengembalian_dana pd WHERE pd.id_penanggung_jawab = ? ORDER BY pd.tanggal DESC, pd.id_pengembalian DESC");
+        $stmtReturns->execute([$kId]);
+        $pengembalianSaya = $stmtReturns->fetchAll(PDO::FETCH_ASSOC);
+        jsonResponse(true, "Daftar dana kantor tersedia", [
+            'daftar_kas' => array_values(array_filter($result, function ($item) { return $item['sisa_dana'] > 0; })),
+            'kas_tanggung_jawab_saya' => $kasSaya,
+            'pengembalian_saya' => $pengembalianSaya
+        ]);
     }
 
     // K-06: Pekerja hanya melihat pengeluaran pada proyek yang ditugaskan & dicatat dirinya
     $id_pekerjaan = isset($_GET['id_pekerjaan']) ? intval($_GET['id_pekerjaan']) : 0;
     $jenis_dana = $_GET['jenis_dana'] ?? '';
 
-    $where = ["pg.id_karyawan = ?"];
-    $params = [$kId];
+    $includeKasPj = ($_GET['include_kas_pj'] ?? '') === '1' && $jenis_dana === 'kantor';
+    if ($includeKasPj) {
+        $where = ["(pg.id_karyawan = ? OR pg.id_penanggung_jawab = ?)"];
+        $params = [$kId, $kId];
+    } else {
+        $where = ["pg.id_karyawan = ?"];
+        $params = [$kId];
+    }
 
     if ($id_pekerjaan > 0) {
         $where[] = "pg.id_pekerjaan = ?";
@@ -174,7 +220,7 @@ if ($method === 'GET') {
     $whereClause = "WHERE " . implode(" AND ", $where);
 
     $sql = "
-        SELECT pg.*,
+        SELECT pg.*, pg.id_dana AS id_kas,
                k.nama AS nama_karyawan,
                p.nama_pekerjaan,
                pj.nama AS nama_penanggung_jawab,
@@ -249,7 +295,7 @@ if ($method === 'GET') {
     // 2. FORM PENGEMBALIAN DANA OLEH PEKERJA
     // ==========================================
     if ($action === 'pengembalian') {
-        $id_dana = !empty($body['id_dana']) ? intval($body['id_dana']) : null;
+        $id_dana = intval($body['id_dana'] ?? $body['id_kas'] ?? 0);
         $id_penanggung_jawab = intval($body['id_penanggung_jawab'] ?? 0);
         $tanggal = !empty($body['tanggal']) ? $body['tanggal'] : date('Y-m-d');
         $nominal = floatval($body['nominal'] ?? 0);
@@ -261,17 +307,33 @@ if ($method === 'GET') {
             $bukti = $uploadedFilePath;
         }
 
-        if ($nominal <= 0) {
-            jsonResponse(false, "Nominal pengembalian dana harus lebih dari 0", null, 400);
+        if ($id_dana <= 0 || $nominal <= 0) {
+            jsonResponse(false, "Paket dana dan nominal pengembalian wajib diisi dengan benar.", null, 400);
         }
 
-        if ($id_dana && !$id_penanggung_jawab) {
-            $stmtD = $pdo->prepare("SELECT id_penanggung_jawab FROM dana_kantor WHERE id_dana = ?");
-            $stmtD->execute([$id_dana]);
-            $id_penanggung_jawab = intval($stmtD->fetchColumn() ?: $kId);
+        $stmtD = $pdo->prepare("SELECT id_penanggung_jawab, id_pekerjaan, nominal FROM dana_kantor WHERE id_dana = ?");
+        $stmtD->execute([$id_dana]);
+        $dana = $stmtD->fetch(PDO::FETCH_ASSOC);
+        if (!$dana) {
+            jsonResponse(false, "Paket dana kantor tidak ditemukan.", null, 404);
         }
-        if (!$id_penanggung_jawab) {
-            $id_penanggung_jawab = $kId;
+        $id_penanggung_jawab = intval($dana['id_penanggung_jawab'] ?? 0);
+        if ($id_penanggung_jawab !== $kId) {
+            jsonResponse(false, "Hanya penanggung jawab paket yang dapat mengajukan pengembalian dana ini.", null, 403);
+        }
+
+        $stmtUsed = $pdo->prepare("SELECT IFNULL(SUM(nominal), 0) FROM pengeluaran WHERE jenis_dana = 'kantor' AND status_verifikasi = 'disetujui' AND (id_dana = ? OR (id_dana IS NULL AND id_penanggung_jawab = ? AND id_pekerjaan <=> ?))");
+        $stmtUsed->execute([$id_dana, $id_penanggung_jawab, $dana['id_pekerjaan']]);
+        $used = floatval($stmtUsed->fetchColumn());
+        $stmtReturned = $pdo->prepare("SELECT IFNULL(SUM(nominal), 0) FROM pengembalian_dana WHERE id_dana = ? AND status_verifikasi = 'disetujui'");
+        $stmtReturned->execute([$id_dana]);
+        $returned = floatval($stmtReturned->fetchColumn());
+        $stmtPending = $pdo->prepare("SELECT IFNULL(SUM(nominal), 0) FROM pengembalian_dana WHERE id_dana = ? AND status_verifikasi = 'menunggu'");
+        $stmtPending->execute([$id_dana]);
+        $pendingReturn = floatval($stmtPending->fetchColumn());
+        $sisaBisaDisetor = max(0, floatval($dana['nominal']) - $used - $returned - $pendingReturn);
+        if ($nominal > $sisaBisaDisetor + 0.01) {
+            jsonResponse(false, "Nominal pengembalian melebihi sisa dana yang tersedia (Rp " . number_format($sisaBisaDisetor, 0, ',', '.') . ").", null, 400);
         }
 
         $stmt = $pdo->prepare("
@@ -312,14 +374,20 @@ if ($method === 'GET') {
 
     // Jika dana kantor, validasi relasi dana kantor & penanggung jawab
     if ($jenis_dana === 'kantor') {
-        if ($id_dana && !$id_penanggung_jawab) {
-            $stmtD = $pdo->prepare("SELECT id_penanggung_jawab FROM dana_kantor WHERE id_dana = ?");
-            $stmtD->execute([$id_dana]);
-            $id_penanggung_jawab = intval($stmtD->fetchColumn() ?: 0);
+        if (!$id_dana) {
+            jsonResponse(false, "Pilih penanggung jawab atau kas kantor yang sudah ditetapkan Admin.", null, 400);
         }
-        if (!$id_penanggung_jawab) {
-            // default penanggung jawab adalah karyawan itu sendiri
-            $id_penanggung_jawab = $kId;
+        if ($id_dana) {
+            $stmtD = $pdo->prepare("SELECT id_penanggung_jawab, id_pekerjaan FROM dana_kantor WHERE id_dana = ?");
+            $stmtD->execute([$id_dana]);
+            $danaTerpilih = $stmtD->fetch(PDO::FETCH_ASSOC);
+            if (!$danaTerpilih) {
+                jsonResponse(false, "Data kas kantor yang dipilih tidak ditemukan.", null, 400);
+            }
+            if (!empty($danaTerpilih['id_pekerjaan']) && (int)$danaTerpilih['id_pekerjaan'] !== $id_pekerjaan) {
+                jsonResponse(false, "Kas kantor yang dipilih bukan untuk pekerjaan ini.", null, 400);
+            }
+            $id_penanggung_jawab = intval($danaTerpilih['id_penanggung_jawab'] ?: 0);
         }
     } else {
         $id_dana = null;

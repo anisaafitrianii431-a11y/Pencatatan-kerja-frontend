@@ -166,7 +166,7 @@ if ($method === 'GET') {
                CASE WHEN u.aktif = 1 THEN 'aktif' ELSE 'nonaktif' END AS status_karyawan
         FROM `user` u
         LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
-        ORDER BY u.id_user ASC
+        ORDER BY u.id_user DESC
     ");
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $result = array_map('formatUserRecord', $rows);

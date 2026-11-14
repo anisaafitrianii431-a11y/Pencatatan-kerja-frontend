@@ -13,6 +13,27 @@ export function getFileUrl(path) {
 
 const LOCAL_DB_VERSION = '2026-11-12-clean';
 
+// Urutkan daftar berdasarkan waktu input terbaru; gunakan tanggal/ID sebagai fallback.
+function sortNewestFirst(rows = []) {
+  const idKeys = ['id_absensi', 'id_pengeluaran', 'id_pengembalian', 'id_dana', 'id_kas', 'id_penugasan', 'id_pekerjaan', 'id_karyawan', 'id_user', 'id_gaji', 'id_pembayaran'];
+  return [...(Array.isArray(rows) ? rows : [])].sort((a, b) => {
+    const createdA = Date.parse(a?.created_at || a?.updated_at || '');
+    const createdB = Date.parse(b?.created_at || b?.updated_at || '');
+    if (Number.isFinite(createdA) && Number.isFinite(createdB) && createdA !== createdB) return createdB - createdA;
+
+    const dateA = Date.parse(a?.tanggal || a?.tanggal_mulai || a?.periode || '');
+    const dateB = Date.parse(b?.tanggal || b?.tanggal_mulai || b?.periode || '');
+    if (Number.isFinite(dateA) && Number.isFinite(dateB) && dateA !== dateB) return dateB - dateA;
+
+    for (const key of idKeys) {
+      const valueA = Number(a?.[key]);
+      const valueB = Number(b?.[key]);
+      if (Number.isFinite(valueA) && Number.isFinite(valueB) && valueA !== valueB) return valueB - valueA;
+    }
+    return 0;
+  });
+}
+
 // Data awal fallback offline bersih (hanya menyimpan akun login)
 const INITIAL_DATA = {
   version: LOCAL_DB_VERSION,
@@ -344,11 +365,11 @@ export const PekerjaService = {
     const live = await checkBackendStatus();
     if (live) {
       const { data } = await safeFetchJson(`${API_BASE}/pekerja.php`);
-      if (data && data.success) return data.data;
+      if (data && data.success) return sortNewestFirst(data.data);
     }
 
     const db = getLocalData();
-    return db.karyawan.map(k => {
+    return sortNewestFirst(db.karyawan.map(k => {
       const u = db.user.find(usr => usr.id_karyawan === k.id_karyawan);
       const penugasanCount = db.penugasan.filter(p => p.id_karyawan === k.id_karyawan).length;
       return {
@@ -359,7 +380,7 @@ export const PekerjaService = {
         aktif: u ? u.aktif : 1,
         total_pekerjaan_aktif: penugasanCount
       };
-    });
+    }));
   },
 
   async create(data) {
@@ -488,7 +509,7 @@ export const PekerjaanService = {
     if (live) {
       const url = id_karyawan ? `${API_BASE}/pekerjaan.php?id_karyawan=${id_karyawan}` : `${API_BASE}/pekerjaan.php`;
       const { data } = await safeFetchJson(url);
-      if (data && data.success) return data.data;
+      if (data && data.success) return sortNewestFirst(data.data);
     }
 
     const db = getLocalData();
@@ -498,7 +519,7 @@ export const PekerjaanService = {
       jobs = jobs.filter(p => assignedJobIds.has(p.id_pekerjaan));
     }
 
-    return jobs.map(p => {
+    return sortNewestFirst(jobs.map(p => {
       const pekerjaCount = db.penugasan.filter(t => t.id_pekerjaan === p.id_pekerjaan).length;
       const jamTotal = db.absensi
         .filter(a => a.id_pekerjaan === p.id_pekerjaan && a.status_verifikasi === 'disetujui' && a.jam_pulang)
@@ -516,7 +537,7 @@ export const PekerjaanService = {
         total_jam_kerja: Number(jamTotal.toFixed(2)),
         total_pengeluaran: totalPengeluaran
       };
-    });
+    }));
   },
 
   async create(data) {
@@ -541,6 +562,8 @@ export const PekerjaanService = {
       titik_lokasi: data.titik_lokasi || '',
       tanggal_mulai: data.tanggal_mulai || '',
       target_selesai: data.target_selesai || '',
+      jenis_upah: data.jenis_upah || 'per_jam',
+      nominal_upah: Number(data.nominal_upah || 0),
       status: data.status || 'belum_mulai'
     };
     db.pekerjaan.unshift(newJob);
@@ -604,7 +627,12 @@ export const PenugasanService = {
     const live = await checkBackendStatus();
     if (live) {
       const { data } = await safeFetchJson(`${API_BASE}/penugasan.php?id_pekerjaan=${id_pekerjaan}`);
-      if (data && data.success) return data.data;
+      if (data && data.success) {
+        const result = data.data;
+        return Array.isArray(result)
+          ? sortNewestFirst(result)
+          : { ...result, pekerja: sortNewestFirst(result?.pekerja || []) };
+      }
     }
 
     const db = getLocalData();
@@ -614,7 +642,7 @@ export const PenugasanService = {
       .filter(a => a.id_pekerjaan === Number(id_pekerjaan) && a.status_verifikasi === 'disetujui' && a.jam_pulang)
       .reduce((sum, a) => sum + hitungDurasi(a.jam_masuk, a.jam_pulang), 0);
 
-    const pekerja = tugasList.map(t => {
+    const pekerja = sortNewestFirst(tugasList.map(t => {
       const k = db.karyawan.find(item => item.id_karyawan === t.id_karyawan);
       const jamK = db.absensi
         .filter(a => a.id_pekerjaan === Number(id_pekerjaan) && a.id_karyawan === t.id_karyawan && a.status_verifikasi === 'disetujui' && a.jam_pulang)
@@ -633,7 +661,7 @@ export const PenugasanService = {
         total_jam_pekerja: Number(jamK.toFixed(2)),
         persentase_kontribusi: persentase
       };
-    });
+    }));
 
     return {
       total_jam_proyek: Number(totalJamProyek.toFixed(2)),
@@ -694,7 +722,7 @@ export const PenugasanService = {
     const live = await checkBackendStatus();
     if (live) {
       const { data } = await safeFetchJson(`${API_BASE}/penugasan.php?action=notifikasi`);
-      if (data && data.success) return data.data;
+      if (data && data.success) return { ...data.data, notifikasi: sortNewestFirst(data.data?.notifikasi || []) };
     }
 
     const db = getLocalData();
@@ -703,7 +731,7 @@ export const PenugasanService = {
     if (!kId) return { total: 0, unread_count: 0, notifikasi: [] };
 
     const tugasList = (db.penugasan || []).filter(t => t.id_karyawan === Number(kId));
-    const notifikasi = tugasList.map(t => {
+    const notifikasi = sortNewestFirst(tugasList.map(t => {
       const p = (db.pekerjaan || []).find(j => j.id_pekerjaan === t.id_pekerjaan);
       return {
         id_penugasan: t.id_penugasan,
@@ -716,7 +744,7 @@ export const PenugasanService = {
         lokasi: p?.lokasi || '',
         status_pekerjaan: p?.status || 'berjalan'
       };
-    }).reverse();
+    }));
 
     const unread_count = notifikasi.filter(n => n.status_baca === 'belum').length;
     return { total: notifikasi.length, unread_count, notifikasi };
@@ -793,14 +821,14 @@ export const AbsensiService = {
               durasi_format: `${Math.floor(mTotal / 60)}j ${mTotal % 60}m`,
             };
           });
-          return [...unsyncedMapped, ...data.data];
+          return sortNewestFirst([...unsyncedMapped, ...data.data]);
         }
-        return data.data;
+        return sortNewestFirst(data.data);
       }
     }
 
     const db = getLocalData();
-    return db.absensi
+    return sortNewestFirst(db.absensi
       .filter(a => {
         if (filter.id_karyawan && a.id_karyawan !== Number(filter.id_karyawan)) return false;
         if (filter.id_pekerjaan && a.id_pekerjaan !== Number(filter.id_pekerjaan)) return false;
@@ -825,7 +853,7 @@ export const AbsensiService = {
           durasi_format: `${Math.floor(mTotal / 60)}j ${mTotal % 60}m`,
         };
       })
-      .sort((a, b) => b.id_absensi - a.id_absensi);
+    );
   },
 
   async absenMasuk({ id_pekerjaan, id_karyawan, tanggal, jam_masuk, catatan, titik_lokasi, foto_lokasi }) {
@@ -1075,14 +1103,14 @@ export const PengeluaranService = {
     if (live) {
       const params = new URLSearchParams(filter).toString();
       const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?${params}`);
-      if (data && data.success) return data.data;
+      if (data && data.success) return sortNewestFirst(data.data);
     }
 
     const db = getLocalData();
     const kasMap = new Map((db.kas_kantor || []).map(k => [Number(k.id_kas), k]));
     const includeKasPj = String(filter.include_kas_pj || '') === '1';
 
-    return db.pengeluaran
+    return sortNewestFirst(db.pengeluaran
       .filter(pg => {
         const kas = pg.id_kas ? kasMap.get(Number(pg.id_kas)) : null;
         if (filter.id_karyawan) {
@@ -1115,7 +1143,7 @@ export const PengeluaranService = {
           nominal_kas: isAdmin && kas ? Number(kas.nominal_masuk) : null
         };
       })
-      .sort((a, b) => b.id_pengeluaran - a.id_pengeluaran);
+    );
   },
 
   async create(data) {
@@ -1382,7 +1410,7 @@ export const PengeluaranService = {
   async getKasTersedia(id_karyawan_aktif = null) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=kas_tersedia`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=dana_tersedia`);
       if (data && data.success) return data.data;
     }
 
@@ -1581,7 +1609,7 @@ export const PengeluaranService = {
         body: isFormData ? data : JSON.stringify(data)
       };
       if (!isFormData) options.headers = { 'Content-Type': 'application/json' };
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=setor_sisa`, options);
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=pengembalian`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
     }
@@ -1981,7 +2009,7 @@ export const GajiService = {
     const db = getLocalData();
     const current = AuthService.getCurrentUser();
     const isEmployee = current && current.peran !== 'admin';
-    return db.gaji
+    return sortNewestFirst(db.gaji
       .filter(g => g.periode === periode && (!isEmployee || Number(g.id_karyawan) === Number(current.id_karyawan)))
       .map(g => {
         const k = db.karyawan.find(item => item.id_karyawan === g.id_karyawan);
@@ -1997,14 +2025,14 @@ export const GajiService = {
           id_pekerjaan_list: jobs.map(j => j.id_pekerjaan).join(','),
           nama_pekerjaan: jobs.map(j => j.nama_pekerjaan).join(', ')
         };
-      });
+      }));
   },
 
   async getHistory() {
     const live = await checkBackendStatus();
     if (live) {
       const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=riwayat`);
-      if (data && data.success) return data.data;
+      if (data && data.success) return sortNewestFirst(data.data);
     }
 
     const db = getLocalData();
@@ -2042,7 +2070,7 @@ export const GajiService = {
 
     // Fallback kalkulasi lokal jika backend offline
     const db = getLocalData();
-    return (db.karyawan || []).map(k => {
+    return sortNewestFirst((db.karyawan || []).map(k => {
       const totalJam = (db.absensi || [])
         .filter(a => a.id_karyawan === k.id_karyawan && a.status_verifikasi === 'disetujui' && a.jam_pulang && a.tanggal?.startsWith(periode))
         .reduce((sum, a) => sum + hitungDurasi(a.jam_masuk, a.jam_pulang), 0);
@@ -2080,7 +2108,7 @@ export const GajiService = {
         status_penetapan: existingGaji ? existingGaji.status_penetapan : 'draft',
         sudah_ditetapkan: !!(existingGaji && existingGaji.status_penetapan === 'ditetapkan')
       };
-    });
+    }));
   },
 
   async tetapkanGaji(payload) {
@@ -2164,11 +2192,11 @@ export const GajiService = {
       if (periode) params.set('periode', periode);
       if (status_bayar) params.set('status_bayar', status_bayar);
       const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
-      if (data && data.success) return data.data;
+      if (data && data.success) return sortNewestFirst(data.data);
     }
 
     const db = getLocalData();
-    return (db.gaji || [])
+    return sortNewestFirst((db.gaji || [])
       .filter(g => g.status_penetapan === 'ditetapkan' && (!periode || g.periode === periode) && (status_bayar === 'semua' || g.status_bayar === status_bayar))
       .map(g => {
         const k = (db.karyawan || []).find(item => item.id_karyawan === g.id_karyawan);
@@ -2179,7 +2207,7 @@ export const GajiService = {
           jabatan: k ? k.jabatan : '',
           nomor_hp: k ? k.nomor_hp : ''
         };
-      });
+      }));
   },
 
   async getPembayaranHistory(id_gaji) {
@@ -2228,11 +2256,11 @@ export const GajiService = {
       if (status_bayar && status_bayar !== 'semua') params.set('status_bayar', status_bayar);
       if (search) params.set('search', search);
       const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
-      if (data && data.success) return data.data;
+      if (data && data.success) return sortNewestFirst(data.data);
     }
 
     const db = getLocalData();
-    return (db.gaji || []).map(g => {
+    return sortNewestFirst((db.gaji || []).map(g => {
       const k = (db.karyawan || []).find(item => item.id_karyawan === g.id_karyawan);
       return {
         ...g,
@@ -2241,7 +2269,7 @@ export const GajiService = {
         jabatan: k ? k.jabatan : '',
         nomor_hp: k ? k.nomor_hp : ''
       };
-    });
+    }));
   },
 
   async getSlip(id_gaji) {
@@ -2379,21 +2407,21 @@ export const GajiService = {
       }
     });
 
-    const pekerjaan_summary = Array.from(jobMap.values()).map(job => {
+    const pekerjaan_summary = sortNewestFirst(Array.from(jobMap.values()).map(job => {
       const estimasi_upah = Number((job.total_jam_disetujui * tarif).toFixed(2));
       return {
         ...job,
         estimasi_upah,
         total_kontribusi: Number((estimasi_upah + job.reimbursement_disetujui).toFixed(2))
       };
-    }).sort((a, b) => b.total_kontribusi - a.total_kontribusi);
+    }));
 
     return {
       karyawan,
       slip,
       tarif_aktif: tarif,
-      absensi: approvedAbs,
-      pengeluaran: approvedPg,
+      absensi: sortNewestFirst(approvedAbs),
+      pengeluaran: sortNewestFirst(approvedPg),
       pekerjaan_summary,
       pending_summary: {
         absensi_menunggu: pendingAbs,

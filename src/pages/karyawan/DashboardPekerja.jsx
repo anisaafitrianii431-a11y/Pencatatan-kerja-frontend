@@ -289,10 +289,10 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
           </button>
           <button
             className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm"
-            onClick={() => onNavigate('Pekerjaan Tersedia')}
+            onClick={() => onNavigate('List Pekerjaan')}
             type="button"
           >
-            <span>Pekerjaan Tersedia</span>
+            <span>List Pekerjaan</span>
             <Icon className="h-4 w-4" name="arrow" />
           </button>
         </nav>
@@ -389,8 +389,8 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
         <SectionHeader
           buttonLabel="Lihat Semua Pekerjaan"
           description="Pekerjaan di perusahaan yang belum ditugaskan dan belum selesai."
-          onClick={() => onNavigate('Pekerjaan Tersedia')}
-          title="Pekerjaan Tersedia"
+          onClick={() => onNavigate('List Pekerjaan')}
+          title="List Pekerjaan"
         />
         {isLoading ? (
           <div

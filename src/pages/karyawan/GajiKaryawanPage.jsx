@@ -134,6 +134,8 @@ export default function GajiKaryawanPage({ currentUser }) {
     currentUser?.tarif_per_jam ??
     0
   );
+  const jenisUpah = slipGaji?.jenis_upah || karyawanInfo.jenis_upah || 'per_jam';
+  const labelJenisUpah = jenisUpah === 'per_hari' ? 'Hari' : jenisUpah === 'per_bulan' ? 'Bulan' : 'Jam';
 
   const allAbsensi = detailData.absensi;
   const allExpenses = detailData.pengeluaran;
@@ -147,16 +149,49 @@ export default function GajiKaryawanPage({ currentUser }) {
       (item) => String(item.id_pekerjaan) === String(selectedPekerjaanId)
     ) || null;
   }, [isFilteredByJob, pekerjaanSummary, selectedPekerjaanId]);
+  const jenisUpahEfektif = activeJob?.jenis_upah || jenisUpah;
+  const tarifEfektif = Number(activeJob?.nominal_upah || tarif);
+  const labelJenisUpahEfektif = jenisUpahEfektif === 'per_hari' ? 'Hari' : jenisUpahEfektif === 'per_bulan' ? 'Bulan' : 'Jam';
 
   const visibleAbsensi = useMemo(() => {
     if (!isFilteredByJob) return allAbsensi;
     return allAbsensi.filter((item) => String(item.id_pekerjaan) === String(selectedPekerjaanId));
   }, [allAbsensi, isFilteredByJob, selectedPekerjaanId]);
 
+  // Hitung upah sesi dengan tarif dari pekerjaan terkait, bukan tarif umum karyawan.
+  // Untuk tarif harian/bulanan, upah per hari dibagi rata ke sesi pada hari itu
+  // agar jumlah rincian sesi tetap sama dengan estimasi upah pekerjaan.
+  const sessionWages = useMemo(() => {
+    const sessionsByJobDay = new Map();
+    visibleAbsensi.forEach((item) => {
+      const key = `${item.id_pekerjaan}:${String(item.tanggal || '').slice(0, 10)}`;
+      sessionsByJobDay.set(key, (sessionsByJobDay.get(key) || 0) + 1);
+    });
+
+    return new Map(visibleAbsensi.map((item) => {
+      const job = pekerjaanSummary.find((row) => String(row.id_pekerjaan) === String(item.id_pekerjaan));
+      const type = job?.jenis_upah || item.jenis_upah || 'per_jam';
+      const rate = Number(job?.nominal_upah ?? item.nominal_upah ?? tarif ?? 0);
+      const duration = Number(item.durasi_jam || 0);
+      let wage = duration * rate;
+
+      if (type !== 'per_jam') {
+        const days = Number(job?.total_hari_disetujui || 0);
+        const dailyWage = days > 0 ? Number(job?.estimasi_upah || 0) / days : 0;
+        const key = `${item.id_pekerjaan}:${String(item.tanggal || '').slice(0, 10)}`;
+        wage = dailyWage / Math.max(1, sessionsByJobDay.get(key) || 1);
+      }
+
+      return [String(item.id_absensi), Number(wage.toFixed(2))];
+    }));
+  }, [visibleAbsensi, pekerjaanSummary, tarif]);
+
   const visibleExpenses = useMemo(() => {
     if (!isFilteredByJob) return allExpenses;
     return allExpenses.filter((item) => String(item.id_pekerjaan) === String(selectedPekerjaanId));
   }, [allExpenses, isFilteredByJob, selectedPekerjaanId]);
+  const personalExpenses = visibleExpenses.filter((item) => item.jenis_dana === 'pribadi');
+  const officeExpenses = visibleExpenses.filter((item) => item.jenis_dana === 'kantor');
 
   // Agregasi angka seluruh periode
   const approvedHoursAll = useMemo(
@@ -164,7 +199,7 @@ export default function GajiKaryawanPage({ currentUser }) {
     [allAbsensi]
   );
   const approvedReimburseAll = useMemo(
-    () => Number(allExpenses.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0).toFixed(2)),
+    () => Number(allExpenses.filter((item) => item.jenis_dana === 'pribadi').reduce((sum, item) => sum + (Number(item.nominal) || 0), 0).toFixed(2)),
     [allExpenses]
   );
 
@@ -173,12 +208,25 @@ export default function GajiKaryawanPage({ currentUser }) {
     ? Number(visibleAbsensi.reduce((sum, item) => sum + (Number(item.durasi_jam) || 0), 0).toFixed(2))
     : (slipGaji ? Number(slipGaji.total_jam || 0) : approvedHoursAll);
 
+  const countWorkDays = (rows) => new Set(rows.map((row) => String(row.tanggal || '').slice(0, 10)).filter(Boolean)).size;
+  const visibleDays = countWorkDays(visibleAbsensi);
+  const approvedDaysAll = countWorkDays(allAbsensi);
+  const totalJobAttendanceDays = pekerjaanSummary.reduce((total, job) => {
+    const rows = allAbsensi.filter((item) => String(item.id_pekerjaan) === String(job.id_pekerjaan));
+    return total + countWorkDays(rows);
+  }, 0);
+  const wageForHoursAndDays = (hours, days, totalDays) => {
+    if (jenisUpahEfektif === 'per_hari') return Number((days * tarifEfektif).toFixed(2));
+    if (jenisUpahEfektif === 'per_bulan') return totalDays > 0 ? Number((tarifEfektif * days / totalDays).toFixed(2)) : 0;
+    return Number((hours * tarifEfektif).toFixed(2));
+  };
+
   const upahKerja = isFilteredByJob
-    ? Number((visibleHours * tarif).toFixed(2))
-    : (slipGaji ? Number(slipGaji.total_upah || 0) : Number((approvedHoursAll * tarif).toFixed(2)));
+    ? wageForHoursAndDays(visibleHours, visibleDays, totalJobAttendanceDays)
+    : Number(pekerjaanSummary.reduce((sum, job) => sum + Number(job.estimasi_upah || 0), 0).toFixed(2));
 
   const totalReimburse = isFilteredByJob
-    ? Number(visibleExpenses.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0).toFixed(2))
+    ? Number(personalExpenses.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0).toFixed(2))
     : (slipGaji ? Number(slipGaji.total_ganti || 0) : approvedReimburseAll);
 
   const bonus = isFilteredByJob ? 0 : Number(slipGaji?.bonus || 0);
@@ -244,10 +292,10 @@ export default function GajiKaryawanPage({ currentUser }) {
             <span aria-current="page">Slip Gaji Pribadi</span>
           </nav>
           <h1 className="worker-page-header-title">
-            Slip Gaji & Rincian Pekerjaan
+            Slip Gaji Pribadi
           </h1>
           <p className="worker-page-header-description">
-            Tinjau penghasilan bulanan, rincian upah berdasarkan proyek yang dikerjakan, status penggantian biaya pribadi, serta cetak slip gaji resmi.
+            Gaji dihitung per pekerjaan dari absensi yang disetujui, ditambah pengeluaran pribadi yang disetujui.
           </p>
         </div>
 
@@ -275,30 +323,6 @@ export default function GajiKaryawanPage({ currentUser }) {
               </div>
             </div>
 
-            <div className="min-w-[230px] flex-1 sm:flex-initial">
-              <label htmlFor="gaji-pekerjaan" className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                Filter Data Pekerjaan
-              </label>
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 shadow-2xs focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500/20">
-                <Briefcase className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-                <select
-                  id="gaji-pekerjaan"
-                  value={selectedPekerjaanId}
-                  onChange={(e) => {
-                    setSelectedPekerjaanId(e.target.value);
-                    setActiveTab('slip');
-                  }}
-                  className="w-full bg-transparent text-xs font-bold text-slate-800 focus:outline-none"
-                >
-                  <option value="semua">Semua Pekerjaan (Slip Bulanan)</option>
-                  {pekerjaanSummary.map((job) => (
-                    <option key={job.id_pekerjaan} value={String(job.id_pekerjaan)}>
-                      {job.nama_pekerjaan} ({job.total_jam_disetujui} jam)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -396,7 +420,7 @@ export default function GajiKaryawanPage({ currentUser }) {
               subtitle={
                 isFilteredByJob && activeJob
                   ? `Lingkup Proyek: ${activeJob.nama_pekerjaan}${activeJob.lokasi ? ` (${activeJob.lokasi})` : ''}`
-                  : 'Bukti Penerimaan Upah Jam Kerja Lapangan & Penggantian Dana Operasional'
+                  : 'Rincian penghasilan berdasarkan absensi dan tarif yang ditetapkan Admin'
               }
               noDokumen={noDokumen}
               periode={selectedPeriode}
@@ -414,8 +438,8 @@ export default function GajiKaryawanPage({ currentUser }) {
                   <tr className="border-b border-slate-200">
                     <td className="bg-slate-100 px-3 py-2 font-bold text-slate-600">Jabatan / Profesi</td>
                     <td className="px-3 py-2">{jabatanKaryawan}</td>
-                    <td className="bg-slate-100 px-3 py-2 font-bold text-slate-600">Tarif Upah / Jam</td>
-                    <td className="px-3 py-2 font-bold text-slate-900">{formatRupiah(tarif)} / Jam</td>
+                    <td className="bg-slate-100 px-3 py-2 font-bold text-slate-600">Tarif Upah / {labelJenisUpahEfektif}</td>
+                    <td className="px-3 py-2 font-bold text-slate-900">{formatRupiah(tarifEfektif)} / {labelJenisUpahEfektif}</td>
                   </tr>
                   <tr className="border-b border-slate-200">
                     <td className="bg-slate-100 px-3 py-2 font-bold text-slate-600">Lingkup Data</td>
@@ -443,7 +467,7 @@ export default function GajiKaryawanPage({ currentUser }) {
           </div>
 
           {/* KARTU IDENTITAS & STATUS PEMBAYARAN (LAYAR WEB ONLY) */}
-          <div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="no-print hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="grid min-w-0 flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
                 <div className="min-w-0">
@@ -453,8 +477,8 @@ export default function GajiKaryawanPage({ currentUser }) {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tarif Dasar</div>
-                  <div className="mt-1 text-sm font-bold text-slate-900">{formatRupiah(tarif)}</div>
-                  <div className="text-xs text-slate-500">per jam disetujui</div>
+                  <div className="mt-1 text-sm font-bold text-slate-900">{formatRupiah(tarifEfektif)}</div>
+                  <div className="text-xs text-slate-500">per {labelJenisUpahEfektif.toLowerCase()} sesuai tarif pekerjaan</div>
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Periode Slip</div>
@@ -547,7 +571,7 @@ export default function GajiKaryawanPage({ currentUser }) {
 
           {/* BANNER INFORMASI JAM/PENGELUARAN MENUNGGU APPROVAL OR SYNC */}
           {(pendingSummary.absensi_menunggu > 0 || pendingSummary.pengeluaran_menunggu > 0 || hasHoursOutOfSync) && (
-            <div className="no-print flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900">
+            <div className="no-print hidden flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
               <div className="space-y-0.5">
                 {pendingSummary.absensi_menunggu > 0 && (
@@ -570,7 +594,7 @@ export default function GajiKaryawanPage({ currentUser }) {
           )}
 
           {/* 4 KARTU RINGKASAN PENGHASILAN */}
-          <div className="no-print grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="no-print hidden grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">Upah Jam Kerja</span>
@@ -639,6 +663,34 @@ export default function GajiKaryawanPage({ currentUser }) {
             </div>
           </div>
 
+          <section aria-labelledby="pilih-pekerjaan-gaji" className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="pilih-pekerjaan-gaji" className="text-lg font-bold text-slate-900">1. Pilih pekerjaan</h2>
+              <p className="text-sm text-slate-500">Tarif dan gaji dihitung dari data pekerjaan dan absensi bulan ini · {pekerjaanSummary.length} pekerjaan</p>
+            </div>
+            {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Memuat daftar pekerjaan dan absensi…</div> : pekerjaanSummary.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">Belum ada pekerjaan atau absensi pada periode ini.</div> : (
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                {pekerjaanSummary.map((job) => {
+                  const jobSelected = String(job.id_pekerjaan) === String(selectedPekerjaanId);
+                  const jobRows = allAbsensi.filter((item) => String(item.id_pekerjaan) === String(job.id_pekerjaan));
+                  const jobDaysCount = countWorkDays(jobRows);
+                  const jobPay = wageForHoursAndDays(Number(job.total_jam_disetujui || 0), jobDaysCount, totalJobAttendanceDays);
+                  const jobRate = Number(job.nominal_upah || 0);
+                  const jobRateType = job.jenis_upah === 'per_hari' ? 'hari' : job.jenis_upah === 'per_bulan' ? 'bulan' : 'jam';
+                  return (
+                    <button key={job.id_pekerjaan} type="button" aria-pressed={jobSelected} onClick={() => { setSelectedPekerjaanId(jobSelected ? 'semua' : String(job.id_pekerjaan)); setActiveTab('slip'); }} className={`rounded-xl border-2 bg-white p-4 text-left shadow-sm transition hover:border-emerald-400 ${jobSelected ? 'border-emerald-600 ring-2 ring-emerald-100' : 'border-slate-200'}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-base font-bold text-slate-900">{job.nama_pekerjaan}</h3><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${jobSelected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{jobSelected ? 'Sedang dilihat' : 'Lihat rincian'}</span></div>
+                      <p className="mt-1.5 text-xs text-slate-600">Tarif {formatRupiah(jobRate)} / {jobRateType} · {job.jenis_upah === 'per_hari' ? `${jobDaysCount} hari kerja` : `${Number(job.total_jam_disetujui || 0).toFixed(2)} jam kerja`}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-3 border-b border-slate-200 pb-3 text-sm"><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Upah absensi</p><p className="mt-0.5 font-bold text-slate-900">{formatRupiah(jobPay)}</p></div><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reimbursement disetujui</p><p className="mt-0.5 font-bold text-amber-700">{formatRupiah(job.reimbursement_disetujui)}</p>{Number(job.reimbursement_menunggu || 0) > 0 && <p className="text-[11px] text-amber-700">Menunggu {formatRupiah(job.reimbursement_menunggu)}</p>}</div></div>
+                      <div className="mt-2.5 flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-700">Total gaji proyek</span><strong className="text-lg text-slate-900">{formatRupiah(jobPay + Number(job.reimbursement_disetujui || 0))}</strong></div>
+                      {Number(job.pengeluaran_kantor_disetujui || 0) > 0 && <p className="mt-1.5 text-[11px] text-blue-700">Pengeluaran uang kantor terpisah: {formatRupiah(job.pengeluaran_kantor_disetujui)}</p>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           {/* ========================================================
               RINGKASAN GAJI BERDASARKAN DATA PEKERJAAN / PROYEK
           ======================================================== */}
@@ -671,20 +723,21 @@ export default function GajiKaryawanPage({ currentUser }) {
                     <th scope="col" className="px-4 py-3 text-center">Jam Kerja</th>
                     <th scope="col" className="px-4 py-3 text-right">Upah Kerja</th>
                     <th scope="col" className="px-4 py-3 text-right">Reimbursement</th>
-                    <th scope="col" className="px-4 py-3 text-right">Total Kontribusi</th>
+                    <th scope="col" className="px-4 py-3 text-right">Pengeluaran Kantor</th>
+                    <th scope="col" className="px-4 py-3 text-right">Total Penghasilan &amp; Reimburse</th>
                     <th scope="col" className="no-print px-5 py-3 text-right">Fokus Slip</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
+                      <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                         Memuat data pekerjaan dan gaji...
                       </td>
                     </tr>
                   ) : pekerjaanSummary.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
+                      <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                         Belum ada aktivitas pekerjaan atau penugasan tercatat pada periode {formatPeriodeIndo(selectedPeriode)}.
                       </td>
                     </tr>
@@ -692,6 +745,9 @@ export default function GajiKaryawanPage({ currentUser }) {
                     pekerjaanSummary.map((job) => {
                       const isSelected = String(job.id_pekerjaan) === String(selectedPekerjaanId);
                       const statusMeta = JOB_STATUS_META[job.status_pekerjaan] || JOB_STATUS_META.berjalan;
+                      const jobAbsensi = allAbsensi.filter((item) => String(item.id_pekerjaan) === String(job.id_pekerjaan));
+                      const jobDays = countWorkDays(jobAbsensi);
+                      const jobWage = wageForHoursAndDays(Number(job.total_jam_disetujui || 0), jobDays, totalJobAttendanceDays);
                       return (
                         <tr
                           key={job.id_pekerjaan}
@@ -728,7 +784,7 @@ export default function GajiKaryawanPage({ currentUser }) {
                             {Number(job.total_jam_disetujui).toFixed(2)} jam
                           </td>
                           <td className="px-4 py-3.5 text-right font-bold text-slate-900">
-                            {formatRupiah(job.estimasi_upah)}
+                            {formatRupiah(jobWage)}
                           </td>
                           <td className="px-4 py-3.5 text-right font-bold text-amber-700">
                             {formatRupiah(job.reimbursement_disetujui)}
@@ -737,6 +793,9 @@ export default function GajiKaryawanPage({ currentUser }) {
                                 ({job.jumlah_nota} nota)
                               </span>
                             )}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-bold text-blue-700">
+                            {formatRupiah(job.pengeluaran_kantor_disetujui || 0)}
                           </td>
                           <td className="px-4 py-3.5 text-right font-extrabold text-slate-900">
                             {formatRupiah(job.total_kontribusi)}
@@ -782,10 +841,14 @@ export default function GajiKaryawanPage({ currentUser }) {
               <div className="flex items-center justify-between gap-4 px-5 py-3">
                 <div>
                   <span className="font-semibold text-slate-800">
-                    1. Upah Jam Kerja Terverifikasi
+                    1. Upah Berdasarkan {jenisUpah === 'per_jam' ? 'Jam' : jenisUpah === 'per_hari' ? 'Hari' : 'Bulan'} Kerja Terverifikasi
                   </span>
                   <span className="block text-xs text-slate-500">
-                    {Number(visibleHours).toFixed(2)} Jam × {formatRupiah(tarif)} / Jam
+                    {jenisUpahEfektif === 'per_jam'
+                      ? `${Number(visibleHours).toFixed(2)} Jam × ${formatRupiah(tarifEfektif)} / Jam`
+                      : jenisUpahEfektif === 'per_hari'
+                        ? `${visibleDays} Hari hadir × ${formatRupiah(tarifEfektif)} / Hari`
+                        : `${visibleDays} dari ${totalJobAttendanceDays} hari kerja proyek × ${formatRupiah(tarifEfektif)} / Bulan`}
                   </span>
                 </div>
                 <span className="font-bold text-slate-900">{formatRupiah(upahKerja)}</span>
@@ -912,7 +975,7 @@ export default function GajiKaryawanPage({ currentUser }) {
                             {Number(item.durasi_jam || 0).toFixed(2)} jam
                           </td>
                           <td className="px-4 py-2.5 text-right font-bold text-slate-900 whitespace-nowrap">
-                            {formatRupiah(item.upah_sesi ?? Number(item.durasi_jam || 0) * tarif)}
+                            {formatRupiah(sessionWages.get(String(item.id_absensi)) || 0)}
                           </td>
                         </tr>
                       ))
@@ -923,7 +986,7 @@ export default function GajiKaryawanPage({ currentUser }) {
                       <tr>
                         <td colSpan={2} className="px-4 py-2.5 text-right text-slate-600 uppercase">Subtotal Upah:</td>
                         <td className="px-4 py-2.5 text-center text-emerald-700">{visibleHours.toFixed(2)} jam</td>
-                        <td className="px-4 py-2.5 text-right text-slate-900">{formatRupiah(visibleHours * tarif)}</td>
+                        <td className="px-4 py-2.5 text-right text-slate-900">{formatRupiah(upahKerja)}</td>
                       </tr>
                     </tfoot>
                   )}
@@ -936,7 +999,7 @@ export default function GajiKaryawanPage({ currentUser }) {
               <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-5 py-3.5">
                 <h2 id="caption-nota-reimburse" className="flex items-center gap-2 text-sm font-bold text-slate-900">
                   <Receipt className="h-4 w-4 text-amber-600" aria-hidden="true" />
-                  <span>Rincian Nota Reimbursement ({visibleExpenses.length})</span>
+                  <span>Rincian Nota Uang Pribadi ({personalExpenses.length})</span>
                 </h2>
                 <span className="text-xs font-bold text-amber-700">
                   {formatRupiah(totalReimburse)}
@@ -960,14 +1023,14 @@ export default function GajiKaryawanPage({ currentUser }) {
                       <tr>
                         <td colSpan={5} className="px-4 py-6 text-center text-slate-400">Memuat data...</td>
                       </tr>
-                    ) : visibleExpenses.length === 0 ? (
+                    ) : personalExpenses.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
                           Tidak ada klaim reimbursement disetujui pada {isFilteredByJob ? 'pekerjaan' : 'periode'} ini.
                         </td>
                       </tr>
                     ) : (
-                      visibleExpenses.map((item) => (
+                      personalExpenses.map((item) => (
                         <tr key={item.id_pengeluaran} className="hover:bg-slate-50">
                           <td className="px-4 py-2.5 font-semibold text-slate-900 whitespace-nowrap">
                             {formatTanggalIndo(item.tanggal)}
@@ -1006,7 +1069,7 @@ export default function GajiKaryawanPage({ currentUser }) {
                       ))
                     )}
                   </tbody>
-                  {visibleExpenses.length > 0 && (
+                  {personalExpenses.length > 0 && (
                     <tfoot className="border-t border-slate-200 bg-slate-50 font-bold">
                       <tr>
                         <td colSpan={2} className="px-4 py-2.5 text-right text-slate-600 uppercase">Subtotal Reimbursement:</td>
@@ -1017,6 +1080,17 @@ export default function GajiKaryawanPage({ currentUser }) {
                   )}
                 </table>
               </div>
+            </section>
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-5 py-3.5">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><Building2 className="h-4 w-4 text-blue-600" />Pengeluaran Uang Kantor ({officeExpenses.length})</h2>
+                <span className="text-xs font-bold text-blue-700">{formatRupiah(officeExpenses.reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</span>
+              </div>
+              {officeExpenses.length === 0 ? <p className="p-5 text-sm text-slate-500">Tidak ada pengeluaran uang kantor pada pekerjaan atau periode ini.</p> : (
+                <div className="divide-y divide-slate-100">
+                  {officeExpenses.map((item) => <div key={item.id_pengeluaran} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-xs"><span><strong className="text-slate-800">{item.nama_pekerjaan}</strong><span className="ml-2 text-slate-500">{formatTanggalIndo(item.tanggal)} · {item.keterangan || 'Tanpa keterangan'}</span></span><strong className="text-blue-700">{formatRupiah(item.nominal)}</strong></div>)}
+                </div>
+              )}
             </section>
           </div>
 

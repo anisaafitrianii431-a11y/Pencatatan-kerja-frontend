@@ -644,7 +644,13 @@ function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
             </div>
           </div>
 
-          {/* Koordinat GPS & Radius Presensi */}
+          {/* Metode Lokasi Absensi */}
+          {job?.metode_lokasi === 'wfh' ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800">
+              <div className="font-semibold">Mode absensi WFH</div>
+              <p className="mt-1">Karyawan dapat mengirim absensi dari lokasi mana pun. GPS saat absen dan foto tetap dicatat untuk pemeriksaan admin.</p>
+            </div>
+          ) : (
           <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-xs text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-500 font-medium">Koordinat GPS &amp; Radius Presensi</span>
@@ -679,6 +685,7 @@ function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
               </p>
             )}
           </div>
+          )}
 
           {/* Deskripsi */}
           {job?.deskripsi && (
@@ -966,18 +973,7 @@ function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
             <p className="text-[11px] text-slate-500">
               Lompat langsung ke modul operasional terkait proyek "{job?.nama_pekerjaan}":
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  navigate(`/admin/lokasi?pekerjaan=${job.id_pekerjaan}`)
-                }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white p-2.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-blue-300 transition cursor-pointer"
-              >
-                <WorkIcon name="location" className="h-4 w-4 text-rose-500" />
-                <span>Peta Lokasi</span>
-              </button>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -1119,11 +1115,14 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
           nama_pekerjaan: job.nama_pekerjaan || '',
           deskripsi: job.deskripsi || '',
           lokasi: job.lokasi || '',
+          metode_lokasi: job.metode_lokasi || 'titik',
           latitude: job.latitude ? String(job.latitude) : '',
           longitude: job.longitude ? String(job.longitude) : '',
           radius_meter: job.radius_meter ? Number(job.radius_meter) : 100,
           tanggal_mulai: job.tanggal_mulai || '',
           target_selesai: job.target_selesai || '',
+          jenis_upah: job.jenis_upah || 'per_jam',
+          nominal_upah: String(job.nominal_upah || ''),
           status: job.status || STATUS_PEKERJAAN.BELUM_MULAI,
           metode_penentuan: job.metode_penentuan || 'terbuka',
           kuota_pekerja:
@@ -1141,11 +1140,14 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
           nama_pekerjaan: '',
           deskripsi: '',
           lokasi: '',
+          metode_lokasi: 'titik',
           latitude: '',
           longitude: '',
           radius_meter: 100,
           tanggal_mulai: '',
           target_selesai: '',
+          jenis_upah: 'per_jam',
+          nominal_upah: '',
           status: STATUS_PEKERJAAN.BELUM_MULAI,
           metode_penentuan: 'terbuka',
           kuota_pekerja: '',
@@ -1182,6 +1184,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       nama_pekerjaan: values.nama_pekerjaan.trim(),
       deskripsi: values.deskripsi.trim(),
       lokasi: values.lokasi.trim(),
+      metode_lokasi: values.metode_lokasi,
       latitude:
         values.latitude && !isNaN(parseFloat(values.latitude))
           ? parseFloat(values.latitude)
@@ -1193,6 +1196,8 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       radius_meter: values.radius_meter ? Number(values.radius_meter) : 100,
       tanggal_mulai: values.tanggal_mulai || null,
       target_selesai: values.target_selesai || null,
+      jenis_upah: values.jenis_upah,
+      nominal_upah: Number(values.nominal_upah || 0),
       status: values.status || STATUS_PEKERJAAN.BELUM_MULAI,
       metode_penentuan: values.metode_penentuan,
       kuota_pekerja:
@@ -1357,7 +1362,22 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
             </div>
           </div>
 
+          <fieldset className="rounded-xl border border-slate-200 bg-white p-3.5">
+            <legend className="px-1 text-xs font-semibold text-slate-800">Metode Lokasi Absensi</legend>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-xs transition ${values.metode_lokasi === 'titik' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                <input type="radio" name="metode_lokasi" value="titik" checked={values.metode_lokasi === 'titik'} onChange={() => updateField('metode_lokasi', 'titik')} className="mt-0.5 accent-blue-600" />
+                <span><strong className="block text-slate-800">Berdasarkan titik GPS</strong><span className="mt-0.5 block text-slate-500">Absensi hanya diizinkan dalam radius yang ditentukan.</span></span>
+              </label>
+              <label className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-xs transition ${values.metode_lokasi === 'wfh' ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                <input type="radio" name="metode_lokasi" value="wfh" checked={values.metode_lokasi === 'wfh'} onChange={() => updateField('metode_lokasi', 'wfh')} className="mt-0.5 accent-emerald-600" />
+                <span><strong className="block text-slate-800">WFH / lokasi bebas</strong><span className="mt-0.5 block text-slate-500">Absensi tidak dibatasi radius titik proyek.</span></span>
+              </label>
+            </div>
+          </fieldset>
+
           {/* Integrasi Peta Interaktif & Koordinat GPS */}
+          {values.metode_lokasi === 'titik' ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -1430,6 +1450,11 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
               </div>
             </div>
           </div>
+          ) : (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+              <strong>Mode WFH aktif.</strong> Karyawan dapat mengirim absensi dari lokasi mana pun. Waktu, GPS saat absen, dan foto tetap dicatat untuk pemeriksaan admin.
+            </div>
+          )}
 
           {/* Tanggal Mulai & Batas Waktu Pekerjaan */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -1459,6 +1484,23 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
               />
             </div>
           </div>
+
+          <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Tarif Gaji Pekerjaan</h3>
+              <p className="mt-1 text-xs text-slate-500">Tarif ini dipakai menghitung upah karyawan pada proyek berdasarkan absensi yang disetujui.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-semibold text-slate-700">Perhitungan Upah
+                <select value={values.jenis_upah} onChange={(e) => updateField('jenis_upah', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+                  <option value="per_jam">Per Jam</option><option value="per_hari">Per Hari</option><option value="per_bulan">Per Bulan</option>
+                </select>
+              </label>
+              <label className="block text-xs font-semibold text-slate-700">Nominal Gaji (Rp)
+                <input type="number" min="0" value={values.nominal_upah} onChange={(e) => updateField('nominal_upah', e.target.value)} placeholder="Contoh: 150000" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+              </label>
+            </div>
+          </section>
 
           {/* Status Pekerjaan (Dapat Ditentukan / Diedit Admin) */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-3">
@@ -2624,7 +2666,7 @@ function DataPekerjaan() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(initialStatus)
   const [methodFilter, setMethodFilter] = useState('')
-  const [sortOrder, setSortOrder] = useState('asc')
+  const [sortOrder, setSortOrder] = useState('terbaru')
   const [page, setPage] = useState(1)
   const [loadingDetailId, setLoadingDetailId] = useState(null)
   const isMounted = useRef(false)
@@ -2728,6 +2770,7 @@ function DataPekerjaan() {
         return matchesName && matchesStatus && matchesMethod
       })
       .sort((left, right) => {
+        if (sortOrder === 'terbaru') return Number(right.id_pekerjaan) - Number(left.id_pekerjaan)
         const comparison = left.nama_pekerjaan.localeCompare(
           right.nama_pekerjaan,
           'id',
@@ -3126,9 +3169,7 @@ function DataPekerjaan() {
                   <button
                     type="button"
                     onClick={() =>
-                      setSortOrder((order) =>
-                        order === 'asc' ? 'desc' : 'asc',
-                      )
+                      setSortOrder((order) => order === 'terbaru' ? 'asc' : order === 'asc' ? 'desc' : 'terbaru')
                     }
                     className="inline-flex items-center gap-1.5 hover:text-slate-900 transition font-bold cursor-pointer"
                   >
@@ -3340,23 +3381,29 @@ function DataPekerjaan() {
                               {job.lokasi || <span className="text-slate-400 italic">Lokasi belum disetel</span>}
                             </span>
                           </div>
-                          {job.latitude && job.longitude ? (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/admin/lokasi?pekerjaan=${job.id_pekerjaan}`)}
+                          {job.metode_lokasi === 'wfh' ? (
+                            <span className="inline-flex items-center gap-1.5 w-fit text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/80">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span>WFH · lokasi bebas</span>
+                            </span>
+                          ) : job.latitude && job.longitude ? (
+                            <a
+                              href={`https://maps.google.com/?q=${job.latitude},${job.longitude}`}
+                              target="_blank"
+                              rel="noreferrer"
                               className="inline-flex items-center gap-1.5 w-fit text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-200/80 transition shadow-2xs cursor-pointer whitespace-nowrap"
-                              title={`GPS: ${job.latitude}, ${job.longitude}. Klik untuk membuka di Peta Lokasi.`}
+                              title={`GPS: ${job.latitude}, ${job.longitude}. Klik untuk membuka Google Maps.`}
                             >
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                               <span>GPS: {Number(job.latitude).toFixed(3)}, {Number(job.longitude).toFixed(3)}</span>
                               <span className="text-emerald-600 font-bold">({job.radius_meter || 100}m)</span>
-                            </button>
+                            </a>
                           ) : (
                             <button
                               type="button"
-                              onClick={() => navigate(`/admin/lokasi?pekerjaan=${job.id_pekerjaan}`)}
-                              className="inline-flex items-center gap-1.5 w-fit text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-md border border-amber-200/80 transition shadow-2xs cursor-pointer whitespace-nowrap"
-                              title="Titik GPS belum disetel. Klik untuk mengatur koordinat di peta."
+                              disabled
+                              className="inline-flex items-center gap-1.5 w-fit text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200/80 whitespace-nowrap"
+                              title="Titik GPS dapat diatur melalui Edit Pekerjaan."
                             >
                               <span>⚠️ Belum Ada GPS</span>
                             </button>

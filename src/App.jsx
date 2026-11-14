@@ -17,7 +17,6 @@ import PresensiKaryawanGajiPage from './pages/karyawan/PresensiKaryawanPage.jsx'
 import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage'
 import PemasukanAdminPage from './pages/admin/PemasukanAdminPage'
 import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage'
-import LokasiKerjaPage from './pages/admin/LokasiKerjaPage'
 import AdminLayout from './layouts/AdminLayout.jsx'
 import DashboardAdmin from './pages/admin/DashboardAdmin.jsx'
 import PekerjaLayout from './layouts/PekerjaLayout.jsx'
@@ -32,7 +31,6 @@ import ProfilAdmin from './pages/admin/ProfilAdmin.jsx'
 import PengaturanAdmin from './pages/admin/PengaturanAdmin.jsx'
 import PekerjaLocalTest from './pages/karyawan/PekerjaLocalTest.jsx'
 import PekerjaanSaya from './pages/karyawan/PekerjaanSaya.jsx'
-import PekerjaanTersedia from './pages/karyawan/PekerjaanTersedia.jsx'
 import ProfilPekerja from './pages/karyawan/ProfilPekerja.jsx'
 import PengaturanPekerja from './pages/karyawan/PengaturanPekerja.jsx'
 
@@ -336,16 +334,14 @@ function AppLayout() {
           { to: '/admin/jam-kerja', label: 'Rekap Jam Kerja Tim', icon: '♧' },
           { to: '/admin/pemasukan', label: 'Pemasukan & Kas Kantor', icon: '💼' },
           { to: '/admin/pengeluaran', label: 'Pengeluaran & Kuitansi', icon: '🧾' },
-          { to: '/admin/lokasi', label: 'Lokasi Kerja', icon: '📍' },
           { to: '/admin/profil', label: 'Profil Administrator', icon: '👤' },
           { to: '/admin/pengaturan', label: 'Pengaturan', icon: '⚙' },
         ]
       : [
-          { to: '/karyawan/pekerjaan-tersedia', label: 'Pekerjaan Tersedia', icon: '🔍' },
           { to: '/karyawan/pekerjaan-saya', label: 'List Pekerjaan', icon: '💼' },
           { to: '/karyawan/absensi', label: 'Absensi', icon: '⏱️' },
           { to: '/karyawan/gaji', label: 'Slip Gaji Pribadi', icon: '▱' },
-          { to: '/karyawan/pengeluaran', label: 'Pengeluaran Saya', icon: '🧾' },
+          { to: '/karyawan/pengeluaran', label: 'Rekap Pengeluaran', icon: '🧾' },
           { to: '/karyawan/profil', label: 'Profil Saya', icon: '👤' },
         ]),
   ]
@@ -485,7 +481,6 @@ function DashboardAdminPage() {
         else if (target === 'Pengeluaran & Kwitansi' || target === 'Pengeluaran & Kuitansi' || target === 'Pengeluaran') navigate('/admin/pengeluaran')
         else if (target === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
         else if (target === 'Manajemen Pengguna') navigate('/admin/pengguna')
-        else if (target === 'Lokasi Kerja') navigate('/admin/lokasi')
         else if (target === 'Rekap Jam Kerja Tim') navigate('/admin/jam-kerja')
         else if (target === 'Approval Presensi') navigate('/admin/approval-absensi')
         else if (target === 'Approval Reimburse') navigate('/admin/approval-pengeluaran')
@@ -532,8 +527,6 @@ function AdminLayoutWrapper() {
     activeItem = 'Pemasukan & Kas Kantor'
   } else if (path.startsWith('/admin/pengeluaran')) {
     activeItem = 'Pengeluaran & Kuitansi'
-  } else if (path.startsWith('/admin/lokasi')) {
-    activeItem = 'Lokasi Kerja'
   } else if (path.startsWith('/admin/profil')) {
     activeItem = 'Profil Administrator'
   } else if (path.startsWith('/admin/pengaturan')) {
@@ -555,7 +548,6 @@ function AdminLayoutWrapper() {
     else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
     else if (item === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
     else if (item === 'Pengeluaran & Kuitansi' || item === 'Pengeluaran & Kwitansi') navigate('/admin/pengeluaran')
-    else if (item === 'Lokasi Kerja') navigate('/admin/lokasi')
     else if (item === 'Profil Administrator') navigate('/admin/profil')
     else if (item === 'Pengaturan') navigate('/admin/pengaturan')
   }
@@ -582,7 +574,7 @@ function AdminLayoutWrapper() {
 }
 
 function navigateWorkerTarget(navigate, target) {
-  if (target === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
+  if (target === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-saya')
   else if (target === 'List Pekerjaan' || target === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
   else if (target === 'Slip Gaji Pribadi') navigate('/karyawan/gaji')
   else if (target === 'Absensi' || target === 'Rekap Absensi' || target === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
@@ -627,17 +619,6 @@ function DashboardPekerjaPage({ mappedUser }) {
   )
 }
 
-function PekerjaanTersediaPage({ mappedUser }) {
-  const navigate = useNavigate()
-  return (
-    <PekerjaanTersedia
-      onNavigate={(target) => navigateWorkerTarget(navigate, target)}
-      workerId={mappedUser?.id_karyawan}
-      workerName={mappedUser?.nama}
-    />
-  )
-}
-
 function RiwayatPengajuanPage({ mappedUser }) {
   const navigate = useNavigate()
   return (
@@ -659,7 +640,7 @@ function PekerjaLayoutWrapper({ mappedUser }) {
   if (path === '/karyawan' || path === '/karyawan/dashboard') {
     activeItem = 'Dashboard'
   } else if (path.startsWith('/karyawan/pekerjaan-tersedia')) {
-    activeItem = 'Pekerjaan Tersedia'
+    activeItem = 'List Pekerjaan'
   } else if (path.startsWith('/karyawan/pekerjaan-saya')) {
     activeItem = 'List Pekerjaan'
   } else if (path.startsWith('/karyawan/gaji')) {
@@ -667,7 +648,7 @@ function PekerjaLayoutWrapper({ mappedUser }) {
   } else if (path.startsWith('/karyawan/rekap-absensi') || path.startsWith('/karyawan/absensi')) {
     activeItem = 'Absensi'
   } else if (path.startsWith('/karyawan/pengeluaran')) {
-    activeItem = 'Pengeluaran Saya'
+    activeItem = location.state?.fromWorkList ? 'List Pekerjaan' : 'Rekap Pengeluaran'
   } else if (path.startsWith('/karyawan/profil')) {
     activeItem = 'Profil Saya'
   } else if (path.startsWith('/karyawan/pengaturan')) {
@@ -676,11 +657,11 @@ function PekerjaLayoutWrapper({ mappedUser }) {
 
   function handleSelectMenuItem(item) {
     if (item === 'Dashboard') navigate('/karyawan')
-    else if (item === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-tersedia')
+    else if (item === 'Pekerjaan Tersedia') navigate('/karyawan/pekerjaan-saya')
     else if (item === 'List Pekerjaan' || item === 'Pekerjaan Saya') navigate('/karyawan/pekerjaan-saya')
     else if (item === 'Slip Gaji Pribadi' || item === 'Gaji Saya' || item === 'Gaji' || item === 'Slip Gaji') navigate('/karyawan/gaji')
     else if (item === 'Absensi' || item === 'Rekap Absensi' || item === 'Presensi & Jam Kerja') navigate('/karyawan/absensi')
-    else if (item === 'Pengeluaran Saya') navigate('/karyawan/pengeluaran')
+    else if (item === 'Pengeluaran Saya' || item === 'Rekap Pengeluaran') navigate('/karyawan/pengeluaran')
     else if (item === 'Profil Saya') navigate('/karyawan/profil')
     else if (item === 'Pengaturan') navigate('/karyawan/pengaturan')
   }
@@ -780,7 +761,6 @@ function AppRoutes() {
               path="/admin/pengeluaran"
               element={<PengeluaranAdminPage currentUser={mappedUser} />}
             />
-            <Route path="/admin/lokasi" element={<LokasiKerjaPage />} />
             <Route path="/admin/profil" element={<ProfilAdmin />} />
             <Route path="/admin/pengaturan" element={<PengaturanAdmin />} />
           </Route>
@@ -791,10 +771,7 @@ function AppRoutes() {
           <Route element={<PekerjaLayoutWrapper mappedUser={mappedUser} />}>
             <Route path="/karyawan" element={<DashboardPekerjaPage mappedUser={mappedUser} />} />
             <Route path="/karyawan/dashboard" element={<DashboardPekerjaPage mappedUser={mappedUser} />} />
-            <Route
-              path="/karyawan/pekerjaan-tersedia"
-              element={<PekerjaanTersediaPage mappedUser={mappedUser} />}
-            />
+            <Route path="/karyawan/pekerjaan-tersedia" element={<Navigate to="/karyawan/pekerjaan-saya" replace />} />
             <Route
               path="/karyawan/pekerjaan-saya"
               element={

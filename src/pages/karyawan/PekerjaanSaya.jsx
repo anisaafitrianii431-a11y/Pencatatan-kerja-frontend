@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import WorkerPageHeader from '../../components/WorkerPageHeader.jsx'
 import { STATUS_PEKERJAAN, STATUS_PEKERJAAN_OPTIONS } from '../../data/pekerjaan.js'
 import { getPekerjaanSaya } from '../../services/workerPekerjaanApi.js'
@@ -31,6 +32,10 @@ function formatDate(value) {
   if (!value) return 'Belum ditentukan'
   const date = new Date(`${String(value).slice(0, 10)}T00:00:00`)
   return Number.isNaN(date.getTime()) ? 'Belum ditentukan' : DATE_FORMATTER.format(date)
+}
+
+function formatRupiah(value) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
 }
 
 function getJakartaToday() {
@@ -171,7 +176,7 @@ function DetailItem({ label, value }) {
   )
 }
 
-function WorkDetails({ job, assignment, onClose }) {
+function WorkDetails({ job, assignment, onClose, onOpenExpenses }) {
   const deadlineBadge = getDeadlineBadge(job.target_selesai, job.status)
 
   return (
@@ -221,17 +226,28 @@ function WorkDetails({ job, assignment, onClose }) {
             <DetailItem label="Tanggal mulai" value={formatDate(job.tanggal_mulai)} />
             <DetailItem label="Target selesai (Deadline)" value={formatDate(job.target_selesai)} />
             <DetailItem label="ID pekerjaan" value={job.id_pekerjaan} />
+            <DetailItem label="Gaji pekerjaan" value={`${formatRupiah(job.nominal_upah)} / ${job.jenis_upah === 'per_hari' ? 'hari' : job.jenis_upah === 'per_bulan' ? 'bulan' : 'jam'}`} />
             <DetailItem
               label="Metode Penugasan"
               value={assignment?.jenis_penugasan === 'mandiri' ? 'Diambil Mandiri oleh Pekerja' : 'Ditetapkan Langsung oleh Admin'}
             />
             <DetailItem label="ID Penugasan" value={assignment?.id_penugasan ?? '—'} />
+            <DetailItem label="Peran pada pekerjaan" value={assignment?.peran_tugas || assignment?.peran_saya || 'Anggota'} />
+            <DetailItem label="Jumlah anggota tim" value={`${job.total_pekerja_aktif || job.total_pekerja || 1} orang`} />
+            <DetailItem label="Kuota pekerja" value={job.kuota_pekerja ? `${job.total_pekerja_aktif || job.total_pekerja || 0} dari ${job.kuota_pekerja} orang` : 'Tidak dibatasi'} />
+            <DetailItem label="Status pengambilan" value={job.status_pengambilan === 'ditutup' ? 'Pengambilan ditutup' : 'Terbuka'} />
+            <DetailItem label="Radius absensi" value={`${job.radius_meter || 100} meter`} />
+            <DetailItem label="Titik lokasi GPS" value={job.latitude && job.longitude ? `${job.latitude}, ${job.longitude}` : 'Belum ditentukan'} />
+            <DetailItem label="Tanggal penugasan" value={formatDate(assignment?.tanggal_penugasan || assignment?.created_at)} />
           </div>
 
           <DetailItem label="Deskripsi" value={job.deskripsi || 'Belum ada deskripsi pekerjaan.'} />
         </div>
 
-        <div className="flex justify-end border-t border-slate-100 px-5 py-4 sm:px-6">
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
+          <button className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700" onClick={onOpenExpenses} type="button">
+            Lihat &amp; Catat Pengeluaran
+          </button>
           <button
             className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
             onClick={onClose}
@@ -325,6 +341,7 @@ function WorkCard({ job, assignment, onOpen }) {
 }
 
 function PekerjaanSaya({ workerId, workerName = '' }) {
+  const navigate = useNavigate()
   const [store, setStore] = useState({
     worker: null,
     assignedJobs: [],
@@ -573,6 +590,7 @@ function PekerjaanSaya({ workerId, workerName = '' }) {
       {selectedTarget && (
         <WorkDetails
           assignment={selectedTarget.assignment}
+          onOpenExpenses={() => navigate(`/karyawan/pengeluaran?pekerjaan=${selectedTarget.job.id_pekerjaan}`, { state: { fromWorkList: true } })}
           job={selectedTarget.job}
           onClose={() => setSelectedTarget(null)}
         />

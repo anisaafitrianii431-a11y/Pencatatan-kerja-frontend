@@ -92,6 +92,12 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
         job: matchedJob ?? fallbackJob,
       }
     })
+    .sort((left, right) => {
+      const leftCreated = Date.parse(left.assignment.created_at || '')
+      const rightCreated = Date.parse(right.assignment.created_at || '')
+      if (Number.isFinite(leftCreated) && Number.isFinite(rightCreated) && leftCreated !== rightCreated) return rightCreated - leftCreated
+      return Number(right.assignment.id_penugasan || right.job?.id_pekerjaan || 0) - Number(left.assignment.id_penugasan || left.job?.id_pekerjaan || 0)
+    })
 
   return { worker, assignedJobs }
 }
@@ -156,6 +162,12 @@ export async function getRiwayatPekerjaanSaya(employeeId, employeeName = '') {
       }
     })
     .filter((item) => item.isCanceled || item.isJobCompleted)
+    .sort((left, right) => {
+      const leftCreated = Date.parse(left.assignment.created_at || '')
+      const rightCreated = Date.parse(right.assignment.created_at || '')
+      if (Number.isFinite(leftCreated) && Number.isFinite(rightCreated) && leftCreated !== rightCreated) return rightCreated - leftCreated
+      return Number(right.assignment.id_penugasan || right.job?.id_pekerjaan || 0) - Number(left.assignment.id_penugasan || left.job?.id_pekerjaan || 0)
+    })
 
   return { worker, historyJobs }
 }

@@ -196,8 +196,8 @@ export default function PemasukanAdminPage() {
     }
     try {
       const compressed = await compressImage(file, { maxWidth: 1600, quality: 0.78 });
-      setKasFormFile(compressed);
-      setKasFormPreview(URL.createObjectURL(compressed));
+      setKasFormFile(compressed.file);
+      setKasFormPreview(URL.createObjectURL(compressed.file));
     } catch {
       setKasFormFile(file);
       setKasFormPreview(URL.createObjectURL(file));
@@ -319,8 +319,8 @@ export default function PemasukanAdminPage() {
     }
     try {
       const compressed = await compressImage(file, { maxWidth: 1600, quality: 0.78 });
-      setSisaFormFile(compressed);
-      setSisaFormPreview(URL.createObjectURL(compressed));
+      setSisaFormFile(compressed.file);
+      setSisaFormPreview(URL.createObjectURL(compressed.file));
     } catch {
       setSisaFormFile(file);
       setSisaFormPreview(URL.createObjectURL(file));

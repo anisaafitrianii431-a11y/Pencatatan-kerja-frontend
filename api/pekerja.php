@@ -19,7 +19,7 @@ if ($currentUser['peran'] === 'admin') {
                 jsonResponse(false, "Karyawan tidak ditemukan", null, 404);
             }
         } else {
-            $stmt = $pdo->query("SELECT id_karyawan, nama, jabatan, tarif_per_jam, no_hp, alamat, foto_profil, kontak_darurat, nama_bank, no_rekening FROM karyawan ORDER BY id_karyawan ASC");
+            $stmt = $pdo->query("SELECT id_karyawan, nama, jabatan, tarif_per_jam, no_hp, alamat, foto_profil, kontak_darurat, nama_bank, no_rekening FROM karyawan ORDER BY id_karyawan DESC");
             $data = $stmt->fetchAll();
             jsonResponse(true, "Daftar pekerja berhasil dimuat", $data);
         }

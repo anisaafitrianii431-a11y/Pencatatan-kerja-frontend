@@ -6,6 +6,7 @@ import {
   subscribeNtpSync,
   syncNtpTime,
 } from '../utils/ntpTime.js'
+import { parseCoordinates } from '../utils/geoLocation.js'
 
 export {
   getNtpSyncState,
@@ -203,6 +204,10 @@ export function getJobAttendanceAvailability(job, jobSessions = [], referenceDat
     lockLabel = 'Absensi Terkunci (Belum Dimulai)'
     lockDescription =
       'Pekerjaan masih berstatus Belum Dimulai. Absensi masuk baru terbuka setelah pekerjaan berjalan.'
+  } else if (job?.metode_lokasi !== 'wfh' && !parseCoordinates(job?.titik_lokasi)) {
+    mode = 'locked_no_location'
+    lockLabel = 'Titik Lokasi Belum Disetel'
+    lockDescription = 'Absensi masuk baru terbuka setelah Admin menetapkan koordinat GPS pekerjaan.'
   } else if (todayCompletedSession) {
     mode = 'locked_today_completed'
     lockLabel = 'Absensi Hari Ini Selesai (Terkunci)'

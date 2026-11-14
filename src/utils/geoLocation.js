@@ -44,7 +44,7 @@ export function formatDistanceLabel(meters) {
   return value < 1000 ? `${value} m` : `${(value / 1000).toFixed(2)} km`
 }
 
-export function getLocationMatchMeta(distanceMeters, hasJobCoords, hasWorkerCoords = true) {
+export function getLocationMatchMeta(distanceMeters, hasJobCoords, hasWorkerCoords = true, radiusMeters = MAX_RADIUS_METERS) {
   if (!hasWorkerCoords) {
     return {
       status: 'gps_kosong',
@@ -59,10 +59,11 @@ export function getLocationMatchMeta(distanceMeters, hasJobCoords, hasWorkerCoor
       toneClass: 'bg-slate-100 text-slate-700 ring-1 ring-slate-300/60',
     }
   }
-  if (Number(distanceMeters) <= MAX_RADIUS_METERS) {
+  const allowedRadius = Number(radiusMeters) > 0 ? Number(radiusMeters) : MAX_RADIUS_METERS
+  if (Number(distanceMeters) <= allowedRadius) {
     return {
       status: 'sesuai',
-      label: `Sesuai Titik (${formatDistanceLabel(distanceMeters)})`,
+      label: `Sesuai Titik (${formatDistanceLabel(distanceMeters)} / ${allowedRadius} m)`,
       toneClass: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
     }
   }

@@ -4,7 +4,6 @@ import WorkerPageHeader from '../../components/WorkerPageHeader.jsx'
 import { getKaryawan } from '../../services/karyawanApi.js'
 import DashboardPekerja from './DashboardPekerja.jsx'
 import PekerjaanSaya from './PekerjaanSaya.jsx'
-import PekerjaanTersedia from './PekerjaanTersedia.jsx'
 import ProfilPekerja from './ProfilPekerja.jsx'
 import PengaturanPekerja from './PengaturanPekerja.jsx'
 
@@ -207,15 +206,6 @@ function PekerjaLocalTest() {
       <PekerjaanSaya
         key={activeEmployee.id_karyawan}
         workerId={activeEmployee.id_karyawan}
-      />
-    )
-  } else if (currentPage === 'Pekerjaan Tersedia') {
-    pageContent = (
-      <PekerjaanTersedia
-        key={activeEmployee.id_karyawan}
-        onNavigate={setCurrentPage}
-        workerId={activeEmployee.id_karyawan}
-        workerName={activeEmployee.nama}
       />
     )
   } else if (currentPage === 'Profil Saya') {

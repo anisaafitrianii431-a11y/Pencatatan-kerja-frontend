@@ -715,6 +715,25 @@ function ensurePekerjaanPenugasanSchema($pdo) {
             // Pastikan tipe ENUM mencakup 'gabungan'
             $pdo->exec("ALTER TABLE pekerjaan MODIFY COLUMN metode_penentuan ENUM('terbuka', 'langsung', 'gabungan') NOT NULL DEFAULT 'terbuka'");
         }
+        if (!$pdo->query("SHOW COLUMNS FROM pekerjaan LIKE 'jenis_upah'")->fetch()) {
+            $pdo->exec("ALTER TABLE pekerjaan ADD COLUMN jenis_upah ENUM('per_jam', 'per_hari', 'per_bulan') NOT NULL DEFAULT 'per_jam' AFTER metode_penentuan");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM pekerjaan LIKE 'metode_lokasi'")->fetch()) {
+            $pdo->exec("ALTER TABLE pekerjaan ADD COLUMN metode_lokasi ENUM('titik', 'wfh') NOT NULL DEFAULT 'titik' AFTER lokasi");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM pekerjaan LIKE 'nominal_upah'")->fetch()) {
+            $pdo->exec("ALTER TABLE pekerjaan ADD COLUMN nominal_upah DECIMAL(12, 2) NOT NULL DEFAULT 0.00 AFTER jenis_upah");
+        }
+        $jobExtraColumns = [
+            'latitude' => "ALTER TABLE pekerjaan ADD COLUMN latitude DECIMAL(10, 7) DEFAULT NULL",
+            'longitude' => "ALTER TABLE pekerjaan ADD COLUMN longitude DECIMAL(10, 7) DEFAULT NULL",
+            'radius_meter' => "ALTER TABLE pekerjaan ADD COLUMN radius_meter INT NOT NULL DEFAULT 100",
+            'kuota_pekerja' => "ALTER TABLE pekerjaan ADD COLUMN kuota_pekerja INT DEFAULT NULL",
+            'status_pengambilan' => "ALTER TABLE pekerjaan ADD COLUMN status_pengambilan ENUM('terbuka', 'ditutup') NOT NULL DEFAULT 'terbuka'",
+        ];
+        foreach ($jobExtraColumns as $column => $sql) {
+            if (!$pdo->query("SHOW COLUMNS FROM pekerjaan LIKE '{$column}'")->fetch()) $pdo->exec($sql);
+        }
         if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'jenis_penugasan'")->fetch()) {
             $pdo->exec("ALTER TABLE penugasan ADD COLUMN jenis_penugasan ENUM('admin', 'mandiri') NOT NULL DEFAULT 'admin' AFTER peran_tugas");
         }
@@ -1159,7 +1178,7 @@ function fetchGajiJobBreakdown($pdo, $idKaryawan, $periode, $tarifOverride = nul
         JOIN pekerjaan p ON a.id_pekerjaan = p.id_pekerjaan
         WHERE a.id_karyawan = ?
           AND DATE_FORMAT(a.tanggal, '%Y-%m') = ?
-        ORDER BY a.tanggal ASC, a.jam_masuk ASC
+        ORDER BY a.tanggal DESC, a.jam_masuk DESC, a.id_absensi DESC
     ");
     $stmtAbsAll->execute([$idKaryawan, $periode]);
     $allAbsensi = $stmtAbsAll->fetchAll();
@@ -1177,7 +1196,7 @@ function fetchGajiJobBreakdown($pdo, $idKaryawan, $periode, $tarifOverride = nul
         WHERE pg.id_karyawan = ?
           AND pg.jenis_dana = 'pribadi'
           AND DATE_FORMAT(pg.tanggal, '%Y-%m') = ?
-        ORDER BY pg.tanggal ASC, pg.id_pengeluaran ASC
+        ORDER BY pg.tanggal DESC, pg.id_pengeluaran DESC
     ");
     $stmtPgAll->execute([$idKaryawan, $periode]);
     $allPengeluaran = $stmtPgAll->fetchAll();

@@ -1,6 +1,15 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './api.js'
 
 function normalizeJob(job) {
+  const latitude = job.latitude ?? ''
+  const longitude = job.longitude ?? ''
+  const parsedLatitude = Number(latitude)
+  const parsedLongitude = Number(longitude)
+  const titikLokasi = String(job.titik_lokasi ?? '').trim() || (
+    latitude !== '' && longitude !== '' && Number.isFinite(parsedLatitude) && Number.isFinite(parsedLongitude)
+      ? `${parsedLatitude}, ${parsedLongitude}`
+      : ''
+  )
   const kuota = job.kuota_pekerja !== null && job.kuota_pekerja !== '' && Number(job.kuota_pekerja) > 0
     ? Number(job.kuota_pekerja)
     : null
@@ -12,9 +21,10 @@ function normalizeJob(job) {
     id_pekerjaan: Number(job.id_pekerjaan),
     deskripsi: job.deskripsi ?? '',
     lokasi: job.lokasi ?? '',
-    titik_lokasi: job.titik_lokasi ?? '',
-    latitude: job.latitude ?? '',
-    longitude: job.longitude ?? '',
+    metode_lokasi: job.metode_lokasi === 'wfh' ? 'wfh' : 'titik',
+    titik_lokasi: titikLokasi,
+    latitude,
+    longitude,
     radius_meter: job.radius_meter ? Number(job.radius_meter) : 100,
     foto_lokasi: job.foto_lokasi ?? '',
     alamat: job.alamat ?? '',

@@ -60,7 +60,7 @@ if ($method === 'GET') {
                            AND a.jam_pulang IS NOT NULL
         WHERE pn.id_pekerjaan = ?
         GROUP BY pn.id_penugasan, pn.id_pekerjaan, pn.id_karyawan, pn.peran_tugas, k.nama, k.jabatan, k.tarif_per_jam
-        ORDER BY pn.id_penugasan ASC
+        ORDER BY pn.id_penugasan DESC
     ");
     $stmt->execute([$id_pekerjaan]);
     $pekerjaList = $stmt->fetchAll();

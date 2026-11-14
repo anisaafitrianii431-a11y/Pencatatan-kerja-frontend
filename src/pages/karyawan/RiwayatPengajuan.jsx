@@ -394,10 +394,10 @@ function RiwayatPengajuan({ onNavigate = () => {}, workerId, workerName = '' }) 
             </button>
             <button
               type="button"
-              onClick={() => onNavigate('Pekerjaan Tersedia')}
+              onClick={() => onNavigate('List Pekerjaan')}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
-              Lihat Pekerjaan Tersedia
+              Lihat List Pekerjaan
             </button>
           </div>
         </div>

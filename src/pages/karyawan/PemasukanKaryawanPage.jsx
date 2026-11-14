@@ -186,8 +186,8 @@ export default function PemasukanKaryawanPage({ currentUser }) {
     }
     try {
       const compressed = await compressImage(file, { maxWidth: 1600, quality: 0.78 });
-      setFormFile(compressed);
-      setFormPreview(URL.createObjectURL(compressed));
+      setFormFile(compressed.file);
+      setFormPreview(URL.createObjectURL(compressed.file));
     } catch {
       setFormFile(file);
       setFormPreview(URL.createObjectURL(file));
@@ -275,8 +275,8 @@ export default function PemasukanKaryawanPage({ currentUser }) {
     }
     try {
       const compressed = await compressImage(file, { maxWidth: 1600, quality: 0.78 });
-      setSetorFile(compressed);
-      setSetorPreview(URL.createObjectURL(compressed));
+      setSetorFile(compressed.file);
+      setSetorPreview(URL.createObjectURL(compressed.file));
     } catch {
       setSetorFile(file);
       setSetorPreview(URL.createObjectURL(file));
@@ -304,12 +304,13 @@ export default function PemasukanKaryawanPage({ currentUser }) {
     setSetorSubmitting(true);
     try {
       const fd = new FormData();
+      fd.append('id_dana', setorModalKas.id_kas);
       fd.append('id_kas', setorModalKas.id_kas);
       fd.append('tanggal', setorTanggal);
       fd.append('nominal', nom);
       fd.append('keterangan', setorKeterangan);
       if (setorFile) {
-        fd.append('bukti_foto', setorFile);
+        fd.append('foto_kwitansi', setorFile);
       }
       await PengeluaranService.setorSisaKas(fd);
       showSuccess('Pengajuan pengembalian sisa dana dikirim ke Admin untuk dikonfirmasi!');

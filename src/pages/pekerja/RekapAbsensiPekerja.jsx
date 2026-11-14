@@ -382,7 +382,7 @@ export default function RekapAbsensiPekerja({ workerId = 1, workerName = 'Budi S
 
               {myAssignments.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500 shadow-sm">
-                  Belum ada pekerjaan yang ditugaskan kepada Anda. Silakan cek menu "Pekerjaan Tersedia" untuk mengambil tugas baru.
+                  Belum ada pekerjaan yang ditugaskan kepada Anda. Silakan hubungi Administrator untuk mendapatkan penugasan.
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

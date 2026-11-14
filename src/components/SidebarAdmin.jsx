@@ -131,7 +131,6 @@ const menuItems = [
   { label: 'Rekap Absensi', icon: 'recap' },
   { label: 'Gaji', icon: 'payroll' },
   { label: 'Pengeluaran & Kwitansi', icon: 'receipt' },
-  { label: 'Lokasi Kerja', icon: 'location' },
   { label: 'Manajemen Pengguna', icon: 'users' },
 ]
 

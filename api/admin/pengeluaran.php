@@ -265,14 +265,7 @@ if ($method === 'GET') {
             JOIN karyawan k ON pg.id_karyawan = k.id_karyawan
             JOIN pekerjaan p ON pg.id_pekerjaan = p.id_pekerjaan
             $whereClause
-            ORDER BY 
-                CASE pg.status_reimbursement
-                    WHEN 'menunggu' THEN 1
-                    WHEN 'disetujui' THEN 2
-                    WHEN 'sebagian' THEN 3
-                    ELSE 4
-                END,
-                pg.tanggal DESC,
+            ORDER BY pg.tanggal DESC,
                 pg.id_pengeluaran DESC
         ";
         $stmt = $pdo->prepare($sql);

@@ -230,7 +230,7 @@ export default function CameraCapture({
   }
 
   const handleSubmitFoto = async () => {
-    if (!snapshot || !lokasi?.coordText || isSubmitting) return
+    if (!snapshot || !lokasi?.coordText || !isLocationAllowed || isSubmitting) return
     await onCapture?.({
       foto: snapshot,
       titik_lokasi: lokasi.coordText,
@@ -240,13 +240,29 @@ export default function CameraCapture({
     })
   }
 
+  const isMasuk = mode === 'masuk'
+  const isWfh = job?.metode_lokasi === 'wfh'
+  const radiusMeters = Number(job?.radius_meter || 100)
   const distanceMeters = calculateDistanceMeters(lokasi?.coordText, job?.titik_lokasi)
-  const locationMeta = getLocationMatchMeta(
+  const locationMeta = isWfh
+    ? { label: 'WFH · lokasi bebas', toneClass: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' }
+    : getLocationMatchMeta(
     distanceMeters,
     Boolean(job?.titik_lokasi && String(job.titik_lokasi).trim()),
     Boolean(lokasi?.coordText),
+    radiusMeters,
   )
-  const isMasuk = mode === 'masuk'
+  const hasJobCoords = Boolean(job?.titik_lokasi && String(job.titik_lokasi).trim())
+  const isLocationAllowed = Boolean(lokasi?.coordText) && (isWfh || (hasJobCoords && distanceMeters !== null && distanceMeters <= radiusMeters))
+  const isJobRunning = String(job?.status || '') === 'berjalan'
+  const canSubmitAttendance = isLocationAllowed && (!isMasuk || isJobRunning)
+  const attendanceBlockMessage = !isWfh && !hasJobCoords
+    ? 'Absensi terkunci karena titik GPS pekerjaan belum ditetapkan Admin.'
+    : !lokasi?.coordText
+      ? (lokasiError || 'Aktifkan GPS dan deteksi lokasi Anda untuk melanjutkan.')
+      : !isWfh && !isLocationAllowed
+        ? `Lokasi Anda di luar radius pekerjaan (${distanceMeters} m dari batas ${radiusMeters} m). Mendekat ke titik kerja untuk melanjutkan.`
+        : (isMasuk && !isJobRunning ? 'Absensi masuk hanya dapat dilakukan saat status pekerjaan Sedang Berjalan.' : '')
   const headerAccent = isMasuk ? 'text-emerald-700' : 'text-rose-700'
   const jobMapUrl = getGoogleMapsUrl(job?.titik_lokasi)
   const workerMapUrl = getGoogleMapsUrl(lokasi?.coordText)
@@ -319,9 +335,9 @@ export default function CameraCapture({
                 Titik Lokasi Pekerjaan
               </p>
               <p className="mt-0.5 font-semibold text-slate-800">
-                {job?.lokasi || 'Lokasi belum diisi'}
+                {isWfh ? 'WFH · lokasi bebas' : (job?.lokasi || 'Alamat lokasi belum diisi')}
               </p>
-              {job?.titik_lokasi ? (
+              {!isWfh && job?.titik_lokasi ? (
                 <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[11px] text-slate-600">
                   <span className="truncate">{job.titik_lokasi}</span>
                   {jobMapUrl && (
@@ -335,9 +351,10 @@ export default function CameraCapture({
                     </a>
                   )}
                 </div>
-              ) : (
+              ) : !isWfh ? (
                 <p className="mt-1 text-[11px] text-slate-400">Koordinat target belum disetel</p>
-              )}
+              ) : null}
+              {!isWfh && <p className="mt-1 text-[10px] font-medium text-slate-500">Radius absensi: {radiusMeters} meter</p>}
             </div>
 
             <div className="rounded-lg border border-slate-200/80 bg-white p-2.5">
@@ -373,6 +390,12 @@ export default function CameraCapture({
             </div>
           </div>
         </div>
+
+        {!canSubmitAttendance && (
+          <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-amber-800">
+            {attendanceBlockMessage}
+          </div>
+        )}
 
         {/* Status Error Submit dari Parent */}
         {submitError && (
@@ -498,7 +521,8 @@ export default function CameraCapture({
               type="button"
               id="btn-ambil-foto"
               onClick={handleAmbilFoto}
-              className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
+              disabled={loadingLokasi || !canSubmitAttendance || isSubmitting}
+              className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               📸 Ambil Foto Langsung
             </button>
@@ -519,7 +543,7 @@ export default function CameraCapture({
               type="button"
               id="btn-gunakan-foto"
               onClick={handleSubmitFoto}
-              disabled={loadingLokasi || !lokasi?.coordText || isSubmitting}
+              disabled={loadingLokasi || !canSubmitAttendance || isSubmitting}
               className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 isMasuk ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
               }`}
@@ -528,8 +552,8 @@ export default function CameraCapture({
                 ? 'Mengirim Absen ke Admin...'
                 : loadingLokasi
                   ? 'Menunggu Titik GPS...'
-                  : !lokasi?.coordText
-                    ? 'Aktifkan GPS Terlebih Dahulu'
+                  : !canSubmitAttendance
+                    ? (isMasuk && !isJobRunning ? 'Pekerjaan Belum Berjalan' : 'Penuhi Syarat Lokasi GPS')
                     : isMasuk
                       ? '✅ Kirim Absen Masuk'
                       : '✅ Kirim Absen Pulang'}

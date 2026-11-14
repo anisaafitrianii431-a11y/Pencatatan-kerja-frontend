@@ -109,11 +109,10 @@ function Icon({ name, className = 'h-5 w-5' }) {
 
 const mainMenuItems = [
   { label: 'Dashboard', icon: 'dashboard' },
-  { label: 'Pekerjaan Tersedia', icon: 'available' },
   { label: 'List Pekerjaan', icon: 'mine' },
-  { label: 'Slip Gaji Pribadi', icon: 'wallet' },
   { label: 'Absensi', icon: 'attendance' },
-  { label: 'Pengeluaran Saya', icon: 'receipt' },
+  { label: 'Rekap Pengeluaran', icon: 'receipt' },
+  { label: 'Slip Gaji Pribadi', icon: 'wallet' },
 ]
 
 function SidebarPekerja({

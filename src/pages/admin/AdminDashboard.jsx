@@ -19,11 +19,6 @@ export default function AdminDashboard() {
           <h1>Selamat Datang, Administrator!</h1>
           <p>Pantau aktivitas kerja dan kehadiran tim Anda dari satu tempat.</p>
         </div>
-        <div className="welcome-actions">
-          <NavLink className="welcome-button welcome-button-secondary" to="/admin/lokasi">
-            Kelola Lokasi
-          </NavLink>
-        </div>
         <span className="welcome-decoration" aria-hidden="true">✦</span>
       </section>
 
@@ -41,7 +36,7 @@ export default function AdminDashboard() {
               <span className="panel-kicker">OPERASIONAL</span>
               <h2>Pekerjaan Berjalan</h2>
             </div>
-            <NavLink to="/admin/lokasi" className="panel-link">Kelola lokasi <span aria-hidden="true">→</span></NavLink>
+            <NavLink to="/admin/pekerjaan" className="panel-link">Kelola pekerjaan <span aria-hidden="true">→</span></NavLink>
           </div>
           <div className="job-list">
             {activeJobs.map((job, index) => {
@@ -67,7 +62,7 @@ export default function AdminDashboard() {
           </div>
           <div className="panel-footer">
             <span>{activeJobs.length} pekerjaan aktif</span>
-            <NavLink to="/admin/lokasi">Lihat semua <span aria-hidden="true">→</span></NavLink>
+            <NavLink to="/admin/pekerjaan">Lihat semua <span aria-hidden="true">→</span></NavLink>
           </div>
         </article>
 

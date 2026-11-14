@@ -47,7 +47,7 @@ if ($method === 'GET') {
                    COALESCE(k.nominal_upah, k.tarif_per_jam, 0) AS tarif_master
             FROM karyawan k
             $whereK
-            ORDER BY k.id_karyawan ASC
+            ORDER BY k.id_karyawan DESC
         ");
         $stmtK->execute($paramsK);
         $karyawanList = $stmtK->fetchAll(PDO::FETCH_ASSOC);
@@ -205,7 +205,7 @@ if ($method === 'GET') {
               AND DATE_FORMAT(a.tanggal, '%Y-%m') = ?
               AND a.status_verifikasi = 'disetujui'
               AND a.jam_pulang IS NOT NULL
-            ORDER BY a.tanggal ASC, a.jam_masuk ASC
+            ORDER BY a.tanggal DESC, a.jam_masuk DESC, a.id_absensi DESC
         ");
         $stmtAbsensi->execute([$id_karyawan, $periode]);
         $absensiList = $stmtAbsensi->fetchAll(PDO::FETCH_ASSOC);
@@ -254,13 +254,7 @@ if ($method === 'GET') {
             FROM gaji g
             JOIN karyawan k ON g.id_karyawan = k.id_karyawan
             $whereClause
-            ORDER BY 
-                CASE g.status_bayar 
-                    WHEN 'belum' THEN 1 
-                    WHEN 'sebagian' THEN 2 
-                    ELSE 3 
-                END,
-                g.id_gaji DESC
+            ORDER BY g.id_gaji DESC
         ";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -317,7 +311,7 @@ if ($method === 'GET') {
         $stmtPay = $pdo->prepare("
             SELECT * FROM pembayaran_gaji 
             WHERE id_gaji = ? 
-            ORDER BY id_pembayaran ASC
+            ORDER BY id_pembayaran DESC
         ");
         $stmtPay->execute([$id_gaji]);
         $pembayaranList = $stmtPay->fetchAll(PDO::FETCH_ASSOC);
@@ -333,7 +327,7 @@ if ($method === 'GET') {
               AND DATE_FORMAT(a.tanggal, '%Y-%m') = ?
               AND a.status_verifikasi = 'disetujui'
               AND a.jam_pulang IS NOT NULL
-            ORDER BY a.tanggal ASC, a.jam_masuk ASC
+            ORDER BY a.tanggal DESC, a.jam_masuk DESC, a.id_absensi DESC
         ");
         $stmtAbsensi->execute([$gaji['id_karyawan'], $gaji['periode']]);
         $absensiList = $stmtAbsensi->fetchAll(PDO::FETCH_ASSOC);

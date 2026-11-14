@@ -1275,7 +1275,7 @@ function DataKaryawan() {
   const [positionFilter, setPositionFilter] = useState('')
   const [wageTypeFilter, setWageTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState(initialStatus)
-  const [sortOrder, setSortOrder] = useState('asc')
+  const [sortOrder, setSortOrder] = useState('terbaru')
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -1394,11 +1394,9 @@ function DataKaryawan() {
 
         return matchesSearch && matchesPosition && matchesWageType && matchesStatus
       })
-      .sort((left, right) =>
-        left.nama.localeCompare(right.nama, 'id', {
-          sensitivity: 'base',
-        }) * (sortOrder === 'asc' ? 1 : -1),
-      )
+      .sort((left, right) => sortOrder === 'terbaru'
+        ? Number(right.id_karyawan) - Number(left.id_karyawan)
+        : left.nama.localeCompare(right.nama, 'id', { sensitivity: 'base' }) * (sortOrder === 'asc' ? 1 : -1))
   }, [employees, positionFilter, search, sortOrder, statusFilter, wageTypeFilter])
 
   // Statistics
@@ -1909,10 +1907,10 @@ function DataKaryawan() {
                   <button
                     type="button"
                     onClick={() =>
-                      setSortOrder((order) => (order === 'asc' ? 'desc' : 'asc'))
+                      setSortOrder((order) => order === 'terbaru' ? 'asc' : order === 'asc' ? 'desc' : 'terbaru')
                     }
                     className="inline-flex items-center gap-1.5 hover:text-slate-900 transition font-bold"
-                    title={`Urutkan nama ${sortOrder === 'asc' ? 'Z-A' : 'A-Z'}`}
+                    title={sortOrder === 'terbaru' ? 'Urutan terbaru; klik untuk nama A-Z' : `Urutkan nama ${sortOrder === 'asc' ? 'Z-A' : 'terbaru'}`}
                   >
                     <span>Nama Karyawan</span>
                     <EmployeeIcon name="sort" className="h-3.5 w-3.5 text-slate-400" />

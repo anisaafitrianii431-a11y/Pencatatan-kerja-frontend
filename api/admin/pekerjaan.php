@@ -88,9 +88,20 @@ if ($method === 'GET') {
     $nama = htmlspecialchars(trim($body['nama_pekerjaan'] ?? ''), ENT_QUOTES, 'UTF-8');
     $deskripsi = htmlspecialchars(trim($body['deskripsi'] ?? ''), ENT_QUOTES, 'UTF-8');
     $lokasi = htmlspecialchars(trim($body['lokasi'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $metode_lokasi = ($body['metode_lokasi'] ?? 'titik') === 'wfh' ? 'wfh' : 'titik';
     $titik_lokasi = trim($body['titik_lokasi'] ?? '');
     $tanggal_mulai = !empty($body['tanggal_mulai']) ? $body['tanggal_mulai'] : null;
     $target_selesai = !empty($body['target_selesai']) ? $body['target_selesai'] : null;
+    $jenis_upah = in_array($body['jenis_upah'] ?? 'per_jam', ['per_jam', 'per_hari', 'per_bulan'], true) ? $body['jenis_upah'] : 'per_jam';
+    $nominal_upah = max(0, floatval($body['nominal_upah'] ?? 0));
+    $latitude = isset($body['latitude']) && $body['latitude'] !== '' ? floatval($body['latitude']) : null;
+    $longitude = isset($body['longitude']) && $body['longitude'] !== '' ? floatval($body['longitude']) : null;
+    if ($titik_lokasi === '' && $latitude !== null && $longitude !== null && $latitude >= -90 && $latitude <= 90 && $longitude >= -180 && $longitude <= 180) {
+        $titik_lokasi = sprintf('%.7F, %.7F', $latitude, $longitude);
+    }
+    $radius_meter = max(10, min(5000, intval($body['radius_meter'] ?? 100)));
+    $kuota_pekerja = isset($body['kuota_pekerja']) && $body['kuota_pekerja'] !== '' ? max(1, intval($body['kuota_pekerja'])) : null;
+    $status_pengambilan = ($body['status_pengambilan'] ?? 'terbuka') === 'ditutup' ? 'ditutup' : 'terbuka';
     $status = in_array($body['status'] ?? '', ['belum_mulai', 'berjalan', 'selesai'], true)
         ? $body['status']
         : 'belum_mulai';
@@ -111,10 +122,10 @@ if ($method === 'GET') {
         $pdo->beginTransaction();
 
         $stmt = $pdo->prepare("
-            INSERT INTO pekerjaan (nama_pekerjaan, deskripsi, lokasi, titik_lokasi, tanggal_mulai, target_selesai, status, metode_penentuan)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO pekerjaan (nama_pekerjaan, deskripsi, lokasi, metode_lokasi, titik_lokasi, tanggal_mulai, target_selesai, status, metode_penentuan, jenis_upah, nominal_upah, latitude, longitude, radius_meter, kuota_pekerja, status_pengambilan)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$nama, $deskripsi, $lokasi, $titik_lokasi, $tanggal_mulai, $target_selesai, $status, $metode]);
+        $stmt->execute([$nama, $deskripsi, $lokasi, $metode_lokasi, $titik_lokasi, $tanggal_mulai, $target_selesai, $status, $metode, $jenis_upah, $nominal_upah, $latitude, $longitude, $radius_meter, $kuota_pekerja, $status_pengambilan]);
         $newId = intval($pdo->lastInsertId());
 
         if ($metode === 'langsung' && !empty($employeeIds)) {
@@ -134,6 +145,7 @@ if ($method === 'GET') {
             "nama_pekerjaan" => $nama,
             "deskripsi" => $deskripsi,
             "lokasi" => $lokasi,
+            "metode_lokasi" => $metode_lokasi,
             "titik_lokasi" => $titik_lokasi,
             "tanggal_mulai" => $tanggal_mulai,
             "target_selesai" => $target_selesai,
@@ -157,9 +169,17 @@ if ($method === 'GET') {
     $nama = htmlspecialchars(trim($body['nama_pekerjaan'] ?? ''), ENT_QUOTES, 'UTF-8');
     $deskripsi = htmlspecialchars(trim($body['deskripsi'] ?? ''), ENT_QUOTES, 'UTF-8');
     $lokasi = htmlspecialchars(trim($body['lokasi'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $metode_lokasi = ($body['metode_lokasi'] ?? 'titik') === 'wfh' ? 'wfh' : 'titik';
     $titik_lokasi = trim($body['titik_lokasi'] ?? '');
     $tanggal_mulai = !empty($body['tanggal_mulai']) ? $body['tanggal_mulai'] : null;
     $target_selesai = !empty($body['target_selesai']) ? $body['target_selesai'] : null;
+    $jenis_upah = in_array($body['jenis_upah'] ?? 'per_jam', ['per_jam', 'per_hari', 'per_bulan'], true) ? $body['jenis_upah'] : 'per_jam';
+    $nominal_upah = max(0, floatval($body['nominal_upah'] ?? 0));
+    $latitude = isset($body['latitude']) && $body['latitude'] !== '' ? floatval($body['latitude']) : null;
+    $longitude = isset($body['longitude']) && $body['longitude'] !== '' ? floatval($body['longitude']) : null;
+    $radius_meter = max(10, min(5000, intval($body['radius_meter'] ?? 100)));
+    $kuota_pekerja = isset($body['kuota_pekerja']) && $body['kuota_pekerja'] !== '' ? max(1, intval($body['kuota_pekerja'])) : null;
+    $status_pengambilan = ($body['status_pengambilan'] ?? 'terbuka') === 'ditutup' ? 'ditutup' : 'terbuka';
     $status = in_array($body['status'] ?? '', ['belum_mulai', 'berjalan', 'selesai'], true)
         ? $body['status']
         : 'berjalan';
@@ -190,14 +210,18 @@ if ($method === 'GET') {
         $nextTitik = array_key_exists('titik_lokasi', $body)
             ? trim((string) ($body['titik_lokasi'] ?? ''))
             : ($prev['titik_lokasi'] ?? '');
+        if ($nextTitik === '' && $latitude !== null && $longitude !== null && $latitude >= -90 && $latitude <= 90 && $longitude >= -180 && $longitude <= 180) {
+            $nextTitik = sprintf('%.7F, %.7F', $latitude, $longitude);
+        }
 
         $stmt = $pdo->prepare("
             UPDATE pekerjaan 
             SET nama_pekerjaan = ?, deskripsi = ?, lokasi = ?, titik_lokasi = ?, 
-                tanggal_mulai = ?, target_selesai = ?, status = ?, metode_penentuan = ?
+                tanggal_mulai = ?, target_selesai = ?, status = ?, metode_penentuan = ?, jenis_upah = ?, nominal_upah = ?, metode_lokasi = ?,
+                latitude = ?, longitude = ?, radius_meter = ?, kuota_pekerja = ?, status_pengambilan = ?
             WHERE id_pekerjaan = ?
         ");
-        $stmt->execute([$nama, $deskripsi, $lokasi, $nextTitik, $tanggal_mulai, $target_selesai, $status, $metode, $id]);
+        $stmt->execute([$nama, $deskripsi, $lokasi, $nextTitik, $tanggal_mulai, $target_selesai, $status, $metode, $jenis_upah, $nominal_upah, $metode_lokasi, $latitude, $longitude, $radius_meter, $kuota_pekerja, $status_pengambilan, $id]);
         $titik_lokasi = $nextTitik;
 
         if ($metode === 'langsung') {
@@ -233,6 +257,7 @@ if ($method === 'GET') {
             "nama_pekerjaan" => $nama,
             "deskripsi" => $deskripsi,
             "lokasi" => $lokasi,
+            "metode_lokasi" => $metode_lokasi,
             "titik_lokasi" => $titik_lokasi,
             "tanggal_mulai" => $tanggal_mulai,
             "target_selesai" => $target_selesai,

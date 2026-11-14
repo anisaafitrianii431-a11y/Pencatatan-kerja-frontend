@@ -596,7 +596,7 @@ export default function RekapAbsensiPekerja({
 
               {myAssignments.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500 shadow-sm">
-                  Belum ada pekerjaan yang Anda ambil atau ditugaskan kepada Anda. Ambil tugas terlebih dahulu di menu <strong>Pekerjaan Tersedia</strong>.
+                  Belum ada pekerjaan yang ditugaskan kepada Anda. Hubungi Administrator untuk mendapatkan penugasan.
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -634,15 +634,17 @@ export default function RekapAbsensiPekerja({
                               <span className="truncate">{job.lokasi || 'Lokasi proyek belum diisi'}</span>
                             </p>
                             <div className="flex items-center justify-between gap-2 text-[11px]">
-                              <span className="text-slate-500">Titik GPS Proyek:</span>
-                              {job.titik_lokasi ? (
+                              <span className="text-slate-500">Metode lokasi:</span>
+                              {job.metode_lokasi === 'wfh' ? (
+                                <span className="font-semibold text-emerald-700">WFH · bebas radius</span>
+                              ) : job.titik_lokasi ? (
                                 <a
                                   href={jobMapUrl}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="font-mono font-semibold text-emerald-700 hover:underline truncate"
                                 >
-                                  {job.titik_lokasi}
+                                  GPS: {job.titik_lokasi} · {job.radius_meter || 100} m
                                 </a>
                               ) : (
                                 <span className="text-amber-600 font-medium">Belum disetel Admin</span>

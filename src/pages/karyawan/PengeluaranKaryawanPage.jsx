@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Receipt,
   Plus,
@@ -26,8 +26,17 @@ import { PengeluaranService, PekerjaanService } from '../../services/api';
 import { compressImage, formatBytes } from '../../utils/imageCompressor';
 import Modal from '../../components/Modal';
 
+const MONTH_OPTIONS = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+].map((label, index) => ({ value: String(index + 1).padStart(2, '0'), label }));
+
 export default function PengeluaranKaryawanPage({ currentUser }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const openedFromWorkList = Boolean(location.state?.fromWorkList);
+  const selectedJobId = searchParams.get('pekerjaan') || '';
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') === 'uang-kantor' ? 'uang-kantor' : 'riwayat'
   );
@@ -38,6 +47,12 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
   const [kasSayaList, setKasSayaList] = useState([]);
   const [pengembalianSaya, setPengembalianSaya] = useState([]);
   const [loading, setLoading] = useState(true);
+  const currentMonth = new Intl.DateTimeFormat('en', { month: '2-digit', timeZone: 'Asia/Jakarta' }).format(new Date());
+  const [summaryStatus, setSummaryStatus] = useState('semua');
+  const [summaryFund, setSummaryFund] = useState('semua');
+  const [summaryReceipt, setSummaryReceipt] = useState('semua');
+  const [summaryMonth, setSummaryMonth] = useState(currentMonth);
+  const [summaryQuery, setSummaryQuery] = useState('');
 
   // Filter Pertanggungjawaban Uang Kantor
   const [kantorSearch, setKantorSearch] = useState('');
@@ -45,6 +60,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
 
   // Modal Input Pengeluaran
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openedFromJob, setOpenedFromJob] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editingOriginItem, setEditingOriginItem] = useState(null);
   const [formJobId, setFormJobId] = useState('');
@@ -105,6 +121,11 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
     } else if (searchParams.has('tab')) {
       setSearchParams({}, { replace: true });
     }
+  };
+
+  const closeExpenseForm = () => {
+    setIsModalOpen(false);
+    if (openedFromWorkList) navigate('/karyawan/pekerjaan-saya', { replace: true });
   };
 
   const handleTabKeyDown = (e) => {
@@ -170,8 +191,8 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
       setKasSayaList(kasData?.kas_tanggung_jawab_saya || []);
       setPengembalianSaya(kasData?.pengembalian_saya || []);
 
-      if (jobs && jobs.length > 0 && !formJobId) {
-        setFormJobId(jobs[0].id_pekerjaan);
+      if (jobs && jobs.length > 0 && (!formJobId || selectedJobId)) {
+        setFormJobId(selectedJobId && jobs.some((job) => String(job.id_pekerjaan) === selectedJobId) ? selectedJobId : jobs[0].id_pekerjaan);
       }
     } catch (err) {
       setErrorMsg(err.message || 'Gagal memuat catatan pengeluaran');
@@ -182,7 +203,15 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
 
   useEffect(() => {
     loadData();
-  }, [currentUser]);
+  }, [currentUser, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJobId || openedFromJob) return;
+    resetForm();
+    setFormJobId(selectedJobId);
+    setIsModalOpen(true);
+    setOpenedFromJob(true);
+  }, [selectedJobId, openedFromJob]);
 
   // Bersihkan stream kamera saat unmount atau modal tertutup
   useEffect(() => {
@@ -215,13 +244,13 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
     try {
       // Kompres otomatis gambar kuitansi menggunakan Canvas API
       const compressed = await compressImage(file, { maxWidth: 1600, quality: 0.78 });
-      setSelectedFile(compressed);
-      setFilePreview(URL.createObjectURL(compressed));
+      setSelectedFile(compressed.file);
+      setFilePreview(URL.createObjectURL(compressed.file));
 
-      const savedPercent = Math.round(((file.size - compressed.size) / file.size) * 100);
+      const savedPercent = Math.round(((file.size - compressed.compressedSize) / file.size) * 100);
       setCompressionStats({
         originalSize: formatBytes(file.size),
-        compressedSize: formatBytes(compressed.size),
+        compressedSize: formatBytes(compressed.compressedSize),
         savedPercent: savedPercent > 0 ? savedPercent : 0
       });
     } catch (err) {
@@ -448,8 +477,8 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
     }
     try {
       const compressed = await compressImage(file, { maxWidth: 1600, quality: 0.78 });
-      setSetorFile(compressed);
-      setSetorPreview(URL.createObjectURL(compressed));
+      setSetorFile(compressed.file);
+      setSetorPreview(URL.createObjectURL(compressed.file));
     } catch {
       setSetorFile(file);
       setSetorPreview(URL.createObjectURL(file));
@@ -477,12 +506,13 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
     setSetorSubmitting(true);
     try {
       const fd = new FormData();
+      fd.append('id_dana', setorModalKas.id_kas);
       fd.append('id_kas', setorModalKas.id_kas);
       fd.append('tanggal', setorTanggal);
       fd.append('nominal', nom);
       fd.append('keterangan', setorKeterangan);
       if (setorFile) {
-        fd.append('bukti_foto', setorFile);
+        fd.append('foto_kwitansi', setorFile);
       }
       await PengeluaranService.setorSisaKas(fd);
       setSuccessMsg('Pengajuan pengembalian sisa dana dikirim ke Admin untuk dikonfirmasi!');
@@ -560,12 +590,70 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
     handleCloseCamera();
   };
 
-  const handleOpenCreateModal = () => {
-    resetForm();
-    if (pekerjaanList.length > 0) {
-      setFormJobId(pekerjaanList[0].id_pekerjaan);
-    }
-    setIsModalOpen(true);
+  const summaryStats = useMemo(() => {
+    const monthRows = summaryMonth ? pengeluaranList.filter((item) => String(item.tanggal || '').slice(5, 7) === summaryMonth) : pengeluaranList;
+    const total = monthRows.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+    const byStatus = (status) => monthRows.filter((item) => item.status_verifikasi === status);
+    const pribadi = monthRows.filter((item) => item.jenis_dana === 'pribadi');
+    const kantor = monthRows.filter((item) => item.jenis_dana === 'kantor');
+    return {
+      total,
+      pending: byStatus('menunggu'),
+      approved: byStatus('disetujui'),
+      rejected: byStatus('ditolak'),
+      pribadi,
+      kantor,
+      missingReceipt: monthRows.filter((item) => !item.foto_kwitansi),
+    };
+  }, [pengeluaranList, summaryMonth]);
+  const filteredPengeluaranList = useMemo(() => pengeluaranList.filter((item) => {
+    if (selectedJobId && String(item.id_pekerjaan) !== selectedJobId) return false;
+    if (summaryMonth && String(item.tanggal || '').slice(5, 7) !== summaryMonth) return false;
+    if (summaryStatus !== 'semua' && item.status_verifikasi !== summaryStatus) return false;
+    if (summaryFund !== 'semua' && item.jenis_dana !== summaryFund) return false;
+    if (summaryReceipt === 'tanpa-foto' && item.foto_kwitansi) return false;
+    if (summaryReceipt === 'ada-foto' && !item.foto_kwitansi) return false;
+    if (summaryQuery && !String(item.keterangan || '').toLocaleLowerCase('id-ID').includes(summaryQuery.toLocaleLowerCase('id-ID'))) return false;
+    return true;
+  }).sort((a, b) => {
+    const activityA = String(a.created_at || a.tanggal || '');
+    const activityB = String(b.created_at || b.tanggal || '');
+    return activityB.localeCompare(activityA) || Number(b.id_pengeluaran) - Number(a.id_pengeluaran);
+  }), [pengeluaranList, selectedJobId, summaryMonth, summaryStatus, summaryFund, summaryReceipt, summaryQuery]);
+  const displayedPengeluaranList = filteredPengeluaranList;
+  const latestJobActivity = new Map();
+  displayedPengeluaranList.forEach((expense) => {
+    const jobId = String(expense.id_pekerjaan);
+    const activity = String(expense.created_at || expense.tanggal || '');
+    if (!latestJobActivity.has(jobId) || activity > latestJobActivity.get(jobId)) latestJobActivity.set(jobId, activity);
+  });
+  displayedPengeluaranList.sort((a, b) =>
+    latestJobActivity.get(String(b.id_pekerjaan)).localeCompare(latestJobActivity.get(String(a.id_pekerjaan))) ||
+    String(b.created_at || b.tanggal || '').localeCompare(String(a.created_at || a.tanggal || '')) ||
+    Number(b.id_pengeluaran) - Number(a.id_pengeluaran)
+  );
+  const expensesByJob = displayedPengeluaranList.reduce((groups, expense) => {
+    const key = String(expense.id_pekerjaan);
+    if (!groups[key]) groups[key] = { items: [], total: 0, approved: 0, pending: 0 };
+    groups[key].items.push(expense);
+    groups[key].total += Number(expense.nominal || 0);
+    if (expense.status_verifikasi === 'disetujui') groups[key].approved += Number(expense.nominal || 0);
+    if (expense.status_verifikasi === 'menunggu') groups[key].pending += Number(expense.nominal || 0);
+    return groups;
+  }, {});
+  const exportSummaryCsv = () => {
+    const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const rows = [
+      ['Tanggal', 'Pekerjaan', 'Keterangan', 'Sumber Dana', 'Nominal', 'Status', 'Bukti Nota'],
+      ...displayedPengeluaranList.map((item) => [item.tanggal, item.nama_pekerjaan, item.keterangan, item.jenis_dana, item.nominal, item.status_verifikasi, item.foto_kwitansi ? 'Ada' : 'Tidak ada']),
+    ];
+    const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rekap-pengeluaran-${summaryMonth || 'semua'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleOpenEditModal = (p) => {
@@ -649,7 +737,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
       formData.append('nominal', formNominal);
       formData.append('jenis_dana', formJenisDana);
       if (formJenisDana === 'kantor' && formIdKas) {
-        formData.append('id_kas', formIdKas);
+        formData.append('id_dana', formIdKas);
       }
       formData.append('keterangan', formKeterangan);
       if (selectedFile) {
@@ -668,6 +756,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
       setIsModalOpen(false);
       resetForm();
       loadData();
+      if (openedFromWorkList) navigate('/karyawan/pekerjaan-saya', { replace: true });
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       setModalError(err.message || 'Gagal menyimpan pengeluaran');
@@ -682,14 +771,14 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 mb-1">
-            <span>Pengeluaran Pribadi & Kantor</span>
+            <span>Pengeluaran Pribadi &amp; Kantor</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center space-x-2">
             <Receipt className="w-7 h-7 text-blue-600" />
-            <span>Pencatatan Pengeluaran & Kuitansi</span>
+            <span>Rekap Pengeluaran</span>
           </h1>
           <p className="text-sm text-slate-500">
-            Catat nota belanja material atau operasional proyek. Lampirkan foto kuitansi dengan kompresi otomatis.
+            Pantau pengeluaran yang Anda catat: jumlah diajukan, disetujui, ditolak, dan sumber dananya.
           </p>
         </div>
 
@@ -702,14 +791,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Catat Pengeluaran Baru</span>
-          </button>
+          <button type="button" onClick={exportSummaryCsv} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Ekspor CSV</button>
         </div>
       </div>
 
@@ -726,6 +808,14 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
           <span>{successMsg}</span>
         </div>
       )}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Rincian sumber dana</h2><p className="text-sm text-slate-600">Dana pribadi yang akan direimburse: <strong>{formatRupiah(summaryStats.pribadi.filter((item) => item.status_verifikasi === 'disetujui' && item.status_ganti !== 'sudah').reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</strong></p></div>
+        <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-slate-100"><div className="bg-blue-600" style={{ width: `${summaryStats.total ? (summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} /><div className="bg-amber-700" style={{ width: `${summaryStats.total ? (summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} /></div>
+        <div className="mt-3 flex flex-wrap gap-5 text-sm"><span><b className="rounded-full bg-blue-100 px-3 py-1 text-blue-800">Uang Kantor</b> {formatRupiah(summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.kantor.length} transaksi</span><span><b className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">Pribadi · Reimburs</b> {formatRupiah(summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.pribadi.length} transaksi</span></div>
+      </section>
+
+      {summaryStats.missingReceipt.length > 0 && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><p><strong>{summaryStats.missingReceipt.length} transaksi belum ada foto nota.</strong> Lengkapi agar lebih cepat diperiksa.</p><button type="button" onClick={() => { setActiveTab('riwayat'); setSummaryStatus('semua'); setSummaryFund('semua'); setSummaryReceipt('tanpa-foto'); setSummaryQuery(''); const next = new URLSearchParams(searchParams); next.delete('pekerjaan'); setSearchParams(next); window.setTimeout(() => document.getElementById('riwayat-pengeluaran-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100); }} className="rounded-xl border border-amber-300 bg-white px-4 py-2 font-semibold">Tampilkan transaksi itu</button></section>}
 
       {/* Tab Navigasi Single-Row */}
       <div
@@ -749,7 +839,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
           }`}
         >
           <Receipt className="w-4 h-4" />
-          <span>Riwayat Pengeluaran Saya ({pengeluaranList.length})</span>
+          <span>Riwayat Pengeluaran Saya ({displayedPengeluaranList.length})</span>
         </button>
 
         <button
@@ -780,8 +870,18 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
               <p className="text-xs text-slate-400">Daftar seluruh nota belanja (Uang Pribadi &amp; Uang Kantor) yang Anda ajukan</p>
             </div>
             <div className="text-xs text-slate-500 font-semibold">
-              {pengeluaranList.length} Transaksi
+              {displayedPengeluaranList.length} Transaksi
             </div>
+          </div>
+
+          <div className="grid gap-3 border-b border-slate-100 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5">
+            <label className="text-xs font-semibold text-slate-600">Bulan<select value={summaryMonth} onChange={(e) => setSummaryMonth(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Semua bulan</option>{MONTH_OPTIONS.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}</select></label>
+            <label className="text-xs font-semibold text-slate-600">Status<select value={summaryStatus} onChange={(e) => setSummaryStatus(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="semua">Semua status</option><option value="menunggu">Menunggu</option><option value="disetujui">Disetujui</option><option value="ditolak">Ditolak</option></select></label>
+            <label className="text-xs font-semibold text-slate-600">Pekerjaan<select value={selectedJobId} onChange={(e) => { const next = new URLSearchParams(searchParams); e.target.value ? next.set('pekerjaan', e.target.value) : next.delete('pekerjaan'); setSearchParams(next); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Semua pekerjaan</option>{pekerjaanList.map((job) => <option key={job.id_pekerjaan} value={job.id_pekerjaan}>{job.nama_pekerjaan}</option>)}</select></label>
+            <label className="text-xs font-semibold text-slate-600">Sumber dana<select value={summaryFund} onChange={(e) => setSummaryFund(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="semua">Semua sumber dana</option><option value="pribadi">Uang pribadi</option><option value="kantor">Uang kantor</option></select></label>
+            <label className="text-xs font-semibold text-slate-600">Bukti nota<select value={summaryReceipt} onChange={(e) => setSummaryReceipt(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="semua">Semua</option><option value="ada-foto">Ada foto</option><option value="tanpa-foto">Belum ada foto</option></select></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Cari keterangan<input value={summaryQuery} onChange={(e) => setSummaryQuery(e.target.value)} placeholder="Cari keterangan..." className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+            <div className="flex items-end justify-between gap-3 text-sm text-slate-500 xl:col-span-3"><span>{displayedPengeluaranList.length} transaksi · {formatRupiah(displayedPengeluaranList.reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</span><button type="button" onClick={() => { setSummaryStatus('semua'); setSummaryFund('semua'); setSummaryReceipt('semua'); setSummaryMonth(''); setSummaryQuery(''); const next = new URLSearchParams(searchParams); next.delete('pekerjaan'); setSearchParams(next); }} className="font-semibold text-emerald-700">Reset filter</button></div>
           </div>
 
           {loading ? (
@@ -789,11 +889,11 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
               <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-600" />
               <p className="text-sm">Memuat catatan pengeluaran...</p>
             </div>
-          ) : pengeluaranList.length === 0 ? (
+          ) : displayedPengeluaranList.length === 0 ? (
             <div className="p-12 text-center text-slate-400">
               <Receipt className="w-10 h-10 mx-auto mb-2 text-slate-300" />
               <p className="text-sm font-medium">Belum ada catatan pengeluaran.</p>
-              <p className="text-xs text-slate-400 mt-1">Gunakan tombol &quot;+ Catat Pengeluaran Baru&quot; untuk mengajukan nota belanja.</p>
+              <p className="text-xs text-slate-400 mt-1">Buka List Pekerjaan, pilih pekerjaan, lalu catat pengeluaran dari detail pekerjaan tersebut.</p>
             </div>
           ) : (
             <div
@@ -818,12 +918,16 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {pengeluaranList.map((p) => {
+                  {displayedPengeluaranList.map((p, index) => {
                     const isOwner = Number(p.id_karyawan) === kId;
                     const isLocked = !isOwner || p.status_verifikasi === 'disetujui' || (p.jenis_dana === 'pribadi' && p.status_ganti === 'sudah');
+                    const previousJobId = displayedPengeluaranList[index - 1]?.id_pekerjaan;
+                    const jobSummary = expensesByJob[String(p.id_pekerjaan)] || { items: [], approved: 0, pending: 0 };
 
                     return (
-                      <tr key={p.id_pengeluaran} className="hover:bg-slate-50/80 transition">
+                      <React.Fragment key={p.id_pengeluaran}>
+                      {index === 0 || String(previousJobId) !== String(p.id_pekerjaan) ? <tr className="border-y border-slate-200 bg-slate-50"><th colSpan={9} className="px-4 py-3 text-left"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-bold text-slate-900">{resolveProjectName(p)} <span className="ml-2 font-normal text-slate-500">{jobSummary.items.length} transaksi</span></span><span className="flex flex-wrap gap-2 text-[11px]"><span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">Menunggu {formatRupiah(jobSummary.pending)}</span><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">Disetujui {formatRupiah(jobSummary.approved)}</span><strong className="self-center text-slate-800">Subtotal {formatRupiah(jobSummary.total)}</strong></span></div></th></tr> : null}
+                      <tr className="hover:bg-slate-50/80 transition">
                         <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
                           {p.tanggal}
                         </td>
@@ -913,6 +1017,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
                           )}
                         </td>
                       </tr>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -1212,7 +1317,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
       {/* Modal Tambah / Edit Pengeluaran */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={closeExpenseForm}
         title={editingId ? 'Edit Catatan Pengeluaran' : 'Form Catat Pengeluaran & Bukti Nota'}
       >
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -1509,7 +1614,7 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
           <div className="pt-2 flex justify-end space-x-2">
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={closeExpenseForm}
               className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
               Batal
@@ -1736,7 +1841,14 @@ export default function PengeluaranKaryawanPage({ currentUser }) {
         maxWidth="max-w-2xl"
       >
         {detailKasPj && (() => {
-          const items = kantorOutflowsList.filter(pg => Number(pg.id_kas) === Number(detailKasPj.id_kas));
+          const items = kantorOutflowsList.filter((pg) => {
+            if (Number(pg.id_dana || pg.id_kas) === Number(detailKasPj.id_kas)) return true;
+            // Nota lama mungkin belum menyimpan ID paket; cocokkan PJ + pekerjaan jika keduanya tersedia.
+            return !pg.id_dana && !pg.id_kas &&
+              Number(pg.id_penanggung_jawab) === Number(detailKasPj.id_karyawan) &&
+              detailKasPj.id_pekerjaan != null &&
+              Number(pg.id_pekerjaan) === Number(detailKasPj.id_pekerjaan);
+          });
           return (
             <div className="space-y-4 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap justify-between gap-2">
