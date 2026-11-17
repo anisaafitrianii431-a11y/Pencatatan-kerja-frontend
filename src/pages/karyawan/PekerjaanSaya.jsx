@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import WorkerPageHeader from '../../components/WorkerPageHeader.jsx'
+import HeaderHalamanKaryawan from '../../components/HeaderHalamanKaryawan.jsx'
 import { STATUS_PEKERJAAN, STATUS_PEKERJAAN_OPTIONS } from '../../data/pekerjaan.js'
 import { getPekerjaanSaya } from '../../services/workerPekerjaanApi.js'
 
@@ -114,6 +114,12 @@ function Icon({ name, className = 'h-5 w-5' }) {
         <path d="M3 3v5h5" />
       </>
     ),
+    receipt: (
+      <>
+        <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+        <path d="M16 8h-6M16 12H8M10 16H8" />
+      </>
+    ),
   }
 
   return (
@@ -176,7 +182,7 @@ function DetailItem({ label, value }) {
   )
 }
 
-function WorkDetails({ job, assignment, onClose, onOpenExpenses }) {
+function WorkDetails({ job, assignment, onClose }) {
   const deadlineBadge = getDeadlineBadge(job.target_selesai, job.status)
 
   return (
@@ -244,12 +250,9 @@ function WorkDetails({ job, assignment, onClose, onOpenExpenses }) {
           <DetailItem label="Deskripsi" value={job.deskripsi || 'Belum ada deskripsi pekerjaan.'} />
         </div>
 
-        <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
-          <button className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700" onClick={onOpenExpenses} type="button">
-            Lihat &amp; Catat Pengeluaran
-          </button>
+        <div className="flex justify-end border-t border-slate-100 px-5 py-4 sm:px-6">
           <button
-            className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 cursor-pointer"
             onClick={onClose}
             type="button"
           >
@@ -261,7 +264,7 @@ function WorkDetails({ job, assignment, onClose, onOpenExpenses }) {
   )
 }
 
-function WorkCard({ job, assignment, onOpen }) {
+function WorkCard({ job, assignment, onOpen, onRecordExpense }) {
   if (!job) {
     return (
       <article className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 sm:p-6">
@@ -328,14 +331,26 @@ function WorkCard({ job, assignment, onOpen }) {
         </p>
       </div>
 
-      <button
-        className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 mt-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-        onClick={() => onOpen(job, assignment)}
-        type="button"
-      >
-        <Icon className="h-4 w-4" name="eye" />
-        Lihat Detail
-      </button>
+      <div className="mt-auto pt-5 flex items-center gap-2">
+        <button
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
+          onClick={() => onOpen(job, assignment)}
+          type="button"
+        >
+          <Icon className="h-4 w-4 text-slate-400" name="eye" />
+          <span>Lihat Detail</span>
+        </button>
+
+        <button
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 px-3 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+          onClick={() => onRecordExpense?.(job)}
+          type="button"
+          title="Catat nota belanja untuk proyek ini"
+        >
+          <Icon className="h-4 w-4" name="receipt" />
+          <span>💰 Catat Belanja</span>
+        </button>
+      </div>
     </article>
   )
 }
@@ -453,7 +468,7 @@ function PekerjaanSaya({ workerId, workerName = '' }) {
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6">
-      <WorkerPageHeader
+      <HeaderHalamanKaryawan
         description="Tinjau seluruh pekerjaan yang ditugaskan kepada Anda, baik oleh Admin maupun yang diambil secara mandiri."
         icon={<Icon className="h-6 w-6" name="work" />}
         title="List Pekerjaan"
@@ -559,6 +574,7 @@ function PekerjaanSaya({ workerId, workerName = '' }) {
               job={job}
               key={assignment.id_penugasan}
               onOpen={(j, a) => setSelectedTarget({ job: j, assignment: a })}
+              onRecordExpense={(j) => navigate(`/karyawan/pengeluaran?pekerjaan=${j.id_pekerjaan}`, { state: { fromWorkList: true } })}
             />
           ))}
         </section>
@@ -590,7 +606,6 @@ function PekerjaanSaya({ workerId, workerName = '' }) {
       {selectedTarget && (
         <WorkDetails
           assignment={selectedTarget.assignment}
-          onOpenExpenses={() => navigate(`/karyawan/pengeluaran?pekerjaan=${selectedTarget.job.id_pekerjaan}`, { state: { fromWorkList: true } })}
           job={selectedTarget.job}
           onClose={() => setSelectedTarget(null)}
         />

@@ -13,7 +13,8 @@ $body = getRequestBody();
 $kId = intval($currentUser['id_karyawan'] ?? 0);
 
 function storeAbsensiPhoto($base64Input, $fileField, $prefix = 'absensi_') {
-    $uploadDir = __DIR__ . '/../uploads/';
+    $subFolder = 'uploads/absensi/';
+    $uploadDir = __DIR__ . '/../' . $subFolder;
     if (!is_dir($uploadDir)) {
         @mkdir($uploadDir, 0755, true);
     }
@@ -28,7 +29,7 @@ function storeAbsensiPhoto($base64Input, $fileField, $prefix = 'absensi_') {
         if ($decoded !== false) {
             $fileName = $prefix . bin2hex(random_bytes(16)) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
             if (@file_put_contents($uploadDir . $fileName, $decoded)) {
-                return 'uploads/' . $fileName;
+                return $subFolder . $fileName;
             }
         }
         return null;
@@ -42,7 +43,7 @@ function storeAbsensiPhoto($base64Input, $fileField, $prefix = 'absensi_') {
         }
         $fileName = $prefix . bin2hex(random_bytes(16)) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
         if (@move_uploaded_file($_FILES[$fileField]['tmp_name'], $uploadDir . $fileName)) {
-            return 'uploads/' . $fileName;
+            return $subFolder . $fileName;
         }
     }
 

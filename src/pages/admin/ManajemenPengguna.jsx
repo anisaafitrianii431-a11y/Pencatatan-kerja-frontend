@@ -5,7 +5,7 @@ import {
   resetUserPassword,
   toggleUserStatus,
 } from '../../services/userApi.js'
-import AdminAvatar from '../../components/AdminAvatar.jsx'
+import AvatarAdmin from '../../components/AvatarAdmin.jsx'
 
 const PAGE_SIZE = 8
 
@@ -206,7 +206,7 @@ function UserResetPasswordModal({ user, isSaving, onClose, onReset }) {
           {/* Banner Info Pengguna */}
           <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 space-y-2">
             <div className="flex items-center gap-3">
-              <AdminAvatar name={user.nama} className="h-10 w-10 text-xs font-bold" />
+              <AvatarAdmin name={user.nama} className="h-10 w-10 text-xs font-bold" />
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-900 truncate">
                   {user.nama}
@@ -851,7 +851,7 @@ function ManajemenPengguna() {
                       {/* 3. Nama Pengguna */}
                       <td className="whitespace-nowrap px-3.5 py-3">
                         <div className="flex items-center gap-2.5">
-                          <AdminAvatar
+                          <AvatarAdmin
                             name={u.nama}
                             className="h-8 w-8 text-xs font-bold shadow-2xs"
                           />

@@ -4,22 +4,22 @@ import { AuthProvider } from './auth/AuthContext.jsx'
 import { useAuth } from './auth/useAuth.js'
 import { AuthProvider as LegacyAuthProvider } from './contexts/AuthContext.jsx'
 import { AbsensiProvider } from './hooks/useAbsensi.jsx'
-import DashboardHome from './components/DashboardHome.jsx'
-import DetailJamAdminPage from './pages/admin/DetailJamAdminPage.jsx'
-import GajiAdminPage from './pages/admin/GajiAdminPage.jsx'
-import JamKerjaAdminPage from './pages/admin/JamKerjaAdminPage.jsx'
-import KontribusiAdminPage from './pages/admin/KontribusiAdminPage.jsx'
-import VerifikasiAdminPage from './pages/admin/VerifikasiAdminPage.jsx'
-import VerifikasiAbsensiAdminPage from './pages/admin/VerifikasiAbsensiAdminPage.jsx'
-import VerifikasiPengeluaranAdminPage from './pages/admin/VerifikasiPengeluaranAdminPage.jsx'
-import GajiKaryawanPage from './pages/karyawan/GajiKaryawanPage.jsx'
-import PresensiKaryawanGajiPage from './pages/karyawan/PresensiKaryawanPage.jsx'
-import PengeluaranAdminPage from './pages/admin/PengeluaranAdminPage'
-import PemasukanAdminPage from './pages/admin/PemasukanAdminPage'
-import PengeluaranKaryawanPage from './pages/karyawan/PengeluaranKaryawanPage'
-import AdminLayout from './layouts/AdminLayout.jsx'
+import BerandaDashboard from './components/BerandaDashboard.jsx'
+import DetailJamKerjaAdmin from './pages/admin/DetailJamKerjaAdmin.jsx'
+import GajiAdmin from './pages/admin/GajiAdmin.jsx'
+import JamKerjaAdmin from './pages/admin/JamKerjaAdmin.jsx'
+import KontribusiAdmin from './pages/admin/KontribusiAdmin.jsx'
+import VerifikasiAdmin from './pages/admin/VerifikasiAdmin.jsx'
+import VerifikasiAbsensiAdmin from './pages/admin/VerifikasiAbsensiAdmin.jsx'
+import VerifikasiPengeluaranAdmin from './pages/admin/VerifikasiPengeluaranAdmin.jsx'
+import GajiKaryawan from './pages/karyawan/GajiKaryawan.jsx'
+import AbsensiKaryawan from './pages/karyawan/AbsensiKaryawan.jsx'
+import PengeluaranAdmin from './pages/admin/PengeluaranAdmin'
+import PemasukanKasAdmin from './pages/admin/PemasukanKasAdmin'
+import PengeluaranKaryawan from './pages/karyawan/PengeluaranKaryawan'
+import TataLetakAdmin from './layouts/TataLetakAdmin.jsx'
 import DashboardAdmin from './pages/admin/DashboardAdmin.jsx'
-import PekerjaLayout from './layouts/PekerjaLayout.jsx'
+import TataLetakKaryawan from './layouts/TataLetakKaryawan.jsx'
 import DashboardPekerja from './pages/karyawan/DashboardPekerja.jsx'
 import RekapAbsensiAdmin from './pages/admin/RekapAbsensiAdmin.jsx'
 import RekapAbsensiPekerja from './pages/karyawan/RekapAbsensiPekerja.jsx'
@@ -29,7 +29,6 @@ import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
 import Penugasan from './pages/admin/Penugasan.jsx'
 import ProfilAdmin from './pages/admin/ProfilAdmin.jsx'
 import PengaturanAdmin from './pages/admin/PengaturanAdmin.jsx'
-import PekerjaLocalTest from './pages/karyawan/PekerjaLocalTest.jsx'
 import PekerjaanSaya from './pages/karyawan/PekerjaanSaya.jsx'
 import ProfilPekerja from './pages/karyawan/ProfilPekerja.jsx'
 import PengaturanPekerja from './pages/karyawan/PengaturanPekerja.jsx'
@@ -436,14 +435,14 @@ function DashboardPage() {
   const navigate = useNavigate()
   const currentUser = {
     ...user,
-    id_karyawan: user.employeeId || user.id || 1,
-    id_user: user.id || 1,
-    nama: user.name || 'Pengguna',
-    peran: user.role,
-    tarif_per_jam: user.tarif_per_jam || 50000,
+    id_karyawan: user?.employeeId || user?.id_karyawan || null,
+    id_user: user?.id_user || user?.id || null,
+    nama: user?.nama || user?.name || 'Pengguna',
+    peran: user?.role || user?.peran,
+    tarif_per_jam: user?.tarif_per_jam || 50000,
   }
 
-  return <DashboardHome currentUser={currentUser} onNavigate={(path) => navigate(`/${path}`)} />
+  return <BerandaDashboard currentUser={currentUser} onNavigate={(path) => navigate(`/${path}`)} />
 }
 
 function KaryawanPage() {
@@ -501,32 +500,20 @@ function AdminLayoutWrapper() {
   const path = location.pathname
   if (path === '/admin' || path === '/admin/dashboard' || path === '/dashboard') {
     activeItem = 'Dashboard'
-  } else if (path.startsWith('/admin/karyawan')) {
-    activeItem = 'Data Karyawan'
-  } else if (path.startsWith('/admin/pekerjaan')) {
-    activeItem = 'Data Pekerjaan'
+  } else if (path.startsWith('/admin/rekap-absensi') || path.startsWith('/admin/approval-absensi') || path.startsWith('/admin/verifikasi') || path.startsWith('/admin/jam-kerja')) {
+    activeItem = 'Rekap Absensi'
   } else if (path.startsWith('/admin/penugasan')) {
     activeItem = 'Penugasan'
-  } else if (path.startsWith('/admin/gaji') || path.startsWith('/admin/detail-jam')) {
-    activeItem = 'Penggajian Karyawan'
-  } else if (path.startsWith('/admin/jam-kerja')) {
-    activeItem = 'Rekap Jam Kerja Tim'
-  } else if (path.startsWith('/admin/approval-absensi') || path.startsWith('/admin/verifikasi')) {
-    activeItem = 'Approval Presensi'
-  } else if (path.startsWith('/admin/approval-pengeluaran')) {
-    activeItem = 'Approval Reimburse'
-  } else if (path.startsWith('/admin/kontribusi')) {
-    activeItem = 'Kontribusi Proyek'
-  } else if (path.startsWith('/admin/rekap-absensi')) {
-    activeItem = 'Rekap Absensi'
-  } else if (path.startsWith('/admin/gaji')) {
+  } else if (path.startsWith('/admin/pengeluaran') || path.startsWith('/admin/pemasukan') || path.startsWith('/admin/approval-pengeluaran')) {
+    activeItem = 'Pengeluaran & Kwitansi'
+  } else if (path.startsWith('/admin/gaji') || path.startsWith('/admin/detail-jam') || path.startsWith('/admin/kontribusi')) {
     activeItem = 'Gaji'
+  } else if (path.startsWith('/admin/pekerjaan')) {
+    activeItem = 'Data Pekerjaan'
+  } else if (path.startsWith('/admin/karyawan')) {
+    activeItem = 'Data Karyawan'
   } else if (path.startsWith('/admin/pengguna')) {
     activeItem = 'Manajemen Pengguna'
-  } else if (path.startsWith('/admin/pemasukan')) {
-    activeItem = 'Pemasukan & Kas Kantor'
-  } else if (path.startsWith('/admin/pengeluaran')) {
-    activeItem = 'Pengeluaran & Kuitansi'
   } else if (path.startsWith('/admin/profil')) {
     activeItem = 'Profil Administrator'
   } else if (path.startsWith('/admin/pengaturan')) {
@@ -535,19 +522,14 @@ function AdminLayoutWrapper() {
 
   function handleSelectMenuItem(item) {
     if (item === 'Dashboard') navigate('/admin')
-    else if (item === 'Data Karyawan') navigate('/admin/karyawan')
-    else if (item === 'Data Pekerjaan') navigate('/admin/pekerjaan')
-    else if (item === 'Penugasan') navigate('/admin/penugasan')
-    else if (item === 'Penggajian Karyawan') navigate('/admin/gaji')
-    else if (item === 'Rekap Jam Kerja Tim') navigate('/admin/jam-kerja')
-    else if (item === 'Approval Presensi') navigate('/admin/approval-absensi')
-    else if (item === 'Approval Reimburse') navigate('/admin/approval-pengeluaran')
-    else if (item === 'Kontribusi Proyek') navigate('/admin/kontribusi')
     else if (item === 'Rekap Absensi') navigate('/admin/rekap-absensi')
-    else if (item === 'Gaji' || item === 'Penggajian') navigate('/admin/gaji')
+    else if (item === 'Penugasan') navigate('/admin/penugasan')
+    else if (item === 'Pengeluaran & Kwitansi' || item === 'Pengeluaran & Kuitansi') navigate('/admin/pengeluaran')
+    else if (item === 'Gaji' || item === 'Penggajian Karyawan' || item === 'Penggajian') navigate('/admin/gaji')
+    else if (item === 'Data Pekerjaan') navigate('/admin/pekerjaan')
+    else if (item === 'Data Karyawan') navigate('/admin/karyawan')
     else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
     else if (item === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
-    else if (item === 'Pengeluaran & Kuitansi' || item === 'Pengeluaran & Kwitansi') navigate('/admin/pengeluaran')
     else if (item === 'Profil Administrator') navigate('/admin/profil')
     else if (item === 'Pengaturan') navigate('/admin/pengaturan')
   }
@@ -562,14 +544,14 @@ function AdminLayoutWrapper() {
   }
 
   return (
-    <AdminLayout
+    <TataLetakAdmin
       activeItem={activeItem}
       adminName={user?.name || 'Administrator'}
       onLogout={handleLogout}
       onSelectMenuItem={handleSelectMenuItem}
     >
       <Outlet />
-    </AdminLayout>
+    </TataLetakAdmin>
   )
 }
 
@@ -676,7 +658,7 @@ function PekerjaLayoutWrapper({ mappedUser }) {
   }
 
   return (
-    <PekerjaLayout
+    <TataLetakKaryawan
       activeItem={activeItem}
       onLogout={handleLogout}
       onSelectMenuItem={handleSelectMenuItem}
@@ -684,7 +666,7 @@ function PekerjaLayoutWrapper({ mappedUser }) {
       workerPhoto={mappedUser?.foto_profil || user?.foto_profil || ''}
     >
       <Outlet />
-    </PekerjaLayout>
+    </TataLetakKaryawan>
   )
 }
 
@@ -703,12 +685,8 @@ function AppRoutes() {
               Number(user.employeeId) > 0 &&
               Number(user.employeeId) < 100000
               ? Number(user.employeeId)
-              : Number.isInteger(Number(user.id)) &&
-                Number(user.id) > 0 &&
-                Number(user.id) < 100000
-                ? Number(user.id)
-                : 1,
-        id_user: user.id_user || user.id || 1,
+              : null,
+        id_user: user.id_user || user.id || null,
         nama: user.nama || user.name || 'Pengguna',
         peran: user.peran || user.role,
       }
@@ -719,7 +697,7 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route element={<ProtectedRoute />}>
-        {/* Rute khusus Admin: Menggunakan AdminLayout asli tanpa tabrakan AppLayout */}
+        {/* Rute khusus Admin: Menggunakan TataLetakAdmin asli tanpa tabrakan AppLayout */}
         <Route element={<ProtectedRoute roles={['admin']} />}>
           <Route element={<AdminLayoutWrapper />}>
             <Route path="/admin" element={<DashboardAdminPage />} />
@@ -731,23 +709,23 @@ function AppRoutes() {
             <Route path="/admin/pengguna" element={<ManajemenPengguna />} />
             <Route
               path="/admin/approval-absensi"
-              element={<VerifikasiAbsensiAdminPage currentUser={mappedUser} />}
+              element={<VerifikasiAbsensiAdmin currentUser={mappedUser} />}
             />
             <Route
               path="/admin/verifikasi"
-              element={<VerifikasiAdminPage currentUser={mappedUser} />}
+              element={<VerifikasiAdmin currentUser={mappedUser} />}
             />
             <Route
               path="/admin/approval-pengeluaran"
-              element={<VerifikasiPengeluaranAdminPage currentUser={mappedUser} />}
+              element={<VerifikasiPengeluaranAdmin currentUser={mappedUser} />}
             />
-            <Route path="/admin/gaji" element={<GajiAdminPage currentUser={mappedUser} />} />
-            <Route path="/admin/kontribusi" element={<KontribusiAdminPage currentUser={mappedUser} />} />
-            <Route path="/admin/jam-kerja" element={<JamKerjaAdminPage currentUser={mappedUser} />} />
+            <Route path="/admin/gaji" element={<GajiAdmin currentUser={mappedUser} />} />
+            <Route path="/admin/kontribusi" element={<KontribusiAdmin currentUser={mappedUser} />} />
+            <Route path="/admin/jam-kerja" element={<JamKerjaAdmin currentUser={mappedUser} />} />
             <Route
               path="/admin/detail-jam"
               element={
-                <DetailJamAdminPage
+                <DetailJamKerjaAdmin
                   currentUser={mappedUser}
                   query={Object.fromEntries(new URLSearchParams(location.search))}
                 />
@@ -755,18 +733,18 @@ function AppRoutes() {
             />
             <Route
               path="/admin/pemasukan"
-              element={<PemasukanAdminPage currentUser={mappedUser} />}
+              element={<PemasukanKasAdmin currentUser={mappedUser} />}
             />
             <Route
               path="/admin/pengeluaran"
-              element={<PengeluaranAdminPage currentUser={mappedUser} />}
+              element={<PengeluaranAdmin currentUser={mappedUser} />}
             />
             <Route path="/admin/profil" element={<ProfilAdmin />} />
             <Route path="/admin/pengaturan" element={<PengaturanAdmin />} />
           </Route>
         </Route>
 
-        {/* Rute khusus Karyawan: Menggunakan PekerjaLayout asli tanpa tabrakan AppLayout */}
+        {/* Rute khusus Karyawan: Menggunakan TataLetakKaryawan asli tanpa tabrakan AppLayout */}
         <Route element={<ProtectedRoute roles={['karyawan']} />}>
           <Route element={<PekerjaLayoutWrapper mappedUser={mappedUser} />}>
             <Route path="/karyawan" element={<DashboardPekerjaPage mappedUser={mappedUser} />} />
@@ -814,8 +792,8 @@ function AppRoutes() {
                 />
               }
             />
-            <Route path="/karyawan/presensi" element={<PresensiKaryawanGajiPage currentUser={mappedUser} />} />
-            <Route path="/karyawan/gaji" element={<GajiKaryawanPage currentUser={mappedUser} />} />
+            <Route path="/karyawan/presensi" element={<AbsensiKaryawan currentUser={mappedUser} />} />
+            <Route path="/karyawan/gaji" element={<GajiKaryawan currentUser={mappedUser} />} />
             <Route path="/karyawan/proyek" element={<Navigate to="/karyawan/pekerjaan-saya" replace />} />
             <Route
               path="/karyawan/pemasukan"
@@ -823,7 +801,7 @@ function AppRoutes() {
             />
             <Route
               path="/karyawan/pengeluaran"
-              element={<PengeluaranKaryawanPage currentUser={mappedUser} />}
+              element={<PengeluaranKaryawan currentUser={mappedUser} />}
             />
             <Route
               path="/karyawan/absensi"
@@ -844,7 +822,7 @@ function AppRoutes() {
           path="/dashboard"
           element={<Navigate to={user ? roleHome(user.role) : '/login'} replace />}
         />
-        <Route path="/pekerja" element={<PekerjaLocalTest />} />
+        <Route path="/pekerja" element={<Navigate to="/karyawan" replace />} />
       </Route>
       <Route path="*" element={<Navigate to={user ? roleHome(user.role) : '/login'} replace />} />
     </Routes>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { changePassword, updateProfile } from '../../api/auth.js'
-import WorkerAvatar from '../../components/WorkerAvatar.jsx'
-import WorkerPageHeader from '../../components/WorkerPageHeader.jsx'
+import AvatarKaryawan from '../../components/AvatarKaryawan.jsx'
+import HeaderHalamanKaryawan from '../../components/HeaderHalamanKaryawan.jsx'
 import { formatCurrency } from '../../utils/formatters.js'
 import { compressImage, fileToDataUrl } from '../../utils/imageCompressor.js'
 
@@ -354,7 +354,7 @@ function PengaturanPekerja({
 
   return (
     <div className="worker-settings-page mx-auto w-full max-w-[1440px] space-y-6">
-      <WorkerPageHeader
+      <HeaderHalamanKaryawan
         breadcrumbText="Pengaturan"
         description="Perbarui data akun pribadi, foto profil, kontak WhatsApp, informasi rekening gaji, kata sandi, dan preferensi aplikasi."
         title="Pengaturan Akun Pekerja"
@@ -394,7 +394,7 @@ function PengaturanPekerja({
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
         <div className="flex flex-col gap-4 rounded-xl border border-slate-100 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <WorkerAvatar
+            <AvatarKaryawan
               className="h-14 w-14 rounded-2xl text-xl shadow-md shadow-emerald-600/15"
               name={profileForm.nama || worker?.nama || 'Pekerja'}
               photoPath={displayedPhotoPath}
@@ -404,7 +404,7 @@ function PengaturanPekerja({
                 {profileForm.nama || worker?.nama || 'Pekerja'}
               </p>
               <p className="mt-0.5 text-xs font-semibold text-emerald-700">
-                {worker?.jabatan || 'Pekerja Lapangan'} · ID Karyawan #{worker?.id_karyawan || '-'}
+                {worker?.jabatan || 'Pekerja Lapangan'} · ID Karyawan {worker?.kode_karyawan || `#${worker?.id_karyawan || '-'}`}
               </p>
               <p className="mt-0.5 truncate text-xs text-slate-500">
                 {profileForm.email || worker?.email || 'Email belum diatur'}
@@ -482,7 +482,7 @@ function PengaturanPekerja({
             {/* Upload Foto Profil */}
             <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <WorkerAvatar
+                <AvatarKaryawan
                   className="h-16 w-16 rounded-2xl text-2xl shadow-sm"
                   name={profileForm.nama || worker?.nama || 'Pekerja'}
                   photoPath={displayedPhotoPath}
@@ -717,7 +717,7 @@ function PengaturanPekerja({
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div className="rounded-xl bg-white p-3.5 shadow-xs">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">ID Karyawan</p>
-                  <p className="mt-1 text-sm font-bold text-slate-800">#{worker?.id_karyawan || '-'}</p>
+                  <p className="mt-1 text-sm font-bold text-slate-800">{worker?.kode_karyawan || `#${worker?.id_karyawan || '-'}`}</p>
                 </div>
                 <div className="rounded-xl bg-white p-3.5 shadow-xs">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Jabatan / Keahlian</p>

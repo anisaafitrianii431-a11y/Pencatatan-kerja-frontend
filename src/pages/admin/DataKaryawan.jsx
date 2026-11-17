@@ -7,8 +7,8 @@ import {
   toggleStatusKaryawan,
   updateKaryawan,
 } from '../../services/karyawanApi.js'
-import AdminAvatar from '../../components/AdminAvatar.jsx'
-import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog.jsx'
+import AvatarAdmin from '../../components/AvatarAdmin.jsx'
+import ModalKonfirmasiHapus from '../../components/ModalKonfirmasiHapus.jsx'
 
 const PAGE_SIZE = 8
 
@@ -17,9 +17,9 @@ const INITIAL_FORM = {
   jabatan: '',
   nomor_hp: '',
   jenis_upah: 'per_jam',
-  nominal_upah: '',
+  nominal_upah: 0,
   lembur_aktif: false,
-  tarif_lembur: '',
+  tarif_lembur: 0,
   catatan_admin: '',
   status: 'aktif',
   kata_sandi: '',
@@ -75,11 +75,10 @@ function computePredictedKode(fullName, existingEmployees = []) {
   if (!fullName || !fullName.trim()) return ''
   const firstWord = fullName.trim().split(/\s+/)[0] || ''
   const clean = firstWord.replace(/[^a-zA-Z]/g, '').toUpperCase()
-  let prefix = clean.slice(0, 4)
-  if (prefix.length < 4) {
-    prefix = prefix.padEnd(4, 'X')
+  let prefix = clean || 'KARY'
+  if (prefix.length < 3) {
+    prefix = prefix.padEnd(3, 'X')
   }
-  if (!prefix) prefix = 'KARY'
 
   let maxSeq = 0
   for (const emp of existingEmployees) {
@@ -304,7 +303,7 @@ function EmployeeDetailModal({ employee, onClose, onEdit, onResetPassword }) {
           {/* Hero Banner Profil Karyawan */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-blue-50/30 p-4 shadow-2xs">
             <div className="flex items-center gap-3.5">
-              <AdminAvatar
+              <AvatarAdmin
                 name={employee.nama}
                 className="h-14 w-14 text-base font-bold shadow-sm ring-2 ring-white"
               />
@@ -653,20 +652,6 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
       }
     }
 
-    // Validasi Besar Gaji
-    if (values.nominal_upah === '' || !Number.isFinite(nominal) || nominal < 0) {
-      setValidationMessage('Besar gaji harus diisi dengan angka yang benar (Rp0 atau lebih).')
-      return
-    }
-
-    // Validasi Gaji Lembur
-    if (lemburAktif) {
-      if (values.tarif_lembur === '' || !Number.isFinite(tarifLembur) || tarifLembur < 0) {
-        setValidationMessage('Besar gaji lembur per jam wajib diisi saat lembur diaktifkan.')
-        return
-      }
-    }
-
     // Validasi Password khusus saat Tambah Karyawan Baru
     if (!isEdit) {
       const pass = values.kata_sandi.trim()
@@ -693,6 +678,7 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
     try {
       await onSave({
         nama,
+        kode_karyawan: predictedKode,
         jabatan: jabatan || null,
         nomor_hp: nomorHp || null,
         jenis_upah: values.jenis_upah,
@@ -739,8 +725,8 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
               </h2>
               <p className="text-xs text-slate-500">
                 {isEdit
-                  ? 'Perbarui informasi karyawan, sistem gaji, dan catatan khusus admin.'
-                  : 'Lengkapi data identitas, pengaturan gaji, dan buat akun login karyawan.'}
+                  ? 'Perbarui informasi karyawan, akun login, dan catatan khusus admin.'
+                  : 'Lengkapi data identitas dan buat akun login karyawan.'}
               </p>
             </div>
           </div>
@@ -864,186 +850,12 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             </div>
           </fieldset>
 
-          {/* BAGIAN B: PENGATURAN GAJI KARYAWAN */}
-          <fieldset className="space-y-4 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4">
-            <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-              <EmployeeIcon name="banknote" className="h-3.5 w-3.5 text-emerald-600" />
-              <span>B. Pengaturan Gaji Karyawan</span>
-            </legend>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Pilih cara pembayaran gaji untuk karyawan ini:
-              </label>
-
-              {/* 3 Card Pilihan Cara Pembayaran Gaji */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {[
-                  {
-                    type: 'per_jam',
-                    title: 'Gaji Per Jam',
-                    desc: 'Dihitung berdasarkan jumlah jam kerja yang disetujui Admin.',
-                    unit: 'per jam',
-                  },
-                  {
-                    type: 'per_hari',
-                    title: 'Gaji Per Hari',
-                    desc: 'Dibayarkan berdasarkan jumlah hari kerja.',
-                    unit: 'per hari',
-                  },
-                  {
-                    type: 'per_bulan',
-                    title: 'Gaji Bulanan',
-                    desc: 'Dibayarkan dengan jumlah tetap setiap bulan.',
-                    unit: 'per bulan',
-                  },
-                ].map((item) => {
-                  const isSelected = values.jenis_upah === item.type
-                  return (
-                    <button
-                      key={item.type}
-                      type="button"
-                      onClick={() => handleWageTypeChange(item.type)}
-                      className={`flex flex-col text-left p-3 rounded-xl border transition-all ${
-                        isSelected
-                          ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs'
-                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className={`text-xs font-bold ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
-                          {item.title}
-                        </span>
-                        <span
-                          className={`h-4 w-4 rounded-full border flex items-center justify-center ${
-                            isSelected
-                              ? 'border-blue-600 bg-blue-600 text-white'
-                              : 'border-slate-300 bg-white'
-                          }`}
-                        >
-                          {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-slate-500 leading-snug">
-                        {item.desc}
-                      </p>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Input Nominal Sesuai Pilihan */}
-            <div>
-              <label
-                htmlFor="form-nominal"
-                className="block text-xs font-semibold text-slate-700 mb-1"
-              >
-                {currentWageConfig.inputLabel} <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                  Rp
-                </span>
-                <input
-                  id="form-nominal"
-                  type="number"
-                  min="0"
-                  step="1000"
-                  required
-                  placeholder="contoh: 50000"
-                  value={values.nominal_upah}
-                  onChange={(e) =>
-                    setValues((prev) => ({ ...prev, nominal_upah: e.target.value }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-24 text-xs sm:text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                  {currentWageConfig.unit}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                <span>Format tampilan:</span>
-                <span className="font-bold text-blue-600">
-                  {values.nominal_upah ? formatCurrency(values.nominal_upah) : 'Rp0'}{' '}
-                  {currentWageConfig.unit}
-                </span>
-              </div>
-            </div>
-
-            {/* Gaji Tambahan Lembur (Opsional) */}
-            <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="block text-xs font-bold text-slate-800">
-                    Gaji Tambahan untuk Lembur (Opsional)
-                  </span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Aktifkan jika karyawan mendapatkan bayaran tambahan saat bekerja melebihi jam kerja.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
-                  <input
-                    type="checkbox"
-                    checked={values.lembur_aktif}
-                    onChange={(e) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        lembur_aktif: e.target.checked,
-                      }))
-                    }
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-
-              {values.lembur_aktif && (
-                <div className="pt-2 border-t border-slate-100">
-                  <label
-                    htmlFor="form-tarif-lembur"
-                    className="block text-xs font-semibold text-slate-700 mb-1"
-                  >
-                    Besar Gaji Lembur Per Jam (Rp) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                      Rp
-                    </span>
-                    <input
-                      id="form-tarif-lembur"
-                      type="number"
-                      min="0"
-                      step="1000"
-                      required={values.lembur_aktif}
-                      placeholder="contoh: 25000"
-                      value={values.tarif_lembur}
-                      onChange={(e) =>
-                        setValues((prev) => ({ ...prev, tarif_lembur: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-20 text-xs sm:text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                      / jam
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Format lembur:</span>
-                    <span className="font-bold text-blue-600">
-                      {values.tarif_lembur ? formatCurrency(values.tarif_lembur) : 'Rp0'} / jam
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </fieldset>
-
-          {/* BAGIAN C: AKUN LOGIN KARYAWAN ATAU STATUS */}
+          {/* BAGIAN B: AKUN LOGIN KARYAWAN ATAU STATUS */}
           {!isEdit ? (
             <fieldset className="space-y-4 rounded-xl border border-blue-200/90 bg-blue-50/30 p-4">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
                 <EmployeeIcon name="lock" className="h-3.5 w-3.5 text-blue-600" />
-                <span>C. Akun Login Karyawan</span>
+                <span>B. Akun Login Karyawan</span>
               </legend>
 
               <div className="rounded-lg bg-white p-3 border border-blue-100 flex items-start gap-2.5 text-xs text-slate-600">
@@ -1123,7 +935,7 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             <fieldset className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <EmployeeIcon name="power" className="h-3.5 w-3.5 text-blue-600" />
-                <span>C. Status Karyawan &amp; Keamanan Akun</span>
+                <span>B. Status Karyawan &amp; Keamanan Akun</span>
               </legend>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80">
@@ -1172,12 +984,12 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             </fieldset>
           )}
 
-          {/* BAGIAN D: CATATAN KHUSUS ADMIN */}
+          {/* BAGIAN C: CATATAN KHUSUS ADMIN */}
           <fieldset className="space-y-2 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4">
             <div className="flex items-center justify-between">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <EmployeeIcon name="fileText" className="h-3.5 w-3.5 text-amber-600" />
-                <span>D. Catatan Khusus Admin</span>
+                <span>C. Catatan Khusus Admin</span>
               </legend>
               <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200/70">
                 Hanya Terlihat Oleh Admin
@@ -2037,7 +1849,7 @@ function DataKaryawan() {
                       {/* 3. Informasi Karyawan (Avatar + Nama Lengkap) */}
                       <td className="whitespace-nowrap px-3.5 py-3">
                         <div className="flex items-center gap-2.5">
-                          <AdminAvatar
+                          <AvatarAdmin
                             name={employee.nama}
                             className="h-8 w-8 text-xs font-bold shadow-2xs"
                           />
@@ -2244,7 +2056,7 @@ function DataKaryawan() {
 
       {/* 8. DIALOG KONFIRMASI HAPUS */}
       {pendingDelete && (
-        <DeleteConfirmationDialog
+        <ModalKonfirmasiHapus
           description="Anda yakin ingin menghapus data karyawan ini dari database perusahaan? Jika karyawan memiliki riwayat operasional (absensi/penugasan/gaji), data tidak dapat dihapus dan disarankan untuk dinonaktifkan."
           isProcessing={isSaving}
           itemName={`${pendingDelete.nama} (ID: ${pendingDelete.kode_karyawan || pendingDelete.id_karyawan})`}

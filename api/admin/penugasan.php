@@ -104,6 +104,31 @@ if ($method === 'GET') {
     $stmt->execute([$id_pekerjaan, $id_karyawan, $peran_tugas]);
     $newId = intval($pdo->lastInsertId());
 
+    // Sinkronkan skema upah & nominal dari pekerjaan ke data karyawan
+    $stmtJob = $pdo->prepare("SELECT jenis_upah, nominal_upah FROM pekerjaan WHERE id_pekerjaan = ?");
+    $stmtJob->execute([$id_pekerjaan]);
+    $jobInfo = $stmtJob->fetch(PDO::FETCH_ASSOC);
+    if ($jobInfo && floatval($jobInfo['nominal_upah']) > 0) {
+        $jJenis = $jobInfo['jenis_upah'] ?: 'per_jam';
+        $jNom = floatval($jobInfo['nominal_upah']);
+        $stmtUpKaryawan = $pdo->prepare("
+            UPDATE karyawan
+            SET jenis_upah = ?,
+                nominal_upah = ?,
+                tarif_per_jam = CASE WHEN ? = 'per_jam' THEN ? ELSE tarif_per_jam END
+            WHERE id_karyawan = ?
+        ");
+        $stmtUpKaryawan->execute([$jJenis, $jNom, $jJenis, $jNom, $id_karyawan]);
+
+        $stmtUpG = $pdo->prepare("
+            UPDATE gaji
+            SET jenis_upah = ?,
+                tarif = ?
+            WHERE id_karyawan = ? AND status_bayar = 'belum' AND total_dibayar <= 0
+        ");
+        $stmtUpG->execute([$jJenis, $jNom, $id_karyawan]);
+    }
+
     jsonResponse(true, "Pekerja berhasil ditugaskan pada pekerjaan ini (Admin)", [
         "id_penugasan" => $newId,
         "id_pekerjaan" => $id_pekerjaan,

@@ -30,6 +30,22 @@ async function request(path, options = {}) {
   return result
 }
 
+export const MASTER_PEKERJA = [
+  { id_karyawan: 1, kode_karyawan: 'BUDI001', nama: 'Budi Santoso', jabatan: 'Teknisi Jaringan Senior', email: 'budi@jamkerja.com' },
+  { id_karyawan: 2, kode_karyawan: 'SITI002', nama: 'Siti Rahma', jabatan: 'Sistem Analis', email: 'siti@jamkerja.com' },
+  { id_karyawan: 3, kode_karyawan: 'AGUS003', nama: 'Agus Setiawan', jabatan: 'Teknisi Lapangan', email: 'agus@jamkerja.com' },
+  { id_karyawan: 4, kode_karyawan: 'DEWI004', nama: 'Dewi Lestari', jabatan: 'Quality Assurance', email: 'dewi@jamkerja.com' },
+  { id_karyawan: 8, kode_karyawan: 'ALDI005', nama: 'Aldiano', jabatan: 'Service', email: 'aldiano@jamkerja.com' },
+  { id_karyawan: 10, kode_karyawan: 'JOVI006', nama: 'Jovi', jabatan: 'Teknisi Lapangan', email: 'jovi@jamkerja.com' },
+  { id_karyawan: 12, kode_karyawan: 'MUHA007', nama: 'Muhammad Fauzan', jabatan: 'Teknisi', email: 'fauzan@jamkerja.com' },
+  { id_karyawan: 13, kode_karyawan: 'TIAR008', nama: 'Tiara', jabatan: 'Teknisi', email: 'tiara@jamkerja.com' },
+  { id_karyawan: 14, kode_karyawan: 'CITRA009', nama: 'Citra', jabatan: 'IT', email: 'citra@jamkerja.com' },
+  { id_karyawan: 15, kode_karyawan: 'ANIS010', nama: 'Anisa Fitriani', jabatan: 'Teknisi', email: 'anisa@jamkerja.com' },
+  { id_karyawan: 18, kode_karyawan: 'ANDI011', nama: 'Andi', jabatan: 'Teknisi jaringan', email: 'andi@jamkerja.com' },
+  { id_karyawan: 21, kode_karyawan: 'PUTRI012', nama: 'Putri Cantika', jabatan: 'sistem Analisis', email: 'putricantika012@jamkerja.com' },
+  { id_karyawan: 22, kode_karyawan: 'ADINDA013', nama: 'Adinda Keyla', jabatan: 'Teknisi Proyek', email: 'adindakeyla013@jamkerja.com' },
+]
+
 function readUser(result) {
   const user = result?.user || result?.data || result
   if (!user || typeof user !== 'object') {
@@ -45,14 +61,27 @@ function readUser(result) {
     throw new Error('Akun Anda tidak aktif. Hubungi administrator.')
   }
 
+  let effectiveName = user.nama || user.name || user.email || 'Pengguna'
+  const userCode = (user.kode_karyawan || user.kode_user || user.username || '').toUpperCase()
+
+  // Jika nama masih berbentuk kode (misal PUTRI012), cocokkan dengan data master
+  if (role !== 'admin' && userCode) {
+    const matched = MASTER_PEKERJA.find((p) => p.kode_karyawan.toUpperCase() === userCode)
+    if (matched && (!user.nama || user.nama === userCode || user.name === userCode)) {
+      effectiveName = matched.nama
+    }
+  }
+
   return {
     id: user.id_user ?? user.id,
     id_user: user.id_user ?? user.id,
     employeeId: user.id_karyawan ?? user.employeeId ?? null,
     id_karyawan: user.id_karyawan ?? user.employeeId ?? null,
+    kode_karyawan: user.kode_karyawan || user.kode_user || '',
+    username: user.username || user.kode_user || '',
     email: user.email || '',
-    name: user.name || user.nama || user.email || 'Pengguna',
-    nama: user.nama || user.name || user.email || 'Pengguna',
+    name: effectiveName,
+    nama: effectiveName,
     jabatan: user.jabatan || '',
     tarif_per_jam: Number(user.tarif_per_jam) || 0,
     no_hp: user.no_hp || '',
@@ -109,8 +138,29 @@ export async function getCurrentUser() {
         const parsed = JSON.parse(stored)
         // Perbaiki jika employeeId tersimpan sebagai timestamp (misal > 100000)
         if (parsed.employeeId && Number(parsed.employeeId) > 100000) {
-          parsed.employeeId = 1
-          localStorage.setItem('ruangkerja_user', JSON.stringify(parsed))
+          parsed.employeeId = null
+        }
+        // Self-heal: jika session lama memegang ID/nama tidak sinkron, cocokkan dengan master
+        const checkCode = (parsed.kode_karyawan || parsed.username || parsed.name || '').toUpperCase()
+        if (checkCode && !checkCode.includes('BUDI')) {
+          const matched = MASTER_PEKERJA.find(
+            (p) =>
+              p.kode_karyawan.toUpperCase() === checkCode ||
+              p.nama.toUpperCase() === checkCode ||
+              checkCode.includes(p.kode_karyawan.toUpperCase()) ||
+              p.nama.toUpperCase().includes(checkCode),
+          )
+          if (matched) {
+            parsed.employeeId = matched.id_karyawan
+            parsed.id_karyawan = matched.id_karyawan
+            parsed.id_user = matched.id_karyawan
+            parsed.nama = matched.nama
+            parsed.name = matched.nama
+            parsed.kode_karyawan = matched.kode_karyawan
+            parsed.jabatan = matched.jabatan || parsed.jabatan
+            parsed.email = matched.email || parsed.email
+            localStorage.setItem('ruangkerja_user', JSON.stringify(parsed))
+          }
         }
         const u = readUser({ ...parsed, id_karyawan: parsed.employeeId || parsed.id_karyawan })
         localStorage.setItem('jam_kerja_auth', JSON.stringify({
@@ -149,11 +199,11 @@ export async function login(credentials) {
     }))
     return user
   } catch (error) {
-    // Jika backend merespons error kredensial spesifik (401 salah password, 403 akun nonaktif, dll)
+    // Jika backend merespons error kredensial spesifik (401 salah password, 403 akun nonaktif, dsb)
+    // Lempar error asli agar pengguna tahu bahwa kata sandi atau username salah
     if (
-      (error.status === 400 || error.status === 401 || error.status === 403) &&
-      error.message &&
-      error.message !== 'Terjadi kesalahan. Silakan coba lagi.'
+      (error.status === 400 || error.status === 401 || error.status === 403) ||
+      (error.message && !error.message.toLowerCase().includes('fetch') && !error.message.toLowerCase().includes('network'))
     ) {
       throw error
     }
@@ -176,14 +226,18 @@ export async function login(credentials) {
       const safeEmployeeId =
         Number(registered.employeeId) > 0 && Number(registered.employeeId) < 100000
           ? Number(registered.employeeId)
-          : 1
+          : null
       const userObj = {
         id: registered.id || 2,
+        id_user: registered.id || 2,
         employeeId: safeEmployeeId,
+        id_karyawan: safeEmployeeId,
         email: registered.email,
         name: registered.name || registered.nama || registered.email?.split('@')[0] || rawId,
+        nama: registered.name || registered.nama || registered.email?.split('@')[0] || rawId,
         jabatan: registered.jabatan || 'Pekerja',
         role: registered.role || 'karyawan',
+        peran: registered.role || 'karyawan',
       }
       localStorage.setItem('ruangkerja_user', JSON.stringify(userObj))
       localStorage.setItem('jam_kerja_auth', JSON.stringify({
@@ -196,32 +250,66 @@ export async function login(credentials) {
       return userObj
     }
 
-    // Jika backend API belum aktif/offline/404, aktifkan fallback demo mode
+    // Fallback HANYA jika server benar-benar offline / network down
+    // Cari kecocokan karyawan dari master data, BUKAN di-hardcode ke Budi Santoso / Anisa!
     const isAdmin = rawId.toLowerCase().includes('admin')
-    const role = isAdmin ? 'admin' : 'karyawan'
-    const name = isAdmin
-      ? 'Administrator'
-      : (rawId.includes('@')
-          ? (rawId.split('@')[0].charAt(0).toUpperCase() + rawId.split('@')[0].slice(1))
-          : rawId.toUpperCase())
-
-    const demoUser = {
-      id: isAdmin ? 1 : 2,
-      employeeId: isAdmin ? null : 1,
-      email: credentials.email || (isAdmin ? 'admin@jamkerja.com' : `${rawId.toLowerCase()}@jamkerja.com`),
-      name,
-      role,
+    if (isAdmin) {
+      const adminUser = {
+        id: 1,
+        id_user: 1,
+        employeeId: null,
+        id_karyawan: null,
+        email: 'admin@jamkerja.com',
+        name: 'Administrator',
+        nama: 'Administrator',
+        role: 'admin',
+        peran: 'admin',
+      }
+      localStorage.setItem('ruangkerja_user', JSON.stringify(adminUser))
+      return adminUser
     }
 
-    localStorage.setItem('ruangkerja_user', JSON.stringify(demoUser))
-    localStorage.setItem('jam_kerja_auth', JSON.stringify({
-      id_user: demoUser.id,
-      id_karyawan: demoUser.employeeId,
-      peran: demoUser.role,
-      email: demoUser.email,
-      nama: demoUser.name,
-    }))
-    return demoUser
+    const matchedEmp = MASTER_PEKERJA.find((p) => {
+      const q = rawId.toLowerCase()
+      return (
+        p.kode_karyawan.toLowerCase() === q ||
+        p.email.toLowerCase() === q ||
+        p.nama.toLowerCase() === q ||
+        q.includes(p.nama.toLowerCase()) ||
+        p.nama.toLowerCase().includes(q) ||
+        (q.startsWith('citr') && p.id_karyawan === 14) ||
+        (q.startsWith('anis') && p.id_karyawan === 15) ||
+        (q.startsWith('putr') && p.id_karyawan === 21) ||
+        (q.startsWith('adin') && p.id_karyawan === 22)
+      )
+    })
+
+    if (matchedEmp) {
+      const userObj = {
+        id: matchedEmp.id_karyawan,
+        id_user: matchedEmp.id_karyawan,
+        employeeId: matchedEmp.id_karyawan,
+        id_karyawan: matchedEmp.id_karyawan,
+        email: matchedEmp.email,
+        name: matchedEmp.nama,
+        nama: matchedEmp.nama,
+        jabatan: matchedEmp.jabatan,
+        role: 'karyawan',
+        peran: 'karyawan',
+        kode_karyawan: matchedEmp.kode_karyawan,
+      }
+      localStorage.setItem('ruangkerja_user', JSON.stringify(userObj))
+      localStorage.setItem('jam_kerja_auth', JSON.stringify({
+        id_user: userObj.id,
+        id_karyawan: userObj.employeeId,
+        peran: userObj.role,
+        email: userObj.email,
+        nama: userObj.name,
+      }))
+      return userObj
+    }
+
+    throw error
   }
 }
 

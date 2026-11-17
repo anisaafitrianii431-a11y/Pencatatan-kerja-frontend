@@ -8,8 +8,8 @@ import {
   getPenugasan,
   getPenugasanById,
 } from '../../services/penugasanApi.js'
-import AdminAvatar from '../../components/AdminAvatar.jsx'
-import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog.jsx'
+import AvatarAdmin from '../../components/AvatarAdmin.jsx'
+import ModalKonfirmasiHapus from '../../components/ModalKonfirmasiHapus.jsx'
 
 const PAGE_SIZE = 8
 
@@ -96,6 +96,13 @@ function Icon({ name, className = 'h-4 w-4' }) {
       <>
         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
         <path d="M3 3v5h5" />
+      </>
+    ),
+    history: (
+      <>
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+        <path d="M12 7v5l3 2" />
       </>
     ),
     alert: (
@@ -190,7 +197,7 @@ function AssignmentDetailModal({ assignment, employee, job, onClose }) {
               Teknisi / Karyawan
             </span>
             <div className="mt-2 flex items-center gap-3">
-              <AdminAvatar
+              <AvatarAdmin
                 name={assignment.nama_karyawan || employee?.nama}
                 className="h-10 w-10 text-xs font-bold shadow-sm"
               />
@@ -249,6 +256,244 @@ function AssignmentDetailModal({ assignment, employee, job, onClose }) {
   )
 }
 
+function WorkerAssignmentHistoryModal({
+  worker,
+  assignments,
+  jobMap,
+  onClose,
+  onViewDetail,
+  onCancelAssignment,
+  onFilterWorker,
+}) {
+  if (!worker) return null
+
+  // Ambil semua penugasan pekerja ini
+  const workerAssignments = assignments.filter(
+    (a) => Number(a.id_karyawan) === Number(worker.id_karyawan)
+  )
+
+  const totalProyek = workerAssignments.length
+  const activeProyek = workerAssignments.filter((a) => {
+    const job = jobMap.get(Number(a.id_pekerjaan))
+    const st = a.status_pekerjaan || job?.status || 'belum_mulai'
+    return st === 'berjalan' || st === 'belum_mulai'
+  }).length
+  const completedProyek = workerAssignments.filter((a) => {
+    const job = jobMap.get(Number(a.id_pekerjaan))
+    const st = a.status_pekerjaan || job?.status || 'belum_mulai'
+    return st === 'selesai'
+  }).length
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm transition-all"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="worker-history-modal-title"
+        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all"
+      >
+        {/* Header Modal */}
+        <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <AvatarAdmin
+              name={worker.nama}
+              className="h-11 w-11 text-sm font-bold shadow-sm"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <h2
+                  id="worker-history-modal-title"
+                  className="text-base sm:text-lg font-bold text-slate-900"
+                >
+                  {worker.nama}
+                </h2>
+                <span className="font-mono text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  {worker.kode_karyawan || `ID: #${worker.id_karyawan}`}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                {worker.jabatan || 'Teknisi Lapangan'} · Riwayat Seluruh Portofolio Penugasan Kerja
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition"
+            title="Tutup dialog"
+          >
+            <Icon name="close" className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Ringkasan Beban Kerja (3 Kartu Metrik) */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-center">
+              <span className="text-[11px] font-medium text-slate-500 block">Total Pekerjaan</span>
+              <span className="text-xl font-bold text-slate-900 mt-0.5 block">{totalProyek}</span>
+              <span className="text-[10px] text-slate-400">Semua riwayat proyek</span>
+            </div>
+
+            <div className="rounded-xl border border-blue-200/80 bg-blue-50/40 p-3 text-center">
+              <span className="text-[11px] font-medium text-blue-700 block">Sedang Aktif</span>
+              <span className="text-xl font-bold text-blue-800 mt-0.5 block">{activeProyek}</span>
+              <span className="text-[10px] text-blue-600/80">Belum selesai / berjalan</span>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 text-center">
+              <span className="text-[11px] font-medium text-emerald-700 block">Proyek Selesai</span>
+              <span className="text-xl font-bold text-emerald-800 mt-0.5 block">{completedProyek}</span>
+              <span className="text-[10px] text-emerald-600/80">Telah rampung</span>
+            </div>
+          </div>
+
+          {/* List Riwayat Penugasan */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                Daftar Pekerjaan yang Diambil ({workerAssignments.length})
+              </h3>
+              {onFilterWorker && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onFilterWorker(worker.id_karyawan)
+                    onClose()
+                  }}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline transition cursor-pointer"
+                >
+                  Tampilkan {worker.nama} di Tabel Utama →
+                </button>
+              )}
+            </div>
+
+            {workerAssignments.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-400 text-xs">
+                Pekerja ini belum memiliki riwayat penugasan pekerjaan apapun.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <table className="w-full text-left text-xs text-slate-700">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Proyek & Lokasi</th>
+                      <th className="px-3 py-2.5">Metode</th>
+                      <th className="px-3 py-2.5">Peran</th>
+                      <th className="px-3 py-2.5">Target Selesai</th>
+                      <th className="px-3 py-2.5 text-center">Status</th>
+                      <th className="px-3 py-2.5 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {workerAssignments.map((as) => {
+                      const job = jobMap.get(Number(as.id_pekerjaan))
+                      const st = as.status_pekerjaan || job?.status || 'belum_mulai'
+                      const isMandiri = as.jenis_penugasan === 'mandiri'
+
+                      return (
+                        <tr key={as.id_penugasan} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-3.5 py-3">
+                            <span className="font-bold text-slate-900 block">
+                              {as.nama_pekerjaan || job?.nama_pekerjaan || 'Pekerjaan'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <Icon name="location" className="h-3 w-3 shrink-0" />
+                              {as.lokasi || job?.lokasi || 'Lokasi belum diatur'}
+                            </span>
+                          </td>
+
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {isMandiri ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/15">
+                                <span className="h-1 w-1 rounded-full bg-purple-500" />
+                                Mandiri
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-600/15">
+                                <span className="h-1 w-1 rounded-full bg-sky-500" />
+                                Admin
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-3 py-3 whitespace-nowrap text-slate-600 font-medium">
+                            {as.peran_tugas || 'Teknisi'}
+                          </td>
+
+                          <td className="px-3 py-3 whitespace-nowrap text-slate-600 font-medium">
+                            {formatDate(as.target_selesai || job?.target_selesai)}
+                          </td>
+
+                          <td className="px-3 py-3 whitespace-nowrap text-center">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+                                st === 'selesai'
+                                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                                  : st === 'berjalan'
+                                    ? 'bg-blue-50 text-blue-700 ring-blue-700/20'
+                                    : 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                              }`}
+                            >
+                              {STATUS_LABELS[st] || st}
+                            </span>
+                          </td>
+
+                          <td className="px-3 py-3 whitespace-nowrap text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose()
+                                  onViewDetail(as)
+                                }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition shadow-2xs cursor-pointer"
+                                title="Lihat detail penugasan ini"
+                              >
+                                <Icon name="eye" className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose()
+                                  onCancelAssignment(as)
+                                }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition shadow-2xs cursor-pointer"
+                                title="Batalkan penugasan ini"
+                              >
+                                <Icon name="trash" className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function Penugasan() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -267,8 +512,20 @@ function Penugasan() {
 
   const [notice, setNotice] = useState(null)
   const [selectedDetail, setSelectedDetail] = useState(null)
+  const [selectedWorkerHistory, setSelectedWorkerHistory] = useState(null)
   const [pendingCancel, setPendingCancel] = useState(null)
   const [loadingDetailId, setLoadingDetailId] = useState(null)
+
+  function handleOpenWorkerHistory(id_karyawan, fallbackNama, fallbackJabatan) {
+    const empId = Number(id_karyawan)
+    const employee = employeeMap.get(empId)
+    setSelectedWorkerHistory({
+      id_karyawan: empId,
+      nama: fallbackNama || employee?.nama || 'Pekerja',
+      jabatan: fallbackJabatan || employee?.jabatan || 'Teknisi',
+      kode_karyawan: employee?.kode_karyawan || `KRY-${empId}`,
+    })
+  }
 
   // Filters & Pagination
   const [search, setSearch] = useState('')
@@ -327,11 +584,11 @@ function Penugasan() {
   }, [])
 
   const employeeMap = useMemo(
-    () => new Map(employees.map((e) => [e.id_karyawan, e])),
+    () => new Map(employees.map((e) => [Number(e.id_karyawan), e])),
     [employees],
   )
   const jobMap = useMemo(
-    () => new Map(jobs.map((j) => [j.id_pekerjaan, j])),
+    () => new Map(jobs.map((j) => [Number(j.id_pekerjaan), j])),
     [jobs],
   )
 
@@ -340,56 +597,134 @@ function Penugasan() {
     window.setTimeout(() => setNotice(null), 3500)
   }
 
-  const filteredAssignments = useMemo(() => {
+  // Kelompokkan data penugasan per Pekerja Unik (1 Baris = 1 Nama Pekerja)
+  const workerGroups = useMemo(() => {
+    const map = new Map()
+    for (const assignment of assignments) {
+      const empId = Number(assignment.id_karyawan)
+      if (!map.has(empId)) {
+        map.set(empId, [])
+      }
+      map.get(empId).push(assignment)
+    }
+
+    const groups = []
+    for (const [empId, workerAssignments] of map.entries()) {
+      const employee = employeeMap.get(empId)
+      const firstName = workerAssignments[0]?.nama_karyawan || employee?.nama || 'Pekerja'
+      const firstRole = workerAssignments[0]?.jabatan || employee?.jabatan || 'Teknisi'
+      const kodeKaryawan = employee?.kode_karyawan || `KRY-${empId}`
+
+      // Urutkan penugasan dari yang terbaru
+      const sorted = [...workerAssignments].sort(
+        (a, b) => Number(b.id_penugasan) - Number(a.id_penugasan)
+      )
+
+      // Pisahkan tugas aktif dan selesai
+      const activeList = sorted.filter((a) => {
+        const job = jobMap.get(Number(a.id_pekerjaan))
+        const st = a.status_pekerjaan || job?.status || 'belum_mulai'
+        return st !== 'selesai'
+      })
+      const completedList = sorted.filter((a) => {
+        const job = jobMap.get(Number(a.id_pekerjaan))
+        const st = a.status_pekerjaan || job?.status || 'belum_mulai'
+        return st === 'selesai'
+      })
+
+      // Proyek utama (prioritaskan yang aktif, jika tidak ada pakai proyek terakhir)
+      const primaryAssignment = activeList[0] || sorted[0]
+      const primaryJob = primaryAssignment ? jobMap.get(Number(primaryAssignment.id_pekerjaan)) : null
+
+      // Target deadline terdekat dari proyek aktif
+      let earliestDeadline = null
+      for (const a of activeList) {
+        const dl = a.target_selesai || jobMap.get(Number(a.id_pekerjaan))?.target_selesai
+        if (dl) {
+          if (!earliestDeadline || dl < earliestDeadline) {
+            earliestDeadline = dl
+          }
+        }
+      }
+
+      // Ringkasan metode penugasan
+      const hasAdmin = sorted.some((a) => a.jenis_penugasan === 'admin')
+      const hasMandiri = sorted.some((a) => a.jenis_penugasan === 'mandiri')
+      const methodSummary = hasAdmin && hasMandiri ? 'campuran' : (hasAdmin ? 'admin' : 'mandiri')
+
+      // Status keseluruhan
+      let overallStatus = 'selesai'
+      if (activeList.some((a) => (a.status_pekerjaan || jobMap.get(Number(a.id_pekerjaan))?.status) === 'berjalan')) {
+        overallStatus = 'berjalan'
+      } else if (activeList.length > 0) {
+        overallStatus = 'belum_mulai'
+      }
+
+      groups.push({
+        id_karyawan: empId,
+        nama: firstName,
+        jabatan: firstRole,
+        kode_karyawan: kodeKaryawan,
+        assignments: sorted,
+        activeAssignments: activeList,
+        completedAssignments: completedList,
+        primaryAssignment,
+        primaryJob,
+        totalActive: activeList.length,
+        totalCompleted: completedList.length,
+        totalAssignments: sorted.length,
+        earliestDeadline,
+        methodSummary,
+        overallStatus,
+      })
+    }
+
+    // Urutkan pekerja dengan tugas aktif di atas, lalu berdasarkan nama
+    return groups.sort((a, b) => {
+      if (a.totalActive > 0 && b.totalActive === 0) return -1
+      if (a.totalActive === 0 && b.totalActive > 0) return 1
+      return a.nama.localeCompare(b.nama, 'id-ID')
+    })
+  }, [assignments, employeeMap, jobMap])
+
+  const filteredWorkerGroups = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('id-ID')
     const today = getJakartaToday()
 
-    return assignments.filter((assignment) => {
-      const employee = employeeMap.get(assignment.id_karyawan)
-      const job = jobMap.get(assignment.id_pekerjaan)
-
-      const employeeName = (
-        assignment.nama_karyawan ||
-        employee?.nama ||
-        ''
-      ).toLocaleLowerCase('id-ID')
-      const jobName = (
-        assignment.nama_pekerjaan ||
-        job?.nama_pekerjaan ||
-        ''
-      ).toLocaleLowerCase('id-ID')
-      const location = (
-        assignment.lokasi ||
-        job?.lokasi ||
-        ''
-      ).toLocaleLowerCase('id-ID')
-
+    return workerGroups.filter((group) => {
       const matchesSearch =
         !normalizedSearch ||
-        employeeName.includes(normalizedSearch) ||
-        jobName.includes(normalizedSearch) ||
-        location.includes(normalizedSearch) ||
-        String(assignment.id_penugasan).includes(normalizedSearch)
+        group.nama.toLocaleLowerCase('id-ID').includes(normalizedSearch) ||
+        group.jabatan.toLocaleLowerCase('id-ID').includes(normalizedSearch) ||
+        group.kode_karyawan.toLocaleLowerCase('id-ID').includes(normalizedSearch) ||
+        group.assignments.some((a) => {
+          const job = jobMap.get(Number(a.id_pekerjaan))
+          const jName = (a.nama_pekerjaan || job?.nama_pekerjaan || '').toLocaleLowerCase('id-ID')
+          const jLoc = (a.lokasi || job?.lokasi || '').toLocaleLowerCase('id-ID')
+          return jName.includes(normalizedSearch) || jLoc.includes(normalizedSearch)
+        })
 
       const matchesEmployee =
-        !employeeFilter || assignment.id_karyawan === Number(employeeFilter)
+        !employeeFilter || group.id_karyawan === Number(employeeFilter)
+
       const matchesJob =
-        !jobFilter || assignment.id_pekerjaan === Number(jobFilter)
+        !jobFilter || group.assignments.some((a) => Number(a.id_pekerjaan) === Number(jobFilter))
+
       const matchesMethod =
-        !methodFilter || assignment.jenis_penugasan === methodFilter
+        !methodFilter ||
+        group.methodSummary === methodFilter ||
+        group.assignments.some((a) => a.jenis_penugasan === methodFilter)
 
-      const jobStatus =
-        assignment.status_pekerjaan || job?.status || 'belum_mulai'
-      const matchesStatus = !statusFilter || jobStatus === statusFilter
+      const matchesStatus =
+        !statusFilter || group.overallStatus === statusFilter
 
-      const deadline = assignment.target_selesai || job?.target_selesai || ''
       let matchesDeadline = true
       if (deadlineFilter === 'expired') {
         matchesDeadline =
-          Boolean(deadline) && deadline < today && jobStatus !== 'selesai'
+          Boolean(group.earliestDeadline) && group.earliestDeadline < today && group.overallStatus !== 'selesai'
       } else if (deadlineFilter === 'active') {
         matchesDeadline =
-          !deadline || deadline >= today || jobStatus === 'selesai'
+          !group.earliestDeadline || group.earliestDeadline >= today || group.overallStatus === 'selesai'
       }
 
       return (
@@ -402,20 +737,19 @@ function Penugasan() {
       )
     })
   }, [
-    assignments,
-    deadlineFilter,
-    employeeFilter,
-    employeeMap,
-    jobFilter,
-    jobMap,
-    methodFilter,
+    workerGroups,
     search,
+    employeeFilter,
+    jobFilter,
+    methodFilter,
     statusFilter,
+    deadlineFilter,
+    jobMap,
   ])
 
-  const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(filteredWorkerGroups.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
-  const visibleAssignments = filteredAssignments.slice(
+  const visibleWorkerGroups = filteredWorkerGroups.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   )
@@ -423,13 +757,11 @@ function Penugasan() {
   const statistics = useMemo(() => {
     return {
       total: assignments.length,
-      adminAssigned: assignments.filter((a) => a.jenis_penugasan === 'admin')
-        .length,
-      mandiriAssigned: assignments.filter((a) => a.jenis_penugasan === 'mandiri')
-        .length,
-      uniqueWorkers: new Set(assignments.map((a) => a.id_karyawan)).size,
+      adminAssigned: assignments.filter((a) => a.jenis_penugasan === 'admin').length,
+      mandiriAssigned: assignments.filter((a) => a.jenis_penugasan === 'mandiri').length,
+      uniqueWorkers: workerGroups.length,
     }
-  }, [assignments])
+  }, [assignments, workerGroups])
 
   const hasActiveFilters = Boolean(
     search ||
@@ -792,7 +1124,7 @@ function Penugasan() {
                   Metode Penugasan
                 </th>
                 <th className="px-4 py-3.5" scope="col">
-                  Tgl Penugasan
+                  Beban Penugasan
                 </th>
                 <th className="px-4 py-3.5" scope="col">
                   Target Selesai
@@ -839,25 +1171,25 @@ function Penugasan() {
                     </div>
                   </td>
                 </tr>
-              ) : visibleAssignments.length === 0 ? (
+              ) : visibleWorkerGroups.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="px-4 py-12 text-center">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                       <Icon name="search" className="h-6 w-6" />
                     </div>
                     <p className="mt-3 text-sm font-semibold text-slate-800">
-                      Data penugasan tidak ditemukan
+                      Data pekerja atau penugasan tidak ditemukan
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
                       {hasActiveFilters
                         ? 'Coba sesuaikan kata pencarian atau atur ulang filter Anda.'
-                        : 'Belum ada relasi penugasan aktif saat ini.'}
+                        : 'Belum ada pekerja dengan penugasan aktif saat ini.'}
                     </p>
                     {hasActiveFilters && (
                       <button
                         type="button"
                         onClick={resetFilters}
-                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                       >
                         <Icon name="rotate-ccw" className="h-3.5 w-3.5" />
                         Reset Filter
@@ -866,20 +1198,16 @@ function Penugasan() {
                   </td>
                 </tr>
               ) : (
-                visibleAssignments.map((assignment, index) => {
-                  const employee = employeeMap.get(assignment.id_karyawan)
-                  const job = jobMap.get(assignment.id_pekerjaan)
-                  const status =
-                    assignment.status_pekerjaan || job?.status || 'belum_mulai'
-                  const deadline =
-                    assignment.target_selesai || job?.target_selesai
+                visibleWorkerGroups.map((group, index) => {
                   const today = getJakartaToday()
                   const isExpired =
-                    Boolean(deadline) && deadline < today && status !== 'selesai'
+                    Boolean(group.earliestDeadline) &&
+                    group.earliestDeadline < today &&
+                    group.overallStatus !== 'selesai'
 
                   return (
                     <tr
-                      key={assignment.id_penugasan}
+                      key={group.id_karyawan}
                       className="transition-colors hover:bg-slate-50/80"
                     >
                       {/* No */}
@@ -889,59 +1217,95 @@ function Penugasan() {
 
                       {/* Pekerja */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <AdminAvatar
-                            name={assignment.nama_karyawan || employee?.nama}
-                            className="h-8 w-8 text-xs font-bold shadow-sm"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenWorkerHistory(
+                              group.id_karyawan,
+                              group.nama,
+                              group.jabatan,
+                            )
+                          }
+                          className="flex items-center gap-2.5 text-left cursor-pointer group rounded-xl p-1.5 -m-1.5 hover:bg-indigo-50/70 transition"
+                          title="Klik untuk melihat riwayat seluruh pekerjaan pekerja ini"
+                        >
+                          <AvatarAdmin
+                            name={group.nama}
+                            className="h-8 w-8 text-xs font-bold shadow-sm group-hover:ring-2 group-hover:ring-indigo-500 transition"
                           />
+                          <div>
+                            <span className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 group-hover:underline transition block">
+                              {group.nama}
+                            </span>
+                            <p className="text-[11px] text-slate-500">
+                              {group.jabatan || 'Teknisi'} · <span className="font-mono text-slate-400">{group.kode_karyawan}</span>
+                            </p>
+                          </div>
+                        </button>
+                      </td>
+
+                      {/* Pekerjaan Terkait */}
+                      <td className="px-4 py-3 max-w-64">
+                        {group.totalActive > 0 && group.primaryAssignment ? (
                           <div>
                             <button
                               type="button"
                               onClick={() =>
                                 navigate(
-                                  `/admin/karyawan?highlight=${assignment.id_karyawan}`,
+                                  `/admin/pekerjaan?highlight=${group.primaryAssignment.id_pekerjaan}`,
                                 )
                               }
-                              className="text-left text-sm font-semibold text-slate-900 hover:text-blue-600 transition cursor-pointer"
-                              title="Buka data karyawan"
+                              className="truncate text-left text-sm font-semibold text-slate-900 hover:text-blue-600 transition cursor-pointer max-w-full block"
+                              title="Buka detail proyek"
                             >
-                              {assignment.nama_karyawan || employee?.nama}
+                              {group.primaryAssignment.nama_pekerjaan || group.primaryJob?.nama_pekerjaan || 'Pekerjaan'}
                             </button>
-                            <p className="text-[11px] text-slate-500">
-                              {assignment.jabatan || employee?.jabatan || 'Teknisi'}
+                            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                              <Icon name="location" className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate">
+                                {group.primaryAssignment.lokasi || group.primaryJob?.lokasi || 'Lokasi belum diatur'}
+                              </span>
                             </p>
+                            {group.totalActive > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenWorkerHistory(
+                                    group.id_karyawan,
+                                    group.nama,
+                                    group.jabatan,
+                                  )
+                                }
+                                className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md transition cursor-pointer"
+                                title="Klik untuk melihat seluruh tugas aktif di riwayat"
+                              >
+                                <span>+{group.totalActive - 1} tugas aktif lainnya</span>
+                                <span className="text-indigo-400 font-bold">→</span>
+                              </button>
+                            )}
                           </div>
-                        </div>
-                      </td>
-
-                      {/* Pekerjaan Terkait */}
-                      <td className="px-4 py-3 max-w-64">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate(
-                              `/admin/pekerjaan?highlight=${assignment.id_pekerjaan}`,
-                            )
-                          }
-                          className="truncate text-left text-sm font-semibold text-slate-900 hover:text-blue-600 transition cursor-pointer max-w-full block"
-                          title="Buka detail proyek"
-                        >
-                          {assignment.nama_pekerjaan || job?.nama_pekerjaan}
-                        </button>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
-                          <Icon name="location" className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">
-                            {assignment.lokasi || job?.lokasi || 'Lokasi belum diatur'}
-                          </span>
-                        </p>
+                        ) : (
+                          <div>
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                              <Icon name="check" className="h-3 w-3 text-emerald-600" />
+                              Semua tugas rampung ({group.totalCompleted})
+                            </span>
+                            <p className="mt-0.5 text-[11px] text-slate-400">Siap untuk penugasan baru</p>
+                          </div>
+                        )}
                       </td>
 
                       {/* Metode Penugasan */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        {assignment.jenis_penugasan === 'mandiri' ? (
+                        {group.methodSummary === 'mandiri' ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/15">
                             <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
                             Diambil Mandiri
+                          </span>
+                        ) : group.methodSummary === 'campuran' ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/15">
+                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                            Admin &amp; Mandiri
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-600/15">
@@ -951,20 +1315,38 @@ function Penugasan() {
                         )}
                       </td>
 
-                      {/* Tgl Penugasan */}
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
-                        {formatDate(assignment.tanggal_penugasan)}
+                      {/* Beban Penugasan */}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                            <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                            {group.totalActive} Proyek Aktif
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {group.totalCompleted} Selesai ({group.totalAssignments} total)
+                          </span>
+                        </div>
                       </td>
 
                       {/* Target Selesai */}
                       <td className="whitespace-nowrap px-4 py-3 text-xs">
-                        <span className="font-semibold text-slate-800 block">
-                          {formatDate(deadline)}
-                        </span>
-                        {isExpired && (
-                          <span className="mt-0.5 inline-block text-[10px] font-bold text-rose-600">
-                            Lewat Deadline
-                          </span>
+                        {group.earliestDeadline ? (
+                          <div>
+                            <span
+                              className={`font-semibold block ${
+                                isExpired ? 'text-rose-600' : 'text-slate-800'
+                              }`}
+                            >
+                              {formatDate(group.earliestDeadline)}
+                            </span>
+                            {isExpired && (
+                              <span className="mt-0.5 inline-block text-[10px] font-bold text-rose-600">
+                                Lewat Target
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
                         )}
                       </td>
 
@@ -972,40 +1354,74 @@ function Penugasan() {
                       <td className="whitespace-nowrap px-4 py-3 text-center">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            status === 'selesai'
+                            group.overallStatus === 'selesai'
                               ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20'
-                              : status === 'berjalan'
+                              : group.overallStatus === 'berjalan'
                                 ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/20'
                                 : 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20'
                           }`}
                         >
-                          {STATUS_LABELS[status] || status}
+                          {STATUS_LABELS[group.overallStatus] || group.overallStatus}
                         </span>
                       </td>
 
                       {/* Aksi */}
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="inline-flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => showAssignmentDetail(assignment)}
-                            disabled={loadingDetailId === assignment.id_penugasan}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition shadow-2xs disabled:opacity-50"
-                            title="Lihat detail penugasan"
-                            aria-label="Lihat detail penugasan"
-                          >
-                            <Icon name="eye" className="h-4 w-4" />
-                          </button>
+                          {group.primaryAssignment && (
+                            <button
+                              type="button"
+                              onClick={() => showAssignmentDetail(group.primaryAssignment)}
+                              disabled={loadingDetailId === group.primaryAssignment.id_penugasan}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition shadow-xs disabled:opacity-50 cursor-pointer"
+                              title="Lihat detail penugasan utama"
+                              aria-label="Lihat detail penugasan utama"
+                            >
+                              <Icon name="eye" className="h-4 w-4" />
+                            </button>
+                          )}
 
                           <button
                             type="button"
-                            onClick={() => setPendingCancel(assignment)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition shadow-2xs"
-                            title="Batalkan penugasan"
-                            aria-label="Batalkan penugasan"
+                            onClick={() =>
+                              handleOpenWorkerHistory(
+                                group.id_karyawan,
+                                group.nama,
+                                group.jabatan,
+                              )
+                            }
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition shadow-xs cursor-pointer"
+                            title={`Lihat riwayat seluruh pekerjaan ${group.nama}`}
+                            aria-label="Lihat riwayat seluruh pekerjaan pekerja"
                           >
-                            <Icon name="trash" className="h-4 w-4" />
+                            <Icon name="history" className="h-4 w-4" />
                           </button>
+
+                          {group.primaryAssignment && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (group.totalActive <= 1) {
+                                  setPendingCancel(group.primaryAssignment)
+                                } else {
+                                  handleOpenWorkerHistory(
+                                    group.id_karyawan,
+                                    group.nama,
+                                    group.jabatan,
+                                  )
+                                }
+                              }}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition shadow-xs cursor-pointer"
+                              title={
+                                group.totalActive <= 1
+                                  ? 'Batalkan penugasan ini'
+                                  : 'Pilih penugasan yang ingin dibatalkan di modal riwayat'
+                              }
+                              aria-label="Batalkan penugasan"
+                            >
+                              <Icon name="trash" className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1021,16 +1437,16 @@ function Penugasan() {
           <p className="text-xs text-slate-500">
             Menampilkan{' '}
             <span className="font-semibold text-slate-800">
-              {filteredAssignments.length === 0
+              {filteredWorkerGroups.length === 0
                 ? 0
                 : (currentPage - 1) * PAGE_SIZE + 1}
-              –{Math.min(currentPage * PAGE_SIZE, filteredAssignments.length)}
+              –{Math.min(currentPage * PAGE_SIZE, filteredWorkerGroups.length)}
             </span>{' '}
             dari{' '}
             <span className="font-semibold text-slate-800">
-              {filteredAssignments.length}
+              {filteredWorkerGroups.length}
             </span>{' '}
-            penugasan
+            pekerja ({statistics.total} total penugasan)
           </p>
 
           <div className="flex items-center justify-between gap-1.5 sm:justify-end">
@@ -1075,9 +1491,25 @@ function Penugasan() {
         />
       )}
 
+      {/* Modal Riwayat Portofolio Penugasan Pekerja */}
+      {selectedWorkerHistory && (
+        <WorkerAssignmentHistoryModal
+          worker={selectedWorkerHistory}
+          assignments={assignments}
+          jobMap={jobMap}
+          onClose={() => setSelectedWorkerHistory(null)}
+          onViewDetail={(as) => showAssignmentDetail(as)}
+          onCancelAssignment={(as) => setPendingCancel(as)}
+          onFilterWorker={(id) => {
+            setEmployeeFilter(String(id))
+            setPage(1)
+          }}
+        />
+      )}
+
       {/* Dialog Konfirmasi Batal Penugasan */}
       {pendingCancel && (
-        <DeleteConfirmationDialog
+        <ModalKonfirmasiHapus
           confirmLabel="Batalkan Penugasan"
           description="Anda yakin ingin membatalkan relasi penugasan ini? Pekerja tidak lagi ditugaskan pada pekerjaan tersebut."
           isProcessing={isSaving}

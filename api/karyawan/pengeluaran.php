@@ -38,7 +38,8 @@ if (isset($_FILES['foto_kwitansi']) && $_FILES['foto_kwitansi']['error'] === UPL
         jsonResponse(false, "Format file tidak valid ($mimeType). Hanya format JPG, PNG, atau WEBP yang diperbolehkan.", null, 400);
     }
 
-    $uploadDir = __DIR__ . '/../uploads/';
+    $subFolder = 'uploads/kwitansi/';
+    $uploadDir = __DIR__ . '/../' . $subFolder;
     if (!is_dir($uploadDir)) {
         @mkdir($uploadDir, 0755, true);
     }
@@ -101,7 +102,7 @@ if (isset($_FILES['foto_kwitansi']) && $_FILES['foto_kwitansi']['error'] === UPL
     }
 
     if ($saved) {
-        $uploadedFilePath = 'uploads/' . $filename;
+        $uploadedFilePath = $subFolder . $filename;
         $body['foto_kwitansi'] = $uploadedFilePath;
     } else {
         jsonResponse(false, "Gagal mengunggah dan mengompresi file bukti faktur ke server.", null, 500);

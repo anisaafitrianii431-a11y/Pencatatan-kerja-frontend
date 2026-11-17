@@ -17,3 +17,15 @@
 
 Options -Indexes -ExecCGI
 
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^absensi_([a-zA-Z0-9_\-]+)\.(jpg|jpeg|png|webp)$ absensi/absensi_$1.$2 [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(kwitansi|nota)_([a-zA-Z0-9_\-]+)\.(jpg|jpeg|png|webp|pdf)$ kwitansi/$1_$2.$3 [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^dana_([a-zA-Z0-9_\-]+)\.(jpg|jpeg|png|webp)$ dana_kantor/dana_$1.$2 [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^kembali_([a-zA-Z0-9_\-]+)\.(jpg|jpeg|png|webp)$ pengembalian/kembali_$1.$2 [L]
+</IfModule>
+

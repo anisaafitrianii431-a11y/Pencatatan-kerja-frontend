@@ -28,7 +28,16 @@ function handleFileUpload($fileKey, $prefix = 'nota_') {
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         if ($ext === 'jpeg') $ext = 'jpg';
         if (in_array($ext, ['jpg', 'png', 'webp', 'pdf'])) {
-            $subFolder = ($prefix === 'bukti_reimburse_') ? 'uploads/bukti_reimburse/' : 'uploads/';
+            $subFolder = 'uploads/kwitansi/';
+            if ($prefix === 'bukti_reimburse_') {
+                $subFolder = 'uploads/bukti_reimburse/';
+            } elseif ($prefix === 'dana_') {
+                $subFolder = 'uploads/dana_kantor/';
+            } elseif ($prefix === 'kembali_') {
+                $subFolder = 'uploads/pengembalian/';
+            } elseif ($prefix === 'bukti_gaji_') {
+                $subFolder = 'uploads/bukti_gaji/';
+            }
             $uploadDir = __DIR__ . '/../' . $subFolder;
             if (!is_dir($uploadDir)) {
                 @mkdir($uploadDir, 0777, true);
@@ -606,7 +615,7 @@ if ($method === 'GET') {
             $statusGanti = ($sisaBayar <= 0 && floatval($curr['total_dibayar']) > 0) ? 'sudah' : 'belum';
         } elseif ($status === 'ditolak') {
             $statusReimburse = 'ditolak';
-            $statusGanti = 'ditolak';
+            $statusGanti = 'belum';
             $sisaBayar = 0.00;
         } else {
             $statusReimburse = 'menunggu';

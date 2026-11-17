@@ -1,4 +1,5 @@
-import AdminAvatar from './AdminAvatar.jsx'
+import { useLocation } from 'react-router-dom'
+import AvatarAdmin from './AvatarAdmin.jsx'
 
 const iconContent = {
   dashboard: (
@@ -123,15 +124,48 @@ function Icon({ name, className = 'h-5 w-5' }) {
   )
 }
 
+// Urutan Menu Utama Berdasarkan Frekuensi Penggunaan Harian (Sesuai Arahan Pembimbing)
 const menuItems = [
-  { label: 'Dashboard', icon: 'dashboard' },
-  { label: 'Data Karyawan', icon: 'employees' },
-  { label: 'Data Pekerjaan', icon: 'jobs' },
-  { label: 'Penugasan', icon: 'assignments' },
-  { label: 'Rekap Absensi', icon: 'recap' },
-  { label: 'Gaji', icon: 'payroll' },
-  { label: 'Pengeluaran & Kwitansi', icon: 'receipt' },
-  { label: 'Manajemen Pengguna', icon: 'users' },
+  { 
+    label: 'Dashboard', 
+    icon: 'dashboard', 
+    match: (p) => p === '/admin' || p === '/admin/dashboard' || p === '/dashboard' 
+  },
+  { 
+    label: 'Rekap Absensi', 
+    icon: 'recap', 
+    match: (p) => p.startsWith('/admin/rekap-absensi') || p.startsWith('/admin/approval-absensi') || p.startsWith('/admin/verifikasi') || p.startsWith('/admin/jam-kerja') 
+  },
+  { 
+    label: 'Penugasan', 
+    icon: 'assignments', 
+    match: (p) => p.startsWith('/admin/penugasan') 
+  },
+  { 
+    label: 'Pengeluaran & Kwitansi', 
+    icon: 'receipt', 
+    match: (p) => p.startsWith('/admin/pengeluaran') || p.startsWith('/admin/pemasukan') || p.startsWith('/admin/approval-pengeluaran') 
+  },
+  { 
+    label: 'Gaji', 
+    icon: 'payroll', 
+    match: (p) => p.startsWith('/admin/gaji') || p.startsWith('/admin/detail-jam') || p.startsWith('/admin/kontribusi') 
+  },
+  { 
+    label: 'Data Pekerjaan', 
+    icon: 'jobs', 
+    match: (p) => p.startsWith('/admin/pekerjaan') 
+  },
+  { 
+    label: 'Data Karyawan', 
+    icon: 'employees', 
+    match: (p) => p.startsWith('/admin/karyawan') 
+  },
+  { 
+    label: 'Manajemen Pengguna', 
+    icon: 'users', 
+    match: (p) => p.startsWith('/admin/pengguna') 
+  },
 ]
 
 function SidebarAdmin({
@@ -142,6 +176,8 @@ function SidebarAdmin({
   onLogout = () => {},
   adminName = 'Admin',
 }) {
+  const location = useLocation()
+  const currentPath = location.pathname
   return (
     <>
       {isMobileOpen && (
@@ -199,23 +235,24 @@ function SidebarAdmin({
           <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Menu Utama
           </p>
-          {menuItems.map(({ label, icon }) => {
-            const isActive = activeItem === label
+          {menuItems.map(({ label, icon, match }) => {
+            const isPathMatch = typeof match === 'function' && match(currentPath)
+            const isActive = activeItem === label || isPathMatch
 
             return (
               <button
+                key={label}
                 aria-current={isActive ? 'page' : undefined}
-                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+                className={`group relative flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold transition-all duration-150 cursor-pointer ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
-                key={label}
                 onClick={() => onSelectMenuItem(label)}
                 type="button"
               >
                 <Icon
-                  className={`h-5 w-5 shrink-0 ${
+                  className={`h-5 w-5 shrink-0 transition-colors ${
                     isActive
                       ? 'text-white'
                       : 'text-slate-400 group-hover:text-white'
@@ -224,7 +261,9 @@ function SidebarAdmin({
                 />
                 <span className="truncate">{label}</span>
                 {isActive && (
-                  <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
+                  <span className="ml-auto flex items-center">
+                    <span className="h-2 w-2 rounded-full bg-white shadow-xs animate-pulse" />
+                  </span>
                 )}
               </button>
             )
@@ -233,7 +272,7 @@ function SidebarAdmin({
 
         <div className="shrink-0 border-t border-slate-800 p-4 space-y-2.5">
           <div className="flex items-center gap-3 rounded-xl bg-slate-800/80 p-3">
-            <AdminAvatar
+            <AvatarAdmin
               className="h-10 w-10 text-xs shrink-0"
               name={adminName}
               tone="brand"

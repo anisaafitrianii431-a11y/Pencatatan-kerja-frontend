@@ -8,11 +8,19 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    watch: {
+      ignored: ['**/api/**', '**/uploads/**', '**/node_modules/**'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost/Pencatatan-kerja/api',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/uploads': {
+        target: 'http://localhost/Pencatatan-kerja/api/uploads',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/uploads/, ''),
       },
     },
   },

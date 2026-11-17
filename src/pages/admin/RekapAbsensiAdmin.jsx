@@ -4,6 +4,7 @@ import { getKaryawan } from '../../services/karyawanApi.js'
 import { getPekerjaan } from '../../services/pekerjaanApi.js'
 import { getPenugasan } from '../../services/penugasanApi.js'
 import { getAbsensi, verifikasiAbsensi } from '../../services/absensiApi.js'
+import { getFileUrl } from '../../services/api.js'
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
@@ -108,6 +109,30 @@ function Icon({ name, className = 'h-5 w-5' }) {
         <path d="m7 9 5-5 5 5" />
       </>
     ),
+    layoutGrid: (
+      <>
+        <rect width="7" height="7" x="3" y="3" rx="1" />
+        <rect width="7" height="7" x="14" y="3" rx="1" />
+        <rect width="7" height="7" x="14" y="14" rx="1" />
+        <rect width="7" height="7" x="3" y="14" rx="1" />
+      </>
+    ),
+    list: (
+      <>
+        <line x1="8" x2="21" y1="6" y2="6" />
+        <line x1="8" x2="21" y1="12" y2="12" />
+        <line x1="8" x2="21" y1="18" y2="18" />
+        <line x1="3" x2="3.01" y1="6" y2="6" />
+        <line x1="3" x2="3.01" y1="12" y2="12" />
+        <line x1="3" x2="3.01" y1="18" y2="18" />
+      </>
+    ),
+    shieldCheck: (
+      <>
+        <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+        <path d="m9 12 2 2 4-4" />
+      </>
+    ),
   }
 
   return (
@@ -201,6 +226,7 @@ export default function RekapAbsensiAdmin() {
   const [opSearch, setOpSearch] = useState('')
   const [opStatusFilter, setOpStatusFilter] = useState('')
   const [opSort, setOpSort] = useState('terbaru') // 'terbaru' | 'nama_asc' | 'sesi_desc' | 'durasi_desc'
+  const [opViewMode, setOpViewMode] = useState('tabel') // 'tabel' | 'grid'
 
   // Filters for Tab B: Kehadiran
   const [kehadiranDate, setKehadiranDate] = useState(paramTanggal || '')
@@ -384,6 +410,41 @@ export default function RekapAbsensiAdmin() {
 
     return filtered
   }, [jobs, assignments, employees, attendances, opSearch, opStatusFilter, opSort])
+
+  // Ringkasan Eksekutif Jam Kerja & Operasional
+  const operationalStats = useMemo(() => {
+    const totalPekerjaan = jobs.length
+    const berjalan = jobs.filter((j) => j.status === 'berjalan').length
+    const selesai = jobs.filter((j) => j.status === 'selesai').length
+    const belumMulai = jobs.filter((j) => j.status === 'belum_mulai').length
+
+    // Seluruh sesi absensi valid yang disetujui
+    const approvedAttendances = attendances.filter((a) => a.status_verifikasi === 'disetujui')
+    const totalMinutes = approvedAttendances.reduce(
+      (acc, curr) => acc + (Number(curr.durasi_menit) || Number(curr.durasi_jam) * 60 || 0),
+      0
+    )
+    const totalDurasiLabel = formatJamMenit(totalMinutes)
+
+    // Teknisi unik yang aktif tercatat di sesi absensi
+    const activeWorkerIds = new Set(attendances.map((a) => a.id_karyawan))
+    const totalWorkerAktif = activeWorkerIds.size
+
+    // Sesi menunggu verifikasi
+    const pendingCount = attendances.filter((a) => a.status_verifikasi === 'menunggu').length
+
+    return {
+      totalPekerjaan,
+      berjalan,
+      selesai,
+      belumMulai,
+      totalMinutes,
+      totalDurasiLabel,
+      totalWorkerAktif,
+      approvedCount: approvedAttendances.length,
+      pendingCount,
+    }
+  }, [jobs, attendances])
 
   // =========================================================================
   // TAB B: STATISTIK KEHADIRAN (6 KARTU & DONUT CHART & DAFTAR)
@@ -593,6 +654,122 @@ export default function RekapAbsensiAdmin() {
         )}
 
         {/* ============================================================== */}
+        {/* 4 KARTU RINGKASAN METRIK EKSEKUTIF (KPI CARDS)                */}
+        {/* ============================================================== */}
+        <div className="mb-6 grid grid-cols-2 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Card 1: Total Jam Kerja */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('operasional')}
+            className={`group rounded-2xl border p-4 text-left transition shadow-xs cursor-pointer ${
+              activeTab === 'operasional'
+                ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                : 'border-slate-200/80 bg-white hover:border-blue-300 hover:bg-slate-50/50'
+            }`}
+            title="Klik untuk melihat rincian jam kerja per proyek"
+          >
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>Total Jam Kerja Proyek</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700 transition group-hover:scale-110">
+                <Icon name="clock" className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 text-2xl font-black tracking-tight text-blue-900">
+              {operationalStats.totalDurasiLabel}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <span className="font-semibold text-blue-700">{operationalStats.approvedCount} sesi valid</span>
+              <span>•</span>
+              <span>Klik rincian</span>
+            </div>
+          </button>
+
+          {/* Card 2: Proyek Berjalan */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('operasional')
+              setOpStatusFilter('berjalan')
+            }}
+            className="group rounded-2xl border border-slate-200/80 bg-white p-4 text-left transition hover:border-emerald-300 hover:bg-slate-50/50 shadow-xs cursor-pointer"
+            title="Klik untuk memfilter proyek berjalan"
+          >
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>Pekerjaan Sedang Berjalan</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition group-hover:scale-110">
+                <Icon name="briefcase" className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 text-2xl font-black tracking-tight text-emerald-700">
+              {operationalStats.berjalan}{' '}
+              <span className="text-xs font-bold text-slate-400">/ {operationalStats.totalPekerjaan} Proyek</span>
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{operationalStats.selesai} selesai • {operationalStats.belumMulai} belum</span>
+            </div>
+          </button>
+
+          {/* Card 3: Teknisi Terjun Lapangan */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('kehadiran')}
+            className={`group rounded-2xl border p-4 text-left transition shadow-xs cursor-pointer ${
+              activeTab === 'kehadiran'
+                ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20'
+                : 'border-slate-200/80 bg-white hover:border-indigo-300 hover:bg-slate-50/50'
+            }`}
+            title="Klik untuk memantau kehadiran harian teknisi"
+          >
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>Teknisi Aktif Lapangan</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 transition group-hover:scale-110">
+                <Icon name="users" className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 text-2xl font-black tracking-tight text-indigo-900">
+              {operationalStats.totalWorkerAktif}{' '}
+              <span className="text-xs font-bold text-slate-400">/ {employees.length} Teknisi</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">
+              Personil tercatat di absensi
+            </div>
+          </button>
+
+          {/* Card 4: Status Verifikasi Presensi */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('riwayat')
+              if (operationalStats.pendingCount > 0) setFilterStatus('menunggu')
+            }}
+            className={`group rounded-2xl border p-4 text-left transition shadow-xs cursor-pointer ${
+              activeTab === 'riwayat'
+                ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
+                : 'border-slate-200/80 bg-white hover:border-amber-300 hover:bg-slate-50/50'
+            }`}
+            title="Klik untuk membuka verifikasi presensi"
+          >
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>Verifikasi Kehadiran</span>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-xl transition group-hover:scale-110 ${
+                operationalStats.pendingCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                <Icon name="shieldCheck" className="h-4 w-4" />
+              </div>
+            </div>
+            <div className={`mt-2 text-2xl font-black tracking-tight ${
+              operationalStats.pendingCount > 0 ? 'text-amber-700' : 'text-emerald-700'
+            }`}>
+              {operationalStats.pendingCount > 0 ? `${operationalStats.pendingCount} Menunggu` : '100% Tuntas'}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">
+              {operationalStats.pendingCount > 0 ? 'Sesi presensi butuh persetujuan' : 'Semua sesi sudah diverifikasi'}
+            </div>
+          </button>
+        </div>
+
+        {/* ============================================================== */}
         {/* TAB NAVIGASI HORIZONTAL: TEPAT DI BAWAH JUDUL & DESKRIPSI */}
         {/* ============================================================== */}
         <div className="mb-6 border-b border-slate-200">
@@ -662,14 +839,14 @@ export default function RekapAbsensiAdmin() {
             <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:flex lg:flex-wrap lg:items-center">
                 {/* Search */}
-                <div className="relative min-w-[220px]">
+                <div className="relative min-w-[240px]">
                   <Icon name="search" className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
                     value={opSearch}
                     onChange={(e) => setOpSearch(e.target.value)}
-                    placeholder="Cari nama / lokasi pekerjaan..."
-                    className="w-full rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                    placeholder="Cari nama atau lokasi pekerjaan..."
+                    className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
 
@@ -677,7 +854,7 @@ export default function RekapAbsensiAdmin() {
                 <select
                   value={opStatusFilter}
                   onChange={(e) => setOpStatusFilter(e.target.value)}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer"
                 >
                   <option value="">Semua Status Pekerjaan</option>
                   <option value="belum_mulai">Belum Mulai</option>
@@ -689,123 +866,272 @@ export default function RekapAbsensiAdmin() {
                 <select
                   value={opSort}
                   onChange={(e) => setOpSort(e.target.value)}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none cursor-pointer"
                 >
                   <option value="terbaru">Urutkan: Pekerjaan Terbaru</option>
                   <option value="nama_asc">Nama Pekerjaan (A-Z)</option>
                   <option value="sesi_desc">Sesi Terbanyak</option>
                   <option value="durasi_desc">Durasi Terpanjang</option>
                 </select>
+
+                {(opSearch || opStatusFilter || opSort !== 'terbaru') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpSearch('')
+                      setOpStatusFilter('')
+                      setOpSort('terbaru')
+                    }}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    Reset Filter
+                  </button>
+                )}
               </div>
 
-              {(opSearch || opStatusFilter || opSort !== 'terbaru') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpSearch('')
-                    setOpStatusFilter('')
-                    setOpSort('terbaru')
-                  }}
-                  className="self-start text-xs font-semibold text-blue-600 hover:text-blue-800 lg:self-auto"
-                >
-                  Reset Filter
-                </button>
-              )}
+              {/* View Switcher: Tabel vs Grid Card */}
+              <div className="flex items-center gap-2 self-end lg:self-auto">
+                <span className="text-[11px] font-semibold text-slate-400">Tampilan:</span>
+                <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setOpViewMode('tabel')}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                      opViewMode === 'tabel'
+                        ? 'bg-white text-blue-600 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Tampilan Tabel Rapat"
+                  >
+                    <Icon name="list" className="h-3.5 w-3.5" />
+                    <span>Tabel</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOpViewMode('grid')}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                      opViewMode === 'grid'
+                        ? 'bg-white text-blue-600 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Tampilan Kartu Kotak Proyek"
+                  >
+                    <Icon name="layoutGrid" className="h-3.5 w-3.5" />
+                    <span>Kartu</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* TABEL PROFESIONAL OPERASIONAL PEKERJAAN */}
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3.5 w-12 text-center">Nomor</th>
-                      <th className="px-4 py-3.5 min-w-[240px]">Nama Pekerjaan</th>
-                      <th className="px-4 py-3.5 min-w-[130px] text-center">Jumlah Karyawan</th>
-                      <th className="px-4 py-3.5 min-w-[140px] text-center">Jumlah Sesi Absensi</th>
-                      <th className="px-4 py-3.5 min-w-[150px] text-center">Total Durasi</th>
-                      <th className="px-4 py-3.5 min-w-[130px] text-center">Status Pekerjaan</th>
-                      <th className="px-4 py-3.5 min-w-[110px] text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                    {operationalData.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-10 text-center text-slate-400">
-                          Tidak ditemukan data pekerjaan yang sesuai dengan kriteria filter.
-                        </td>
-                      </tr>
-                    ) : (
-                      operationalData.map((job, index) => (
-                        <tr
-                          key={job.id_pekerjaan}
-                          className="transition hover:bg-slate-50/70 cursor-pointer"
-                          onClick={() => setSelectedJobDetail(job)}
-                        >
-                          <td className="px-4 py-3 text-center text-slate-400 font-mono">
-                            {index + 1}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900 text-sm">
-                                  {job.nama_pekerjaan}
-                                </span>
-                                <span className="rounded bg-slate-100 px-1.5 py-0.2 font-mono text-[10px] text-slate-600">
-                                  #{job.id_pekerjaan}
+            {/* KONTEN OPERASIONAL: TABEL ATAU KARTU PROYEK */}
+            {opViewMode === 'grid' ? (
+              /* TAMPILAN 1: GRID KARTU PROYEK MODERN */
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {operationalData.length === 0 ? (
+                  <div className="col-span-full rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-400">
+                    Tidak ditemukan data pekerjaan yang sesuai dengan kriteria filter.
+                  </div>
+                ) : (
+                  operationalData.map((job) => {
+                    const words = (job.nama_pekerjaan || '').trim().split(/\s+/);
+                    const initials = words.length > 1 ? `${words[0][0]}${words[1][0]}`.toUpperCase() : (words[0] || 'PJ').slice(0, 2).toUpperCase();
+                    const ratio = operationalStats.totalMinutes > 0 ? Math.min(100, Math.round((job.totalMenitApproved / operationalStats.totalMinutes) * 100)) : 0;
+
+                    return (
+                      <div
+                        key={job.id_pekerjaan}
+                        onClick={() => setSelectedJobDetail(job)}
+                        className="group flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition hover:border-blue-300 hover:shadow-md cursor-pointer"
+                      >
+                        <div>
+                          {/* Header Card */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-xs font-black text-white shadow-xs">
+                                {initials}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="font-bold text-slate-900 group-hover:text-blue-600 transition">
+                                    {job.nama_pekerjaan}
+                                  </h3>
+                                </div>
+                                <span className="font-mono text-[10px] text-slate-400">
+                                  ID Proyek #{job.id_pekerjaan}
                                 </span>
                               </div>
-                              <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                                <Icon name="location" className="h-3 w-3 text-slate-400 shrink-0" />
-                                {job.lokasi || 'Lokasi Belum Disetel'}
-                              </span>
                             </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
-                              <Icon name="users" className="h-3.5 w-3.5" />
-                              {job.totalWorkers} Orang
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="font-semibold text-slate-800">
-                              {job.totalSessions} sesi
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {/* Total durasi akumulasi sesi absensi valid yang sudah disetujui */}
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedJobDuration(job)
-                              }}
-                              title="Akumulasi sesi valid yang disetujui. Klik untuk rincian."
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 font-mono hover:bg-blue-100 cursor-pointer transition shadow-2xs"
-                            >
-                              <Icon name="clock" className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                              <span>{job.totalDurasiLabel}</span>
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
                             <JobStatusBadge status={job.status} />
-                          </td>
-                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedJobDetail(job)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition shadow-2xs"
-                            >
-                              <Icon name="eye" className="h-3.5 w-3.5 text-blue-600" />
-                              Detail
-                            </button>
+                          </div>
+
+                          {/* Lokasi */}
+                          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                            <Icon name="location" className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <span className="truncate">{job.lokasi || 'Lokasi Belum Disetel'}</span>
+                          </div>
+
+                          {/* 3 Metric Tiles di dalam Kartu */}
+                          <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2.5 text-center text-xs">
+                            <div className="rounded-lg bg-white p-1.5 border border-slate-200/60 shadow-2xs">
+                              <span className="block text-[10px] font-semibold text-slate-400">Personil</span>
+                              <span className="font-bold text-slate-800">{job.totalWorkers} Orang</span>
+                            </div>
+                            <div className="rounded-lg bg-white p-1.5 border border-slate-200/60 shadow-2xs">
+                              <span className="block text-[10px] font-semibold text-slate-400">Total Sesi</span>
+                              <span className="font-bold text-slate-800">{job.totalSessions} Sesi</span>
+                            </div>
+                            <div className="rounded-lg bg-white p-1.5 border border-slate-200/60 shadow-2xs">
+                              <span className="block text-[10px] font-semibold text-slate-400">Jam Kerja</span>
+                              <span className="font-bold text-blue-700 font-mono">{job.totalDurasiLabel}</span>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar Kontribusi Jam */}
+                          <div className="mt-4">
+                            <div className="flex justify-between text-[11px] font-medium text-slate-500 mb-1">
+                              <span>Porsi Jam Operasional:</span>
+                              <span className="font-bold text-blue-700">{ratio}%</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
+                                style={{ width: `${ratio}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Footer Card */}
+                        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-blue-600 group-hover:text-blue-700">
+                          <span>Buka Detail Jam Kerja</span>
+                          <span className="transition-transform group-hover:translate-x-1">→</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              /* TAMPILAN 2: TABEL PROFESIONAL OPERASIONAL PEKERJAAN */
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3.5 w-12 text-center">Nomor</th>
+                        <th className="px-4 py-3.5 min-w-[260px]">Nama Pekerjaan & Lokasi</th>
+                        <th className="px-4 py-3.5 min-w-[130px] text-center">Jumlah Karyawan</th>
+                        <th className="px-4 py-3.5 min-w-[140px] text-center">Jumlah Sesi Absensi</th>
+                        <th className="px-4 py-3.5 min-w-[170px] text-center">Total Durasi Kerja</th>
+                        <th className="px-4 py-3.5 min-w-[130px] text-center">Status Pekerjaan</th>
+                        <th className="px-4 py-3.5 min-w-[110px] text-center">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {operationalData.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-12 text-center text-slate-400">
+                            Tidak ditemukan data pekerjaan yang sesuai dengan kriteria filter.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        operationalData.map((job, index) => {
+                          const words = (job.nama_pekerjaan || '').trim().split(/\s+/);
+                          const initials = words.length > 1 ? `${words[0][0]}${words[1][0]}`.toUpperCase() : (words[0] || 'PJ').slice(0, 2).toUpperCase();
+                          const ratio = operationalStats.totalMinutes > 0 ? Math.min(100, Math.round((job.totalMenitApproved / operationalStats.totalMinutes) * 100)) : 0;
+
+                          return (
+                            <tr
+                              key={job.id_pekerjaan}
+                              className="transition hover:bg-blue-50/40 cursor-pointer group"
+                              onClick={() => setSelectedJobDetail(job)}
+                            >
+                              <td className="px-4 py-3.5 text-center text-slate-400 font-mono font-semibold">
+                                {index + 1}
+                              </td>
+                              <td className="px-4 py-3.5">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-xs font-black text-white shadow-2xs group-hover:scale-105 transition">
+                                    {initials}
+                                  </div>
+                                  <div className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition">
+                                        {job.nama_pekerjaan}
+                                      </span>
+                                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 font-semibold">
+                                        #{job.id_pekerjaan}
+                                      </span>
+                                    </div>
+                                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                                      <Icon name="location" className="h-3 w-3 text-slate-400 shrink-0" />
+                                      {job.lokasi || 'Lokasi Belum Disetel'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 border border-blue-200/60 shadow-2xs">
+                                  <Icon name="users" className="h-3.5 w-3.5" />
+                                  {job.totalWorkers} Orang
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <div className="font-bold text-slate-800 text-xs">
+                                  {job.totalSessions} Sesi
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {job.approvedSessionsCount} disetujui
+                                </div>
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSelectedJobDuration(job)
+                                  }}
+                                  title="Akumulasi sesi valid yang disetujui. Klik untuk rincian."
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-1 text-xs font-bold text-blue-800 font-mono hover:bg-blue-100 cursor-pointer transition shadow-2xs"
+                                >
+                                  <Icon name="clock" className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                                  <span>{job.totalDurasiLabel}</span>
+                                </button>
+                                {ratio > 0 && (
+                                  <div className="w-24 mx-auto mt-1.5">
+                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-blue-600 rounded-full"
+                                        style={{ width: `${ratio}%` }}
+                                        title={`${ratio}% dari total jam kerja`}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <JobStatusBadge status={job.status} />
+                              </td>
+                              <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedJobDetail(job)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition shadow-2xs cursor-pointer"
+                                >
+                                  <Icon name="eye" className="h-3.5 w-3.5" />
+                                  <span>Detail</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -976,7 +1302,7 @@ export default function RekapAbsensiAdmin() {
               </div>
             </div>
 
-            {/* DIAGRAM DONUT RASIO STATUS VERIFIKASI & TABEL DAFTAR KEHADIRAN KARYAWAN */}
+            {/* BAGIAN ATAS: DIAGRAM DONUT RASIO & PUSAT VERIFIKASI */}
             <div className="grid gap-6 lg:grid-cols-12">
               {/* Card Rasio Donut Chart */}
               <div className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
@@ -1151,180 +1477,296 @@ export default function RekapAbsensiAdmin() {
                 </div>
               </div>
 
-              {/* Card Tabel Daftar Kehadiran Karyawan */}
-              <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
-                  <div>
+              {/* Card Pusat Panduan & Antrean Verifikasi */}
+              <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <span>Daftar Kehadiran Karyawan</span>
-                      <span className="rounded-full bg-blue-100 px-2 py-0.2 text-[10px] font-bold text-blue-700">
-                        {kehadiranTableEmployees.length}
-                      </span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {kehadiranDate ? `Tanggal: ${formatDate(kehadiranDate)}` : 'Kumulatif Seluruh Tanggal'}
-                      {kehadiranCardFilter && (
-                        <span className="ml-1 font-semibold text-blue-600">
-                          • Filter: {kehadiranCardFilter.replace('_', ' ')}
+                      <span>Pusat Verifikasi Absensi Karyawan</span>
+                      {kehadiranStats.waiting > 0 && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-300 animate-pulse">
+                          <span className="h-2 w-2 rounded-full bg-amber-500" />
+                          {kehadiranStats.waiting} Sesi Menunggu Review
                         </span>
                       )}
-                    </p>
+                    </h3>
                   </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Sistem validasi absensi: pastikan karyawan melakukan presensi di lokasi dan jam kerja yang tepat.
+                  </p>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Search */}
-                    <div className="relative min-w-[150px]">
-                      <Icon name="search" className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={kehadiranSearch}
-                        onChange={(e) => setKehadiranSearch(e.target.value)}
-                        placeholder="Cari nama / ID..."
-                        className="w-full rounded-lg border border-slate-200 py-1 pl-8 pr-2 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
-                      />
+                  {kehadiranStats.waiting > 0 ? (
+                    <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50/80 p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl shrink-0">⚡</span>
+                        <div className="flex-1">
+                          <h4 className="text-xs font-bold text-amber-900">
+                            Aksi Diperlukan: Terdapat {kehadiranStats.waiting} sesi absensi menunggu persetujuan Anda!
+                          </h4>
+                          <p className="mt-1 text-xs text-amber-800 leading-relaxed">
+                            Karyawan baru saja mengirim absensi. Silakan klik tombol <strong className="rounded bg-amber-200 px-1.5 py-0.5 text-amber-950 font-bold">"⚡ Periksa & Setujui"</strong> pada baris karyawan di tabel bawah untuk memeriksa foto selfie, titik GPS, dan memberikan persetujuan kerja.
+                          </p>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setKehadiranCardFilter((prev) => (prev === 'menunggu_review' ? '' : 'menunggu_review'))}
+                              className="rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+                            >
+                              {kehadiranCardFilter === 'menunggu_review' ? '✓ Sedang Difilter' : '🔍 Tampilkan Hanya Yang Perlu Review'}
+                            </button>
+                            {kehadiranCardFilter && (
+                              <button
+                                type="button"
+                                onClick={() => setKehadiranCardFilter('')}
+                                className="text-xs text-slate-600 hover:text-slate-900 underline font-medium"
+                              >
+                                Tampilkan Semua Karyawan
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-
-                    {/* Filter Status */}
-                    <select
-                      value={kehadiranStatusFilter}
-                      onChange={(e) => setKehadiranStatusFilter(e.target.value)}
-                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="">Semua Status</option>
-                      <option value="hadir">Hadir</option>
-                      <option value="belum_absen">Belum Absen</option>
-                      <option value="menunggu">Menunggu Review</option>
-                      <option value="disetujui">Sesi Disetujui</option>
-                      <option value="ditolak">Sesi Ditolak</option>
-                    </select>
-
-                    {(kehadiranSearch || kehadiranStatusFilter || kehadiranCardFilter) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setKehadiranSearch('')
-                          setKehadiranStatusFilter('')
-                          setKehadiranCardFilter('')
-                        }}
-                        className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 shrink-0"
-                        title="Reset pencarian & filter"
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl shrink-0">✅</span>
+                        <div>
+                          <h4 className="text-xs font-bold text-emerald-900">
+                            Semua Absensi Sudah Terverifikasi
+                          </h4>
+                          <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
+                            Tidak ada absensi yang tertunda. Anda dapat memantau rincian durasi kerja, jam masuk, jam pulang, dan koordinat GPS karyawan pada tabel di bawah.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Table */}
-                <div className="overflow-x-auto max-h-[380px] overflow-y-auto pr-1">
-                  <table className="w-full text-left text-xs">
-                    <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <div className="pt-4 border-t border-slate-100 mt-4 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+                  <span>💡 <strong>Tip Cepat:</strong> Anda dapat mengklik langsung baris karyawan mana saja pada tabel di bawah untuk membuka modal verifikasi.</span>
+                  <span className="font-semibold text-slate-700">Total: {kehadiranStats.totalEmployeesCount} Karyawan</span>
+                </div>
+              </div>
+            </div>
+
+            {/* TABEL DAFTAR KEHADIRAN KARYAWAN (FULL WIDTH - LEGA, LUAS, & JELAS) */}
+            <div className="w-full rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>Daftar Kehadiran & Status Verifikasi Karyawan</span>
+                    <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                      {kehadiranTableEmployees.length} Karyawan
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {kehadiranDate ? `Tanggal: ${formatDate(kehadiranDate)}` : 'Kumulatif Seluruh Tanggal'}
+                    {kehadiranCardFilter && (
+                      <span className="ml-1.5 font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        Filter Aktif: {kehadiranCardFilter.replace('_', ' ')}
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Search */}
+                  <div className="relative min-w-[180px]">
+                    <Icon name="search" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={kehadiranSearch}
+                      onChange={(e) => setKehadiranSearch(e.target.value)}
+                      placeholder="Cari nama atau ID..."
+                      className="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Filter Status */}
+                  <select
+                    value={kehadiranStatusFilter}
+                    onChange={(e) => setKehadiranStatusFilter(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Semua Status</option>
+                    <option value="hadir">Hadir</option>
+                    <option value="belum_absen">Belum Absen</option>
+                    <option value="menunggu">Menunggu Review</option>
+                    <option value="disetujui">Sesi Disetujui</option>
+                    <option value="ditolak">Sesi Ditolak</option>
+                  </select>
+
+                  {(kehadiranSearch || kehadiranStatusFilter || kehadiranCardFilter) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKehadiranSearch('')
+                        setKehadiranStatusFilter('')
+                        setKehadiranCardFilter('')
+                      }}
+                      className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition shrink-0"
+                      title="Reset pencarian & filter"
+                    >
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                    <tr>
+                      <th className="px-3.5 py-3 w-12 text-center">No</th>
+                      <th className="px-4 py-3 min-w-[200px]">Nama Karyawan</th>
+                      <th className="px-3 py-3 min-w-[100px] text-center">ID Karyawan</th>
+                      <th className="px-3 py-3 min-w-[110px] text-center">Presensi</th>
+                      <th className="px-4 py-3 min-w-[170px] text-center">Status Verifikasi</th>
+                      <th className="px-3 py-3 min-w-[100px] text-center">Durasi Kerja</th>
+                      <th className="px-4 py-3 min-w-[160px] text-center">Aksi Verifikasi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {kehadiranTableEmployees.length === 0 ? (
                       <tr>
-                        <th className="px-3 py-2 w-10 text-center">No</th>
-                        <th className="px-3 py-2 min-w-[150px]">Karyawan</th>
-                        <th className="px-3 py-2 min-w-[90px] text-center">ID</th>
-                        <th className="px-3 py-2 min-w-[100px] text-center">Presensi</th>
-                        <th className="px-3 py-2 min-w-[120px] text-center">Sesi & Status</th>
-                        <th className="px-3 py-2 min-w-[80px] text-center">Durasi</th>
-                        <th className="px-3 py-2 min-w-[70px] text-center">Aksi</th>
+                        <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                          Tidak ada karyawan yang cocok dengan kriteria filter saat ini.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                      {kehadiranTableEmployees.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
-                            Tidak ada karyawan yang cocok dengan kriteria filter.
+                    ) : (
+                      kehadiranTableEmployees.map((emp, idx) => (
+                        <tr
+                          key={emp.id_karyawan}
+                          onClick={() => {
+                            if (emp.latestAttendance) {
+                              const job = jobs.find((j) => j.id_pekerjaan === emp.latestAttendance.id_pekerjaan)
+                              setSelectedAttendance({ ...emp.latestAttendance, emp, job })
+                            }
+                          }}
+                          className={`transition ${
+                            emp.latestAttendance
+                              ? 'cursor-pointer hover:bg-blue-50/60'
+                              : 'hover:bg-slate-50/70'
+                          } ${emp.waitingSesi > 0 ? 'bg-amber-50/30' : ''}`}
+                        >
+                          <td className="px-3.5 py-3 text-center text-slate-400 font-mono text-xs">
+                            {idx + 1}
                           </td>
-                        </tr>
-                      ) : (
-                        kehadiranTableEmployees.map((emp, idx) => (
-                          <tr key={emp.id_karyawan} className="hover:bg-slate-50/70 transition">
-                            <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-[11px]">
-                              {idx + 1}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <div className="flex items-center gap-2">
-                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-100 text-[10px] font-bold text-blue-700">
-                                  {emp.nama.charAt(0)}
-                                </span>
-                                <div className="min-w-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => navigate(`/admin/karyawan?highlight=${emp.id_karyawan}`)}
-                                    className="font-bold text-slate-900 hover:text-blue-600 transition truncate cursor-pointer text-left block"
-                                    title="Lihat profil karyawan"
-                                  >
-                                    {emp.nama}
-                                  </button>
-                                  <p className="text-[10px] text-slate-400">{emp.jabatan || 'Teknisi'}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                                {emp.kode_karyawan || `KARY${String(emp.id_karyawan).padStart(3, '0')}`}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 font-bold text-blue-700 text-xs">
+                                {emp.nama.charAt(0).toUpperCase()}
                               </span>
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                  emp.isPresent
-                                    ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
-                                    : 'bg-slate-100 text-slate-500'
-                                }`}
-                              >
-                                <span className={`h-1.5 w-1.5 rounded-full ${emp.isPresent ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                                {emp.isPresent ? 'Hadir' : 'Belum Absen'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              {emp.totalSesi === 0 ? (
-                                <span className="text-slate-300 font-mono text-[11px]">—</span>
-                              ) : (
-                                <div className="flex items-center justify-center gap-1">
-                                  {emp.approvedSesi > 0 && (
-                                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700" title={`${emp.approvedSesi} sesi disetujui`}>
-                                      ✓ {emp.approvedSesi}
-                                    </span>
-                                  )}
-                                  {emp.waitingSesi > 0 && (
-                                    <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700" title={`${emp.waitingSesi} sesi menunggu`}>
-                                      ⏳ {emp.waitingSesi}
-                                    </span>
-                                  )}
-                                  {emp.rejectedSesi > 0 && (
-                                    <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold text-rose-700" title={`${emp.rejectedSesi} sesi ditolak`}>
-                                      ✕ {emp.rejectedSesi}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-mono font-bold text-blue-600 text-[11px]">
-                              {emp.durasiLabel}
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              {emp.latestAttendance ? (
+                              <div className="min-w-0">
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigate(`/admin/karyawan?highlight=${emp.id_karyawan}`)
+                                  }}
+                                  className="font-bold text-slate-900 hover:text-blue-600 transition truncate cursor-pointer text-left block text-sm"
+                                  title="Lihat profil karyawan"
+                                >
+                                  {emp.nama}
+                                </button>
+                                <p className="text-[11px] text-slate-500">{emp.jabatan || 'Teknisi'}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                              {emp.kode_karyawan || `KARY${String(emp.id_karyawan).padStart(3, '0')}`}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                                emp.isPresent
+                                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/30'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              <span className={`h-2 w-2 rounded-full ${emp.isPresent ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                              {emp.isPresent ? 'Hadir' : 'Belum Absen'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {emp.totalSesi === 0 ? (
+                              <span className="text-slate-400 font-mono text-xs">—</span>
+                            ) : emp.waitingSesi > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 border border-amber-300 shadow-2xs">
+                                <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                                ⏳ Perlu Review ({emp.waitingSesi})
+                              </span>
+                            ) : emp.approvedSesi > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-300">
+                                <span>✓</span> Disetujui ({emp.approvedSesi})
+                              </span>
+                            ) : emp.rejectedSesi > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 border border-rose-300">
+                                <span>✕</span> Ditolak ({emp.rejectedSesi})
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center font-mono font-bold text-blue-600 text-xs">
+                            {emp.durasiLabel}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {emp.latestAttendance ? (
+                              emp.waitingSesi > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
                                     const job = jobs.find((j) => j.id_pekerjaan === emp.latestAttendance.id_pekerjaan)
                                     setSelectedAttendance({ ...emp.latestAttendance, emp, job })
                                   }}
-                                  className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition shadow-2xs"
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm ring-2 ring-amber-400/30 transition cursor-pointer"
+                                  title="Klik untuk memeriksa foto selfie, GPS & menyetujui absensi"
                                 >
-                                  Detail
+                                  <span className="animate-pulse">⚡</span> Periksa & Setujui
+                                </button>
+                              ) : emp.approvedSesi > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const job = jobs.find((j) => j.id_pekerjaan === emp.latestAttendance.id_pekerjaan)
+                                    setSelectedAttendance({ ...emp.latestAttendance, emp, job })
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition cursor-pointer"
+                                  title="Lihat rincian absensi"
+                                >
+                                  <span>👁️</span> Lihat Detail
                                 </button>
                               ) : (
-                                <span className="text-slate-300 text-[10px]">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const job = jobs.find((j) => j.id_pekerjaan === emp.latestAttendance.id_pekerjaan)
+                                    setSelectedAttendance({ ...emp.latestAttendance, emp, job })
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-800 transition cursor-pointer"
+                                  title="Lihat rincian penolakan"
+                                >
+                                  <span>✕</span> Rincian
+                                </button>
+                              )
+                            ) : (
+                              <span className="text-slate-400 text-xs italic">Belum Ada Sesi</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -2017,13 +2459,15 @@ export default function RekapAbsensiAdmin() {
         )}
 
         {/* ============================================================== */}
-        {/* MODAL 4: DETAIL & VERIFIKASI ABSENSI (LENGKAP DENGAN GPS) */}
+        {/* MODAL 4: DETAIL & VERIFIKASI ABSENSI (LENGKAP DENGAN GPS & FOTO) */}
         {/* ============================================================== */}
         {selectedAttendance && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-base font-bold text-slate-900">Detail & Verifikasi Absensi</h3>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>Detail & Verifikasi Absensi</span>
+                </h3>
                 <button
                   onClick={() => setSelectedAttendance(null)}
                   className="text-slate-400 hover:text-slate-600"
@@ -2033,6 +2477,59 @@ export default function RekapAbsensiAdmin() {
               </div>
 
               <div className="space-y-3 text-xs">
+                {/* Foto Selfie Absensi Masuk & Pulang */}
+                {(selectedAttendance.foto_lokasi || selectedAttendance.foto_pulang) && (
+                  <div className="space-y-3">
+                    {selectedAttendance.foto_lokasi && (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                            <Icon name="camera" className="h-3.5 w-3.5 text-blue-600" />
+                            Foto Presensi Masuk (Selfie Kamera)
+                          </p>
+                          <a
+                            href={getFileUrl(selectedAttendance.foto_lokasi)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            Buka Ukuran Asli ↗
+                          </a>
+                        </div>
+                        <img
+                          src={getFileUrl(selectedAttendance.foto_lokasi)}
+                          alt="Foto Presensi Masuk"
+                          className="mx-auto h-48 w-full max-w-xs rounded-xl object-cover border border-slate-200 shadow-sm"
+                        />
+                      </div>
+                    )}
+
+                    {selectedAttendance.foto_pulang && (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                            <Icon name="camera" className="h-3.5 w-3.5 text-emerald-600" />
+                            Foto Presensi Pulang (Selfie Kamera)
+                          </p>
+                          <a
+                            href={getFileUrl(selectedAttendance.foto_pulang)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            Buka Ukuran Asli ↗
+                          </a>
+                        </div>
+                        <img
+                          src={getFileUrl(selectedAttendance.foto_pulang)}
+                          alt="Foto Presensi Pulang"
+                          className="mx-auto h-48 w-full max-w-xs rounded-xl object-cover border border-slate-200 shadow-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-between border-b border-slate-50 pb-2">
                   <span className="text-slate-500">Nama Karyawan:</span>
                   <div className="text-right">
@@ -2056,14 +2553,22 @@ export default function RekapAbsensiAdmin() {
                 </div>
                 <div className="flex justify-between border-b border-slate-50 pb-2">
                   <span className="text-slate-500">Jam Masuk / Pulang:</span>
-                  <span className="font-mono text-slate-800">
+                  <span className="font-mono text-slate-800 font-semibold">
                     {selectedAttendance.jam_masuk?.slice(0, 5)} - {selectedAttendance.jam_pulang?.slice(0, 5) || 'Aktif'}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-50 pb-2">
                   <span className="text-slate-500">Durasi Kerja:</span>
-                  <span className="font-bold text-blue-600">{selectedAttendance.durasi_format || formatJamMenit(selectedAttendance.durasi_menit)}</span>
+                  <span className="font-bold text-blue-600 font-mono">{selectedAttendance.durasi_format || formatJamMenit(selectedAttendance.durasi_menit)}</span>
                 </div>
+
+                {/* Catatan Karyawan */}
+                {selectedAttendance.catatan && (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <span className="text-slate-500 block text-[11px] font-semibold">Catatan Karyawan Saat Absen:</span>
+                    <p className="text-xs text-slate-800 mt-1 italic font-medium">"{selectedAttendance.catatan}"</p>
+                  </div>
+                )}
 
                 {/* Informasi Koordinat GPS & Jarak */}
                 {(selectedAttendance.masuk_latitude || selectedAttendance.titik_lokasi) && (
@@ -2113,7 +2618,7 @@ export default function RekapAbsensiAdmin() {
                 <button
                   type="button"
                   onClick={() => setSelectedAttendance(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                 >
                   Tutup
                 </button>
@@ -2124,7 +2629,7 @@ export default function RekapAbsensiAdmin() {
                       handleVerify(selectedAttendance.id_absensi, 'menunggu')
                       setSelectedAttendance(null)
                     }}
-                    className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition"
+                    className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
                   >
                     Set Menunggu
                   </button>
@@ -2135,9 +2640,9 @@ export default function RekapAbsensiAdmin() {
                     handleVerify(selectedAttendance.id_absensi, 'ditolak')
                     setSelectedAttendance(null)
                   }}
-                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-sm transition"
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-sm transition cursor-pointer"
                 >
-                  Tolak
+                  Tolak Absensi
                 </button>
                 <button
                   type="button"
@@ -2145,9 +2650,9 @@ export default function RekapAbsensiAdmin() {
                     handleVerify(selectedAttendance.id_absensi, 'disetujui')
                     setSelectedAttendance(null)
                   }}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition cursor-pointer flex items-center gap-1"
                 >
-                  Setujui
+                  <span>✓</span> Setujui Absensi
                 </button>
               </div>
             </div>

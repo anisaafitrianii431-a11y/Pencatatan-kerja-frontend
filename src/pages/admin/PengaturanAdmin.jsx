@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import AdminPageBanner from '../../components/AdminPageBanner.jsx'
+import BannerHalamanAdmin from '../../components/BannerHalamanAdmin.jsx'
 
 const ADMIN_SETTINGS_KEY = 'pam_admin_settings'
 const DEFAULT_ADMIN_SETTINGS = {
@@ -42,7 +42,7 @@ function PengaturanAdmin({ onNavigate = () => {} }) {
 
   return (
     <div className="admin-settings-page mx-auto w-full max-w-[1440px] space-y-6">
-      <AdminPageBanner
+      <BannerHalamanAdmin
         description="Kelola preferensi antarmuka sistem, notifikasi aktivitas penugasan, dan status keamanan akun administrator."
         icon={
           <svg

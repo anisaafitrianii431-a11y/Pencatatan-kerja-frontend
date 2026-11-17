@@ -48,6 +48,7 @@ export async function getKaryawanById(id) {
 export async function createKaryawan(values) {
   const employee = await apiPost('/karyawan', {
     nama: values.nama?.trim(),
+    kode_karyawan: values.kode_karyawan?.trim() || null,
     jabatan: values.jabatan?.trim() || null,
     nomor_hp: values.nomor_hp?.trim() || null,
     jenis_upah: values.jenis_upah || 'per_jam',

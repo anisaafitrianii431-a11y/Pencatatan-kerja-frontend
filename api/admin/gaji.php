@@ -59,24 +59,161 @@ if ($method === 'GET') {
             $jenisUpah = $k['jenis_upah'] ?: 'per_jam';
             $tarifMaster = floatval($k['tarif_master']);
 
-            // 1. Ambil agregasi presensi HANYA yang berstatus 'disetujui' dan sudah ada jam_pulang
+            // 1. Ambil seluruh sesi presensi disetujui pada periode ini berserta data pekerjaannya
             $stmtPresensi = $pdo->prepare("
-                SELECT 
-                    COUNT(a.id_absensi) AS total_sesi,
-                    COUNT(DISTINCT a.tanggal) AS total_hari,
-                    IFNULL(SUM($sqlDurasi), 0) AS total_jam
+                SELECT a.id_absensi, a.tanggal, a.id_pekerjaan,
+                       ROUND($sqlDurasi, 2) AS durasi_jam,
+                       p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah
                 FROM absensi a
+                LEFT JOIN pekerjaan p ON a.id_pekerjaan = p.id_pekerjaan
                 WHERE a.id_karyawan = ?
                   AND DATE_FORMAT(a.tanggal, '%Y-%m') = ?
                   AND a.status_verifikasi = 'disetujui'
                   AND a.jam_pulang IS NOT NULL
+                ORDER BY a.tanggal ASC, a.jam_masuk ASC
             ");
             $stmtPresensi->execute([$kId, $periode]);
-            $presensi = $stmtPresensi->fetch(PDO::FETCH_ASSOC);
+            $attRows = $stmtPresensi->fetchAll(PDO::FETCH_ASSOC);
 
-            $totalJamActual = round(floatval($presensi['total_jam'] ?? 0), 2);
-            $totalHariActual = intval($presensi['total_hari'] ?? 0);
-            $totalSesiActual = intval($presensi['total_sesi'] ?? 0);
+            // Ambil pekerjaan yang ditugaskan ke karyawan ini via penugasan
+            $stmtPenugasan = $pdo->prepare("
+                SELECT p.id_pekerjaan, p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah
+                FROM penugasan pn
+                JOIN pekerjaan p ON pn.id_pekerjaan = p.id_pekerjaan
+                WHERE pn.id_karyawan = ?
+                  AND (pn.status_penugasan IS NULL OR pn.status_penugasan <> 'dibatalkan')
+                ORDER BY pn.id_penugasan DESC
+            ");
+            $stmtPenugasan->execute([$kId]);
+            $assignedJobs = $stmtPenugasan->fetchAll(PDO::FETCH_ASSOC);
+
+            // Ringkasan per pekerjaan (Sesuai arahan pembimbing: jam/hari x tarif pekerjaan)
+            $jobGroups = [];
+            $totalUpahCalculated = 0.0;
+            $totalJamActual = 0.0;
+            $allDates = [];
+
+            // A. Masukkan pekerjaan dari kehadiran aktual
+            foreach ($attRows as $ar) {
+                $jId = intval($ar['id_pekerjaan'] ?? 0);
+                $dur = floatval($ar['durasi_jam'] ?? 0);
+                $tgl = substr($ar['tanggal'] ?? '', 0, 10);
+                if ($tgl !== '') $allDates[$tgl] = true;
+                $totalJamActual += $dur;
+
+                if (!isset($jobGroups[$jId])) {
+                    $jJenis = $ar['job_jenis_upah'] ?: $jenisUpah;
+                    $jNominal = floatval($ar['job_nominal_upah'] ?? 0) > 0 ? floatval($ar['job_nominal_upah']) : $tarifMaster;
+                    $jobGroups[$jId] = [
+                        'id_pekerjaan' => $jId,
+                        'nama_pekerjaan' => $ar['nama_pekerjaan'] ?: ($jId === 0 ? 'Tugas Lapangan / Mandiri' : 'Pekerjaan #' . $jId),
+                        'jenis_upah' => $jJenis,
+                        'nominal_upah' => $jNominal,
+                        'total_jam' => 0.0,
+                        'dates' => [],
+                        'subtotal_upah' => 0.0
+                    ];
+                }
+                $jobGroups[$jId]['total_jam'] = round($jobGroups[$jId]['total_jam'] + $dur, 2);
+                if ($tgl !== '') $jobGroups[$jId]['dates'][$tgl] = true;
+            }
+
+            // B. Masukkan pekerjaan yang ditugaskan jika belum ada sesi presensi
+            foreach ($assignedJobs as $aj) {
+                $jId = intval($aj['id_pekerjaan']);
+                if (!isset($jobGroups[$jId])) {
+                    $jJenis = $aj['job_jenis_upah'] ?: $jenisUpah;
+                    $jNominal = floatval($aj['job_nominal_upah'] ?? 0) > 0 ? floatval($aj['job_nominal_upah']) : $tarifMaster;
+                    $jobGroups[$jId] = [
+                        'id_pekerjaan' => $jId,
+                        'nama_pekerjaan' => $aj['nama_pekerjaan'] ?: ('Pekerjaan #' . $jId),
+                        'jenis_upah' => $jJenis,
+                        'nominal_upah' => $jNominal,
+                        'total_jam' => 0.0,
+                        'dates' => [],
+                        'subtotal_upah' => 0.0
+                    ];
+                }
+            }
+
+            $totalJamActual = round($totalJamActual, 2);
+            $totalHariActual = count($allDates);
+            $totalSesiActual = count($attRows);
+
+            foreach ($jobGroups as &$jg) {
+                $jg['total_hari'] = count($jg['dates']);
+                $rNom = $jg['nominal_upah'];
+                if ($jg['jenis_upah'] === 'per_hari') {
+                    $jg['subtotal_upah'] = round($jg['total_hari'] * $rNom, 2);
+                    $jg['lama_bekerja'] = $jg['total_hari'] . ' Hari';
+                } elseif ($jg['jenis_upah'] === 'per_bulan') {
+                    // Hanya cairkan jika karyawan sudah ada kehadiran presensi yang disetujui di bulan ini
+                    if ($jg['total_hari'] > 0 || $totalHariActual > 0 || $totalSesiActual > 0) {
+                        $jg['subtotal_upah'] = round($rNom, 2);
+                        $jg['lama_bekerja'] = $jg['total_hari'] . ' Hari Kerja (1 Bulan)';
+                    } else {
+                        $jg['subtotal_upah'] = 0.0;
+                        $jg['lama_bekerja'] = '0 Hari (Belum Hadir)';
+                    }
+                } else {
+                    $jg['subtotal_upah'] = round($jg['total_jam'] * $rNom, 2);
+                    $jg['lama_bekerja'] = $jg['total_jam'] . ' Jam';
+                }
+                $totalUpahCalculated += $jg['subtotal_upah'];
+                unset($jg['dates']);
+            }
+            unset($jg);
+
+            // Jika karyawan tanpa penugasan spesifik tapi berskema bulanan di master:
+            // Hanya cairkan jika sudah ada presensi yang disetujui di bulan ini
+            if (empty($jobGroups) && $jenisUpah === 'per_bulan' && $tarifMaster > 0) {
+                if ($totalHariActual > 0 || $totalSesiActual > 0) {
+                    $totalUpahCalculated = $tarifMaster;
+                } else {
+                    $totalUpahCalculated = 0.0;
+                }
+            }
+
+            // Tentukan skema upah & tarif yang berlaku dari pekerjaan yang dijalankan / ditugaskan
+            if (count($jobGroups) === 1) {
+                $firstJob = reset($jobGroups);
+                $calculatedJenisUpah = $firstJob['jenis_upah'];
+                $calculatedTarif = $firstJob['nominal_upah'];
+            } elseif (count($jobGroups) > 1) {
+                $types = array_unique(array_column($jobGroups, 'jenis_upah'));
+                $calculatedJenisUpah = count($types) === 1 ? reset($types) : 'multi';
+                $calculatedTarif = reset($jobGroups)['nominal_upah'];
+            } else {
+                $calculatedJenisUpah = $jenisUpah;
+                $calculatedTarif = $tarifMaster;
+            }
+
+            // Sinkronkan skema upah ke tabel master karyawan jika berubah mengikuti pekerjaan yang ditugaskan
+            if (count($jobGroups) >= 1 && ($tarifMaster == 0 || $jenisUpah !== $calculatedJenisUpah)) {
+                $stmtSyncK = $pdo->prepare("
+                    UPDATE karyawan 
+                    SET jenis_upah = ?, nominal_upah = ?,
+                        tarif_per_jam = CASE WHEN ? = 'per_jam' THEN ? ELSE tarif_per_jam END
+                    WHERE id_karyawan = ?
+                ");
+                $stmtSyncK->execute([$calculatedJenisUpah, $calculatedTarif, $calculatedJenisUpah, $calculatedTarif, $kId]);
+            }
+
+            // Ambil total reimbursement biaya pribadi yang disetujui yang belum terbayar
+            $stmtReimb = $pdo->prepare("
+                SELECT IFNULL(SUM(CASE 
+                    WHEN status_reimbursement = 'sudah' OR status_ganti = 'sudah' THEN 0 
+                    WHEN sisa_pembayaran > 0 THEN sisa_pembayaran 
+                    ELSE COALESCE(nominal_disetujui, nominal) 
+                END), 0) AS total_reimburse
+                FROM pengeluaran
+                WHERE id_karyawan = ?
+                  AND DATE_FORMAT(tanggal, '%Y-%m') = ?
+                  AND status_verifikasi = 'disetujui'
+                  AND jenis_dana = 'pribadi'
+            ");
+            $stmtReimb->execute([$kId, $periode]);
+            $totalReimburseActual = round(floatval($stmtReimb->fetchColumn() ?: 0), 2);
 
             // 2. Cek apakah record gaji sudah pernah disimpan/ditetapkan untuk periode ini
             $stmtGaji = $pdo->prepare("
@@ -89,15 +226,42 @@ if ($method === 'GET') {
             $gajiRow = $stmtGaji->fetch(PDO::FETCH_ASSOC);
 
             if ($gajiRow) {
+                // Jika record gaji belum dibayar (total_dibayar <= 0 & status_bayar = belum):
+                // Sinkronkan otomatis jika skema upah / tarif / jam kerja telah diperbarui dari penugasan/pekerjaan
+                $hasPayment = floatval($gajiRow['total_dibayar'] ?? 0) > 0 || ($gajiRow['status_bayar'] ?? '') === 'sudah';
+                if (!$hasPayment) {
+                    $bonusUsed = floatval($gajiRow['bonus'] ?? 0);
+                    $potonganUsed = floatval($gajiRow['potongan'] ?? 0);
+                    $newGajiBersih = max(0, round($totalUpahCalculated + $totalReimburseActual + $bonusUsed - $potonganUsed, 2));
+
+                    if ($gajiRow['jenis_upah'] !== $calculatedJenisUpah || floatval($gajiRow['tarif']) != $calculatedTarif || floatval($gajiRow['total_jam']) != $totalJamActual || floatval($gajiRow['total_upah']) != $totalUpahCalculated) {
+                        $stmtSyncG = $pdo->prepare("
+                            UPDATE gaji 
+                            SET jenis_upah = ?, tarif = ?, total_jam = ?, total_hari = ?, total_upah = ?, total_ganti = ?, gaji_bersih = ?, sisa_pembayaran = ?
+                            WHERE id_gaji = ?
+                        ");
+                        $stmtSyncG->execute([$calculatedJenisUpah, $calculatedTarif, $totalJamActual, $totalHariActual, $totalUpahCalculated, $totalReimburseActual, $newGajiBersih, $newGajiBersih, $gajiRow['id_gaji']]);
+                        $gajiRow['jenis_upah'] = $calculatedJenisUpah;
+                        $gajiRow['tarif'] = $calculatedTarif;
+                        $gajiRow['total_jam'] = $totalJamActual;
+                        $gajiRow['total_hari'] = $totalHariActual;
+                        $gajiRow['total_upah'] = $totalUpahCalculated;
+                        $gajiRow['total_ganti'] = $totalReimburseActual;
+                        $gajiRow['gaji_bersih'] = $newGajiBersih;
+                        $gajiRow['sisa_pembayaran'] = $newGajiBersih;
+                    }
+                }
+
                 // Gunakan data snapshot yang tersimpan
                 $isSaved = true;
                 $statusPenetapan = $gajiRow['status_penetapan'] ?: 'ditetapkan';
                 $statusBayar = $gajiRow['status_bayar'] ?: 'belum';
-                $jenisUpahUsed = $gajiRow['jenis_upah'] ?: $jenisUpah;
+                $jenisUpahUsed = $gajiRow['jenis_upah'] ?: $calculatedJenisUpah;
                 $tarifUsed = floatval($gajiRow['tarif']);
                 $totalJamUsed = floatval($gajiRow['total_jam']);
                 $totalHariUsed = intval($gajiRow['total_hari']);
                 $totalUpahUsed = floatval($gajiRow['total_upah']);
+                $totalGantiUsed = floatval($gajiRow['total_ganti'] ?? 0);
                 $bonusUsed = floatval($gajiRow['bonus']);
                 $potonganUsed = floatval($gajiRow['potongan']);
                 $catatanPenyesuaian = $gajiRow['catatan_penyesuaian'] ?? '';
@@ -112,24 +276,16 @@ if ($method === 'GET') {
                 $isSaved = false;
                 $statusPenetapan = 'draft';
                 $statusBayar = 'belum';
-                $jenisUpahUsed = $jenisUpah;
-                $tarifUsed = $tarifMaster;
+                $jenisUpahUsed = $calculatedJenisUpah;
+                $tarifUsed = $calculatedTarif;
                 $totalJamUsed = $totalJamActual;
                 $totalHariUsed = $totalHariActual;
-
-                // Hitung sesuai jenis upah
-                if ($jenisUpahUsed === 'per_jam') {
-                    $totalUpahUsed = round($totalJamUsed * $tarifUsed, 2);
-                } elseif ($jenisUpahUsed === 'per_hari') {
-                    $totalUpahUsed = round($totalHariUsed * $tarifUsed, 2);
-                } else { // per_bulan
-                    $totalUpahUsed = round($tarifUsed, 2);
-                }
-
+                $totalUpahUsed = round($totalUpahCalculated, 2);
+                $totalGantiUsed = $totalReimburseActual;
                 $bonusUsed = 0.00;
                 $potonganUsed = 0.00;
                 $catatanPenyesuaian = '';
-                $gajiBersihUsed = max(0, $totalUpahUsed);
+                $gajiBersihUsed = max(0, round($totalUpahUsed + $totalGantiUsed, 2));
                 $totalDibayar = 0.00;
                 $sisaPembayaran = $gajiBersihUsed;
                 $idGaji = null;
@@ -150,6 +306,8 @@ if ($method === 'GET') {
                 'total_hari' => $totalHariUsed,
                 'total_sesi' => $totalSesiActual,
                 'total_upah' => $totalUpahUsed,
+                'total_ganti' => $totalGantiUsed,
+                'pekerjaan_list' => array_values($jobGroups),
                 'bonus' => $bonusUsed,
                 'potongan' => $potonganUsed,
                 'catatan_penyesuaian' => $catatanPenyesuaian,
@@ -194,10 +352,10 @@ if ($method === 'GET') {
         $stmtK->execute([$id_karyawan]);
         $karyawan = $stmtK->fetch(PDO::FETCH_ASSOC);
 
-        // Ambil seluruh sesi absensi yang berstatus 'disetujui' pada periode ini
+        // Ambil seluruh sesi absensi yang berstatus 'disetujui' pada periode ini beserta info pekerjaan
         $stmtAbsensi = $pdo->prepare("
-            SELECT a.id_absensi, a.tanggal, a.jam_masuk, a.jam_pulang,
-                   p.nama_pekerjaan,
+            SELECT a.id_absensi, a.tanggal, a.jam_masuk, a.jam_pulang, a.id_pekerjaan,
+                   p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah,
                    ROUND($sqlDurasi, 2) AS durasi_jam
             FROM absensi a
             LEFT JOIN pekerjaan p ON a.id_pekerjaan = p.id_pekerjaan
@@ -210,10 +368,100 @@ if ($method === 'GET') {
         $stmtAbsensi->execute([$id_karyawan, $periode]);
         $absensiList = $stmtAbsensi->fetchAll(PDO::FETCH_ASSOC);
 
+        // Susun ringkasan pekerjaan (pekerjaan_summary)
+        $jobMap = [];
+        $tarifMaster = floatval($karyawan['nominal_upah'] ?? $karyawan['tarif_per_jam'] ?? 0);
+        $defaultUpah = $karyawan['jenis_upah'] ?: 'per_jam';
+
+        foreach ($absensiList as $a) {
+            $jId = intval($a['id_pekerjaan'] ?? 0);
+            $dur = floatval($a['durasi_jam'] ?? 0);
+            $tgl = substr($a['tanggal'] ?? '', 0, 10);
+
+            if (!isset($jobMap[$jId])) {
+                $jJenis = $a['job_jenis_upah'] ?: $defaultUpah;
+                $jNominal = floatval($a['job_nominal_upah'] ?? 0) > 0 ? floatval($a['job_nominal_upah']) : $tarifMaster;
+                $jobMap[$jId] = [
+                    'id_pekerjaan' => $jId,
+                    'nama_pekerjaan' => $a['nama_pekerjaan'] ?: ($jId === 0 ? 'Tugas Lapangan / Mandiri' : 'Pekerjaan #' . $jId),
+                    'jenis_upah' => $jJenis,
+                    'nominal_upah' => $jNominal,
+                    'total_jam' => 0.0,
+                    'dates' => [],
+                    'subtotal_upah' => 0.0
+                ];
+            }
+            $jobMap[$jId]['total_jam'] = round($jobMap[$jId]['total_jam'] + $dur, 2);
+            if ($tgl !== '') $jobMap[$jId]['dates'][$tgl] = true;
+        }
+
+        // Tambahkan juga pekerjaan dari penugasan aktif jika belum ada sesi presensi
+        $stmtPn = $pdo->prepare("
+            SELECT p.id_pekerjaan, p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah
+            FROM penugasan pn
+            JOIN pekerjaan p ON pn.id_pekerjaan = p.id_pekerjaan
+            WHERE pn.id_karyawan = ?
+              AND (pn.status_penugasan IS NULL OR pn.status_penugasan <> 'dibatalkan')
+            ORDER BY pn.id_penugasan DESC
+        ");
+        $stmtPn->execute([intval($gaji['id_karyawan'] ?? $id_karyawan)]);
+        $pnJobs = $stmtPn->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($pnJobs as $pj) {
+            $jId = intval($pj['id_pekerjaan']);
+            if (!isset($jobMap[$jId])) {
+                $jJenis = $pj['job_jenis_upah'] ?: $defaultUpah;
+                $jNominal = floatval($pj['job_nominal_upah'] ?? 0) > 0 ? floatval($pj['job_nominal_upah']) : $tarifSnapshot;
+                $jobMap[$jId] = [
+                    'id_pekerjaan' => $jId,
+                    'nama_pekerjaan' => $pj['nama_pekerjaan'] ?: ('Pekerjaan #' . $jId),
+                    'jenis_upah' => $jJenis,
+                    'nominal_upah' => $jNominal,
+                    'total_jam' => 0.0,
+                    'dates' => [],
+                    'subtotal_upah' => ($jJenis === 'per_bulan' ? $jNominal : 0.0)
+                ];
+            }
+        }
+
+        $pekerjaanSummary = [];
+        foreach ($jobMap as $j) {
+            $j['total_hari'] = count($j['dates']);
+            if ($j['jenis_upah'] === 'per_hari') {
+                $j['subtotal_upah'] = round($j['total_hari'] * $j['nominal_upah'], 2);
+                $j['lama_bekerja'] = $j['total_hari'] . ' Hari';
+            } elseif ($j['jenis_upah'] === 'per_bulan') {
+                $j['subtotal_upah'] = round($j['nominal_upah'], 2);
+                $j['lama_bekerja'] = '1 Bulan (Flat)';
+            } else {
+                $j['subtotal_upah'] = round($j['total_jam'] * $j['nominal_upah'], 2);
+                $j['lama_bekerja'] = $j['total_jam'] . ' Jam';
+            }
+            unset($j['dates']);
+            $pekerjaanSummary[] = $j;
+        }
+
+        // Ambil reimbursement biaya pribadi yang disetujui yang belum terbayar
+        $stmtReimb = $pdo->prepare("
+            SELECT IFNULL(SUM(CASE 
+                WHEN status_reimbursement = 'sudah' OR status_ganti = 'sudah' THEN 0 
+                WHEN sisa_pembayaran > 0 THEN sisa_pembayaran 
+                ELSE COALESCE(nominal_disetujui, nominal) 
+            END), 0) AS total_reimburse
+            FROM pengeluaran
+            WHERE id_karyawan = ?
+              AND DATE_FORMAT(tanggal, '%Y-%m') = ?
+              AND status_verifikasi = 'disetujui'
+              AND jenis_dana = 'pribadi'
+        ");
+        $stmtReimb->execute([$id_karyawan, $periode]);
+        $totalReimburse = round(floatval($stmtReimb->fetchColumn() ?: 0), 2);
+
         jsonResponse(true, "Rincian presensi disetujui berhasil dimuat", [
             'karyawan' => $karyawan,
             'periode' => $periode,
-            'absensi' => $absensiList
+            'absensi' => $absensiList,
+            'pekerjaan_summary' => $pekerjaanSummary,
+            'total_reimburse' => $totalReimburse
         ]);
     }
 
@@ -316,10 +564,10 @@ if ($method === 'GET') {
         $stmtPay->execute([$id_gaji]);
         $pembayaranList = $stmtPay->fetchAll(PDO::FETCH_ASSOC);
 
-        // Ambil sesi absensi yang mendasari perhitungan ini
+        // Ambil sesi absensi yang mendasari perhitungan ini berserta data proyeknya
         $stmtAbsensi = $pdo->prepare("
-            SELECT a.id_absensi, a.tanggal, a.jam_masuk, a.jam_pulang,
-                   p.nama_pekerjaan,
+            SELECT a.id_absensi, a.tanggal, a.jam_masuk, a.jam_pulang, a.id_pekerjaan,
+                   p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah,
                    ROUND($sqlDurasi, 2) AS durasi_jam
             FROM absensi a
             LEFT JOIN pekerjaan p ON a.id_pekerjaan = p.id_pekerjaan
@@ -332,10 +580,98 @@ if ($method === 'GET') {
         $stmtAbsensi->execute([$gaji['id_karyawan'], $gaji['periode']]);
         $absensiList = $stmtAbsensi->fetchAll(PDO::FETCH_ASSOC);
 
+        // Ringkasan per pekerjaan untuk tampilan resmi Slip Gaji (Sesuai arahan pembimbing)
+        $jobMap = [];
+        $tarifSnapshot = floatval($gaji['tarif']);
+        $defaultUpah = $gaji['jenis_upah'] ?: 'per_jam';
+
+        foreach ($absensiList as $a) {
+            $jId = intval($a['id_pekerjaan'] ?? 0);
+            $dur = floatval($a['durasi_jam'] ?? 0);
+            $tgl = substr($a['tanggal'] ?? '', 0, 10);
+
+            if (!isset($jobMap[$jId])) {
+                $jJenis = $a['job_jenis_upah'] ?: $defaultUpah;
+                $jNominal = floatval($a['job_nominal_upah'] ?? 0) > 0 ? floatval($a['job_nominal_upah']) : $tarifSnapshot;
+                $jobMap[$jId] = [
+                    'id_pekerjaan' => $jId,
+                    'nama_pekerjaan' => $a['nama_pekerjaan'] ?: ($jId === 0 ? 'Tugas Lapangan / Mandiri' : 'Pekerjaan #' . $jId),
+                    'jenis_upah' => $jJenis,
+                    'nominal_upah' => $jNominal,
+                    'total_jam' => 0.0,
+                    'dates' => [],
+                    'subtotal_upah' => 0.0
+                ];
+            }
+            $jobMap[$jId]['total_jam'] = round($jobMap[$jId]['total_jam'] + $dur, 2);
+            if ($tgl !== '') $jobMap[$jId]['dates'][$tgl] = true;
+        }
+
+        // Tambahkan juga pekerjaan dari penugasan aktif jika belum ada sesi presensi
+        $stmtPn = $pdo->prepare("
+            SELECT p.id_pekerjaan, p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah
+            FROM penugasan pn
+            JOIN pekerjaan p ON pn.id_pekerjaan = p.id_pekerjaan
+            WHERE pn.id_karyawan = ?
+              AND (pn.status_penugasan IS NULL OR pn.status_penugasan <> 'dibatalkan')
+            ORDER BY pn.id_penugasan DESC
+        ");
+        $stmtPn->execute([intval($gaji['id_karyawan'] ?? $id_karyawan)]);
+        $pnJobs = $stmtPn->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($pnJobs as $pj) {
+            $jId = intval($pj['id_pekerjaan']);
+            if (!isset($jobMap[$jId])) {
+                $jJenis = $pj['job_jenis_upah'] ?: $defaultUpah;
+                $jNominal = floatval($pj['job_nominal_upah'] ?? 0) > 0 ? floatval($pj['job_nominal_upah']) : $tarifSnapshot;
+                $jobMap[$jId] = [
+                    'id_pekerjaan' => $jId,
+                    'nama_pekerjaan' => $pj['nama_pekerjaan'] ?: ('Pekerjaan #' . $jId),
+                    'jenis_upah' => $jJenis,
+                    'nominal_upah' => $jNominal,
+                    'total_jam' => 0.0,
+                    'dates' => [],
+                    'subtotal_upah' => ($jJenis === 'per_bulan' ? $jNominal : 0.0)
+                ];
+            }
+        }
+
+        $pekerjaanSummary = [];
+        foreach ($jobMap as $j) {
+            $j['total_hari'] = count($j['dates']);
+            if ($j['jenis_upah'] === 'per_hari') {
+                $j['subtotal_upah'] = round($j['total_hari'] * $j['nominal_upah'], 2);
+                $j['lama_bekerja'] = $j['total_hari'] . ' Hari';
+            } elseif ($j['jenis_upah'] === 'per_bulan') {
+                $j['subtotal_upah'] = round($j['nominal_upah'], 2);
+                $j['lama_bekerja'] = '1 Bulan (Flat)';
+            } else {
+                $j['subtotal_upah'] = round($j['total_jam'] * $j['nominal_upah'], 2);
+                $j['lama_bekerja'] = $j['total_jam'] . ' Jam';
+            }
+            unset($j['dates']);
+            $pekerjaanSummary[] = $j;
+        }
+
+        // Ambil daftar pengeluaran / reimbursement pribadi yang disetujui pada periode ini
+        $stmtPg = $pdo->prepare("
+            SELECT pg.*, p.nama_pekerjaan
+            FROM pengeluaran pg
+            LEFT JOIN pekerjaan p ON pg.id_pekerjaan = p.id_pekerjaan
+            WHERE pg.id_karyawan = ?
+              AND DATE_FORMAT(pg.tanggal, '%Y-%m') = ?
+              AND pg.status_verifikasi = 'disetujui'
+              AND pg.jenis_dana = 'pribadi'
+            ORDER BY pg.tanggal DESC, pg.id_pengeluaran DESC
+        ");
+        $stmtPg->execute([$gaji['id_karyawan'], $gaji['periode']]);
+        $reimbursementList = $stmtPg->fetchAll(PDO::FETCH_ASSOC);
+
         jsonResponse(true, "Detail slip gaji berhasil dimuat", [
             'gaji' => $gaji,
             'pembayaran' => $pembayaranList,
-            'absensi' => $absensiList
+            'absensi' => $absensiList,
+            'pekerjaan_summary' => $pekerjaanSummary,
+            'reimbursement' => $reimbursementList
         ]);
     }
 
@@ -449,36 +785,142 @@ if ($method === 'GET') {
                 $catatanPenyesuaian = trim($body['catatan_penyesuaian']);
             }
 
-            // Hitung jam & hari aktual HANYA dari absensi yang disetujui
-            $stmtPresensi = $pdo->prepare("
-                SELECT 
-                    COUNT(DISTINCT a.tanggal) AS total_hari,
-                    IFNULL(SUM($sqlDurasi), 0) AS total_jam
+            // Hitung jam & hari aktual serta upah dari masing-masing pekerjaan
+            $stmtAtt = $pdo->prepare("
+                SELECT a.id_absensi, a.tanggal, a.id_pekerjaan,
+                       ROUND($sqlDurasi, 2) AS durasi_jam,
+                       p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah
                 FROM absensi a
+                LEFT JOIN pekerjaan p ON a.id_pekerjaan = p.id_pekerjaan
                 WHERE a.id_karyawan = ?
                   AND DATE_FORMAT(a.tanggal, '%Y-%m') = ?
                   AND a.status_verifikasi = 'disetujui'
                   AND a.jam_pulang IS NOT NULL
             ");
-            $stmtPresensi->execute([$kId, $targetPeriode]);
-            $pres = $stmtPresensi->fetch(PDO::FETCH_ASSOC);
+            $stmtAtt->execute([$kId, $targetPeriode]);
+            $attRows = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
 
-            $totalJam = round(floatval($pres['total_jam'] ?? 0), 2);
-            $totalHari = intval($pres['total_hari'] ?? 0);
-            $jenisUpah = $k['jenis_upah'] ?: 'per_jam';
-            $tarifSnapshot = floatval($k['tarif_master']);
+            // Ambil pekerjaan yang ditugaskan ke karyawan ini via penugasan
+            $stmtPenugasan = $pdo->prepare("
+                SELECT p.id_pekerjaan, p.nama_pekerjaan, p.jenis_upah AS job_jenis_upah, p.nominal_upah AS job_nominal_upah
+                FROM penugasan pn
+                JOIN pekerjaan p ON pn.id_pekerjaan = p.id_pekerjaan
+                WHERE pn.id_karyawan = ?
+                  AND (pn.status_penugasan IS NULL OR pn.status_penugasan <> 'dibatalkan')
+                ORDER BY pn.id_penugasan DESC
+            ");
+            $stmtPenugasan->execute([$kId]);
+            $assignedJobs = $stmtPenugasan->fetchAll(PDO::FETCH_ASSOC);
 
-            // Hitung upah pokok sesuai skema upah
-            if ($jenisUpah === 'per_jam') {
-                $totalUpah = round($totalJam * $tarifSnapshot, 2);
-            } elseif ($jenisUpah === 'per_hari') {
-                $totalUpah = round($totalHari * $tarifSnapshot, 2);
-            } else { // per_bulan
-                $totalUpah = round($tarifSnapshot, 2);
+            $jobGroups = [];
+            $totalJam = 0.0;
+            $allDates = [];
+            $totalUpah = 0.0;
+            $defaultTarifMaster = floatval($k['tarif_master']);
+            $defaultJenisUpah = $k['jenis_upah'] ?: 'per_jam';
+
+            foreach ($attRows as $ar) {
+                $jId = intval($ar['id_pekerjaan'] ?? 0);
+                $dur = floatval($ar['durasi_jam'] ?? 0);
+                $tgl = substr($ar['tanggal'] ?? '', 0, 10);
+                if ($tgl !== '') $allDates[$tgl] = true;
+                $totalJam += $dur;
+
+                if (!isset($jobGroups[$jId])) {
+                    $jobGroups[$jId] = [
+                        'jenis_upah' => $ar['job_jenis_upah'] ?: $defaultJenisUpah,
+                        'nominal_upah' => floatval($ar['job_nominal_upah'] ?? 0) > 0 ? floatval($ar['job_nominal_upah']) : $defaultTarifMaster,
+                        'total_jam' => 0.0,
+                        'dates' => []
+                    ];
+                }
+                $jobGroups[$jId]['total_jam'] = round($jobGroups[$jId]['total_jam'] + $dur, 2);
+                if ($tgl !== '') $jobGroups[$jId]['dates'][$tgl] = true;
             }
 
-            // Gaji Bersih = Total Upah + Bonus - Potongan
-            $gajiBersih = max(0, round($totalUpah + $bonus - $potongan, 2));
+            // Masukkan pekerjaan yang ditugaskan jika belum ada sesi presensi
+            foreach ($assignedJobs as $aj) {
+                $jId = intval($aj['id_pekerjaan']);
+                if (!isset($jobGroups[$jId])) {
+                    $jobGroups[$jId] = [
+                        'jenis_upah' => $aj['job_jenis_upah'] ?: $defaultJenisUpah,
+                        'nominal_upah' => floatval($aj['job_nominal_upah'] ?? 0) > 0 ? floatval($aj['job_nominal_upah']) : $defaultTarifMaster,
+                        'total_jam' => 0.0,
+                        'dates' => []
+                    ];
+                }
+            }
+
+            $totalJam = round($totalJam, 2);
+            $totalHari = count($allDates);
+
+            foreach ($jobGroups as $jg) {
+                $hCount = count($jg['dates']);
+                $rNom = $jg['nominal_upah'];
+                if ($jg['jenis_upah'] === 'per_hari') {
+                    $totalUpah += round($hCount * $rNom, 2);
+                } elseif ($jg['jenis_upah'] === 'per_bulan') {
+                    // Hanya cairkan jika karyawan sudah hadir bekerja di bulan ini
+                    if ($hCount > 0 || $totalHari > 0 || count($attRows) > 0) {
+                        $totalUpah += round($rNom, 2);
+                    }
+                } else {
+                    $totalUpah += round($jg['total_jam'] * $rNom, 2);
+                }
+            }
+
+            // Jika tanpa pekerjaan spesifik tapi master berstatus per_bulan:
+            // Hanya cairkan jika ada presensi yang disetujui di bulan ini
+            if (empty($jobGroups) && $defaultJenisUpah === 'per_bulan' && $defaultTarifMaster > 0) {
+                if ($totalHari > 0 || count($attRows) > 0) {
+                    $totalUpah = $defaultTarifMaster;
+                } else {
+                    $totalUpah = 0.0;
+                }
+            }
+
+            // Ambil reimbursement biaya pribadi yang disetujui yang belum terbayar
+            $stmtReimb = $pdo->prepare("
+                SELECT IFNULL(SUM(CASE 
+                    WHEN status_reimbursement = 'sudah' OR status_ganti = 'sudah' THEN 0 
+                    WHEN sisa_pembayaran > 0 THEN sisa_pembayaran 
+                    ELSE COALESCE(nominal_disetujui, nominal) 
+                END), 0) AS total_reimburse
+                FROM pengeluaran
+                WHERE id_karyawan = ?
+                  AND DATE_FORMAT(tanggal, '%Y-%m') = ?
+                  AND status_verifikasi = 'disetujui'
+                  AND jenis_dana = 'pribadi'
+            ");
+            $stmtReimb->execute([$kId, $targetPeriode]);
+            $totalReimburse = round(floatval($stmtReimb->fetchColumn() ?: 0), 2);
+
+            if (count($jobGroups) === 1) {
+                $first = reset($jobGroups);
+                $tarifSnapshot = $first['nominal_upah'];
+                $jenisUpah = $first['jenis_upah'];
+            } elseif (count($jobGroups) > 1) {
+                $types = array_unique(array_column($jobGroups, 'jenis_upah'));
+                $jenisUpah = count($types) === 1 ? reset($types) : 'multi';
+                $tarifSnapshot = reset($jobGroups)['nominal_upah'];
+            } else {
+                $tarifSnapshot = $defaultTarifMaster;
+                $jenisUpah = $defaultJenisUpah;
+            }
+
+            // Sinkronkan ke master karyawan jika skema upah terupdate
+            if (count($jobGroups) >= 1 && ($defaultTarifMaster == 0 || $defaultJenisUpah !== $jenisUpah)) {
+                $stmtSyncK = $pdo->prepare("
+                    UPDATE karyawan 
+                    SET jenis_upah = ?, nominal_upah = ?,
+                        tarif_per_jam = CASE WHEN ? = 'per_jam' THEN ? ELSE tarif_per_jam END
+                    WHERE id_karyawan = ?
+                ");
+                $stmtSyncK->execute([$jenisUpah, $tarifSnapshot, $jenisUpah, $tarifSnapshot, $kId]);
+            }
+
+            // Gaji Bersih = Total Upah + Reimburse + Bonus - Potongan
+            $gajiBersih = max(0, round($totalUpah + $totalReimburse + $bonus - $potongan, 2));
             $sisaPembayaran = max(0, round($gajiBersih - $existingDibayar, 2));
 
             // Status bayar akurat
@@ -501,7 +943,7 @@ if ($method === 'GET') {
                         total_jam = ?,
                         total_hari = ?,
                         total_upah = ?,
-                        total_ganti = 0.00,
+                        total_ganti = ?,
                         bonus = ?,
                         potongan = ?,
                         catatan_penyesuaian = ?,
@@ -519,6 +961,7 @@ if ($method === 'GET') {
                     $totalJam,
                     $totalHari,
                     $totalUpah,
+                    $totalReimburse,
                     $bonus,
                     $potongan,
                     $catatanPenyesuaian,
@@ -538,7 +981,7 @@ if ($method === 'GET') {
                         status_bayar, status_penetapan, tanggal_ditetapkan, ditetapkan_oleh
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?,
-                        ?, 0.00, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
                         ?, ?, ?,
                         ?, 'ditetapkan', NOW(), ?
                     )
@@ -551,6 +994,7 @@ if ($method === 'GET') {
                     $totalHari,
                     $tarifSnapshot,
                     $totalUpah,
+                    $totalReimburse,
                     $bonus,
                     $potongan,
                     $catatanPenyesuaian,
@@ -758,6 +1202,58 @@ if ($method === 'GET') {
             WHERE id_gaji = ?
         ");
         $stmtUpG->execute([$totalDibayarBaru, $sisaPembayaranBaru, $statusBaru, $id_gaji]);
+
+        // 4. Jika gaji sudah lunas terbayar, sinkronkan reimbursement pengeluaran karyawan di periode ini
+        if ($statusBaru === 'sudah') {
+            $stmtGetReimb = $pdo->prepare("
+                SELECT id_pengeluaran, COALESCE(nominal_disetujui, nominal) AS nominal_final, total_dibayar, sisa_pembayaran
+                FROM pengeluaran
+                WHERE id_karyawan = ?
+                  AND DATE_FORMAT(tanggal, '%Y-%m') = ?
+                  AND status_verifikasi = 'disetujui'
+                  AND jenis_dana = 'pribadi'
+                  AND (status_reimbursement != 'sudah' OR status_ganti != 'sudah')
+            ");
+            $stmtGetReimb->execute([$g['id_karyawan'], $g['periode']]);
+            $unpaidReimb = $stmtGetReimb->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($unpaidReimb as $ur) {
+                $nomFinal = floatval($ur['nominal_final']);
+                $sisaReimb = floatval($ur['sisa_pembayaran'] ?: $nomFinal);
+
+                if ($sisaReimb > 0) {
+                    $stmtLogPay = $pdo->prepare("
+                        INSERT INTO pembayaran_reimbursement (
+                            id_pengeluaran, tanggal_bayar, nominal_bayar, metode_pembayaran,
+                            nomor_referensi, nama_penerima, nama_pembayar, catatan
+                        ) VALUES (
+                            ?, ?, ?, ?,
+                            ?, ?, ?, ?
+                        )
+                    ");
+                    $stmtLogPay->execute([
+                        $ur['id_pengeluaran'],
+                        $tanggalBayar,
+                        $sisaReimb,
+                        $metode,
+                        $nomorReferensi ?: ('PAYROLL-' . $g['periode']),
+                        $namaPenerima,
+                        $namaPembayar,
+                        'Dibayarkan bersamaan dengan Slip Gaji periode ' . $g['periode']
+                    ]);
+                }
+
+                $stmtUpReimb = $pdo->prepare("
+                    UPDATE pengeluaran
+                    SET total_dibayar = ?,
+                        sisa_pembayaran = 0.00,
+                        status_reimbursement = 'sudah',
+                        status_ganti = 'sudah'
+                    WHERE id_pengeluaran = ?
+                ");
+                $stmtUpReimb->execute([$nomFinal, $ur['id_pengeluaran']]);
+            }
+        }
 
         $statusText = $statusBaru === 'sudah' ? 'LUNAS (Sudah Dibayar)' : 'DIBAYAR SEBAGIAN';
 

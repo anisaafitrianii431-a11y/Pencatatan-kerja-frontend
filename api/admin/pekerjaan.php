@@ -133,8 +133,25 @@ if ($method === 'GET') {
                 INSERT INTO penugasan (id_pekerjaan, id_karyawan, peran_tugas, jenis_penugasan, status_baca)
                 VALUES (?, ?, 'Anggota Tim Pelaksana', 'admin', 'belum')
             ");
+            $stmtUpK = $pdo->prepare("
+                UPDATE karyawan
+                SET jenis_upah = ?,
+                    nominal_upah = ?,
+                    tarif_per_jam = CASE WHEN ? = 'per_jam' THEN ? ELSE tarif_per_jam END
+                WHERE id_karyawan = ?
+            ");
+            $stmtUpG = $pdo->prepare("
+                UPDATE gaji
+                SET jenis_upah = ?,
+                    tarif = ?
+                WHERE id_karyawan = ? AND status_bayar = 'belum' AND total_dibayar <= 0
+            ");
             foreach ($employeeIds as $empId) {
                 $stmtAssign->execute([$newId, $empId]);
+                if ($nominal_upah > 0) {
+                    $stmtUpK->execute([$jenis_upah, $nominal_upah, $jenis_upah, $nominal_upah, $empId]);
+                    $stmtUpG->execute([$jenis_upah, $nominal_upah, $empId]);
+                }
             }
         }
 
@@ -184,10 +201,26 @@ if ($method === 'GET') {
         ? $body['status']
         : 'berjalan';
     $metode = ($body['metode_penentuan'] ?? 'terbuka') === 'langsung' ? 'langsung' : 'terbuka';
+    $rawEmpList = $body['id_karyawan_list'] ?? [];
+    if (is_string($rawEmpList)) {
+        $rawEmpList = explode(',', $rawEmpList);
+    } elseif (!is_array($rawEmpList)) {
+        $rawEmpList = [];
+    }
     $employeeIds = array_values(array_unique(array_filter(
-        array_map('intval', is_array($body['id_karyawan_list'] ?? null) ? $body['id_karyawan_list'] : []),
+        array_map('intval', $rawEmpList),
         fn($v) => $v > 0
     )));
+
+    // Jika metode langsung tapi daftar ID kosong pada update, gunakan pekerja yang sudah ditugaskan sebelumnya
+    if ($metode === 'langsung' && empty($employeeIds)) {
+        $stmtExisting = $pdo->prepare("SELECT id_karyawan FROM penugasan WHERE id_pekerjaan = ?");
+        $stmtExisting->execute([$id]);
+        $existingEmp = array_map('intval', $stmtExisting->fetchAll(PDO::FETCH_COLUMN));
+        if (!empty($existingEmp)) {
+            $employeeIds = $existingEmp;
+        }
+    }
 
     if (empty($nama)) {
         jsonResponse(false, "Nama pekerjaan wajib diisi", null, 400);
@@ -207,11 +240,12 @@ if ($method === 'GET') {
             jsonResponse(false, "Data pekerjaan tidak ditemukan", null, 404);
         }
 
-        $nextTitik = array_key_exists('titik_lokasi', $body)
-            ? trim((string) ($body['titik_lokasi'] ?? ''))
-            : ($prev['titik_lokasi'] ?? '');
-        if ($nextTitik === '' && $latitude !== null && $longitude !== null && $latitude >= -90 && $latitude <= 90 && $longitude >= -180 && $longitude <= 180) {
+        if ($latitude !== null && $longitude !== null && $latitude >= -90 && $latitude <= 90 && $longitude >= -180 && $longitude <= 180) {
             $nextTitik = sprintf('%.7F, %.7F', $latitude, $longitude);
+        } else {
+            $nextTitik = array_key_exists('titik_lokasi', $body)
+                ? trim((string) ($body['titik_lokasi'] ?? ''))
+                : ($prev['titik_lokasi'] ?? '');
         }
 
         $stmt = $pdo->prepare("
@@ -249,6 +283,34 @@ if ($method === 'GET') {
         } elseif ($prev['metode_penentuan'] === 'langsung' && $metode === 'terbuka') {
             // Jika diubah dari langsung ke terbuka, bersihkan penugasan admin agar terbuka kembali
             $pdo->prepare("DELETE FROM penugasan WHERE id_pekerjaan = ? AND jenis_penugasan = 'admin'")->execute([$id]);
+        }
+
+        // Sinkronkan jenis upah & nominal pekerjaan ke seluruh karyawan yang ditugaskan
+        $stmtAllAssigned = $pdo->prepare("SELECT DISTINCT id_karyawan FROM penugasan WHERE id_pekerjaan = ?");
+        $stmtAllAssigned->execute([$id]);
+        $assignedEmpIds = array_values(array_unique(array_filter(
+            array_merge($employeeIds, array_map('intval', $stmtAllAssigned->fetchAll(PDO::FETCH_COLUMN))),
+            fn($v) => $v > 0
+        )));
+
+        if (!empty($assignedEmpIds) && $nominal_upah > 0) {
+            $stmtUpK = $pdo->prepare("
+                UPDATE karyawan
+                SET jenis_upah = ?,
+                    nominal_upah = ?,
+                    tarif_per_jam = CASE WHEN ? = 'per_jam' THEN ? ELSE tarif_per_jam END
+                WHERE id_karyawan = ?
+            ");
+            $stmtUpG = $pdo->prepare("
+                UPDATE gaji
+                SET jenis_upah = ?,
+                    tarif = ?
+                WHERE id_karyawan = ? AND status_bayar = 'belum' AND total_dibayar <= 0
+            ");
+            foreach ($assignedEmpIds as $empId) {
+                $stmtUpK->execute([$jenis_upah, $nominal_upah, $jenis_upah, $nominal_upah, $empId]);
+                $stmtUpG->execute([$jenis_upah, $nominal_upah, $empId]);
+            }
         }
 
         $pdo->commit();

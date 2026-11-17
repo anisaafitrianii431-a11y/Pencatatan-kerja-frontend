@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { updateProfile } from '../../api/auth.js'
-import WorkerAvatar from '../../components/WorkerAvatar.jsx'
-import WorkerPageHeader from '../../components/WorkerPageHeader.jsx'
+import AvatarKaryawan from '../../components/AvatarKaryawan.jsx'
+import HeaderHalamanKaryawan from '../../components/HeaderHalamanKaryawan.jsx'
 import { formatCurrency } from '../../utils/formatters.js'
 
 function buildFormFromWorker(worker) {
@@ -174,7 +174,7 @@ function ProfilPekerja({
 
   return (
     <div className="worker-profile-page mx-auto w-full max-w-[1440px] space-y-6">
-      <WorkerPageHeader
+      <HeaderHalamanKaryawan
         breadcrumbText="Profil Saya"
         description="Informasi identitas akun, kontak WhatsApp, alamat, dan detail kepegawaian CV. Putra Anugrah Mandiri."
         title="Profil Pekerja"
@@ -216,7 +216,7 @@ function ProfilPekerja({
         <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 to-transparent p-6 sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4 sm:gap-5">
-              <WorkerAvatar
+              <AvatarKaryawan
                 className="h-16 w-16 rounded-2xl text-2xl shadow-lg shadow-emerald-600/20 ring-4 ring-emerald-100"
                 name={worker.nama || 'Pekerja'}
                 photoPath={worker.foto_profil || ''}
@@ -477,7 +477,7 @@ function ProfilPekerja({
                     ID Karyawan
                   </dt>
                   <dd className="mt-1 text-base font-bold text-slate-800">
-                    #{worker.id_karyawan}
+                    {worker.kode_karyawan || `#${worker.id_karyawan}`}
                   </dd>
                 </div>
 

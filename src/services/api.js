@@ -8,10 +8,17 @@ const API_BASE = '/api';
 export function getFileUrl(path) {
   if (!path) return '';
   if (/^(https?:|data:|blob:)/i.test(path)) return path;
-  return `${API_BASE}/${String(path).replace(/^\/+/, '')}`;
+  const cleanPath = String(path).replace(/^\/+/, '');
+  if (cleanPath.startsWith('api/')) {
+    return `/${cleanPath}`;
+  }
+  if (typeof window !== 'undefined' && window.location.pathname.includes('/pencatatan-kerja')) {
+    return `/pencatatan-kerja/api/${cleanPath}`;
+  }
+  return `${API_BASE}/${cleanPath}`;
 }
 
-const LOCAL_DB_VERSION = '2026-11-12-clean';
+const LOCAL_DB_VERSION = '2026-11-14-sync-v1';
 
 // Urutkan daftar berdasarkan waktu input terbaru; gunakan tanggal/ID sebagai fallback.
 function sortNewestFirst(rows = []) {
@@ -34,17 +41,37 @@ function sortNewestFirst(rows = []) {
   });
 }
 
-// Data awal fallback offline bersih (hanya menyimpan akun login)
+// Data awal sinkron dengan database & Manajemen Pengguna
 const INITIAL_DATA = {
   version: LOCAL_DB_VERSION,
   karyawan: [
-    { id_karyawan: 5, nama: 'nadia', jabatan: 'Teknik jaringan', tarif_per_jam: 500000 },
-    { id_karyawan: 6, nama: 'budi santoso', jabatan: 'Software Development', tarif_per_jam: 0 },
+    { id_karyawan: 1, kode_karyawan: 'BUDI001', nama: 'Budi Santoso', jabatan: 'Teknisi Jaringan Senior', email: 'budi@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 50000, tarif_per_jam: 50000, status: 'aktif' },
+    { id_karyawan: 2, kode_karyawan: 'SITI002', nama: 'Siti Rahma', jabatan: 'Sistem Analis', email: 'siti@jamkerja.com', jenis_upah: 'per_bulan', nominal_upah: 6500000, tarif_per_jam: 60000, status: 'aktif' },
+    { id_karyawan: 3, kode_karyawan: 'AGUS003', nama: 'Agus Setiawan', jabatan: 'Teknisi Lapangan', email: 'agus@jamkerja.com', jenis_upah: 'per_hari', nominal_upah: 250000, tarif_per_jam: 40000, status: 'aktif' },
+    { id_karyawan: 4, kode_karyawan: 'DEWI004', nama: 'Dewi Lestari', jabatan: 'Quality Assurance', email: 'dewi@jamkerja.com', jenis_upah: 'per_hari', nominal_upah: 200000, tarif_per_jam: 45000, status: 'aktif' },
+    { id_karyawan: 8, kode_karyawan: 'ALDI005', nama: 'Aldiano', jabatan: 'Service', email: 'aldiano@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 0, tarif_per_jam: 0, status: 'aktif' },
+    { id_karyawan: 10, kode_karyawan: 'JOVI006', nama: 'Jovi', jabatan: 'Teknisi Lapangan', email: 'jovi@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 35000, tarif_per_jam: 35000, status: 'aktif' },
+    { id_karyawan: 12, kode_karyawan: 'MUHA007', nama: 'Muhammad Fauzan', jabatan: 'Teknisi', email: 'fauzan@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 35000, tarif_per_jam: 35000, status: 'nonaktif' },
+    { id_karyawan: 13, kode_karyawan: 'TIAR008', nama: 'Tiara', jabatan: 'Teknisi', email: 'tiara@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 40000, tarif_per_jam: 40000, status: 'aktif' },
+    { id_karyawan: 14, kode_karyawan: 'CITRA009', nama: 'Citra', jabatan: 'IT', email: 'citra@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 50000, tarif_per_jam: 50000, status: 'aktif' },
+    { id_karyawan: 15, kode_karyawan: 'ANIS010', nama: 'Anisa Fitriani', jabatan: 'Teknisi', email: 'anisa@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 45000, tarif_per_jam: 45000, status: 'aktif' },
+    { id_karyawan: 18, kode_karyawan: 'ANDI011', nama: 'Andi', jabatan: 'Teknisi jaringan', nomor_hp: '082108674523', email: 'andi@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 35000, tarif_per_jam: 35000, status: 'aktif' },
+    { id_karyawan: 21, kode_karyawan: 'PUTRI012', nama: 'Putri Cantika', jabatan: 'sistem Analisis', nomor_hp: '0846736456', email: 'putricantika012@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 0, tarif_per_jam: 0, status: 'aktif' }
   ],
   user: [
-    { id_user: 1, id_karyawan: null, email: 'admin@jamkerja.com', kata_sandi: 'admin123', peran: 'admin', aktif: 1 },
-    { id_user: 5, id_karyawan: 5, email: 'nadia@gmail.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1 },
-    { id_user: 6, id_karyawan: 6, email: 'budi@gmail.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1 },
+    { id_user: 1, id_karyawan: null, kode_user: 'ADM001', username: 'ADM001', email: 'admin@jamkerja.com', kata_sandi: 'admin123', peran: 'admin', aktif: 1, nama: 'Administrator', jabatan: 'Administrator Sistem' },
+    { id_user: 2, id_karyawan: 1, kode_user: 'BUDI001', username: 'BUDI001', email: 'budi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Budi Santoso', jabatan: 'Teknisi Jaringan Senior', kode_karyawan: 'BUDI001' },
+    { id_user: 3, id_karyawan: 2, kode_user: 'SITI002', username: 'SITI002', email: 'siti@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Siti Rahma', jabatan: 'Sistem Analis', kode_karyawan: 'SITI002' },
+    { id_user: 4, id_karyawan: 3, kode_user: 'AGUS003', username: 'AGUS003', email: 'agus@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Agus Setiawan', jabatan: 'Teknisi Lapangan', kode_karyawan: 'AGUS003' },
+    { id_user: 5, id_karyawan: 4, kode_user: 'DEWI004', username: 'DEWI004', email: 'dewi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Dewi Lestari', jabatan: 'Quality Assurance', kode_karyawan: 'DEWI004' },
+    { id_user: 6, id_karyawan: 8, kode_user: 'ALDI005', username: 'ALDI005', email: 'aldiano@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Aldiano', jabatan: 'Service', kode_karyawan: 'ALDI005' },
+    { id_user: 7, id_karyawan: 10, kode_user: 'JOVI006', username: 'JOVI006', email: 'jovi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Jovi', jabatan: 'Teknisi Lapangan', kode_karyawan: 'JOVI006' },
+    { id_user: 8, id_karyawan: 12, kode_user: 'MUHA007', username: 'MUHA007', email: 'fauzan@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 0, nama: 'Muhammad Fauzan', jabatan: 'Teknisi', kode_karyawan: 'MUHA007' },
+    { id_user: 11, id_karyawan: 18, kode_user: 'ANDI011', username: 'ANDI011', email: 'andi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Andi', jabatan: 'Teknisi jaringan', kode_karyawan: 'ANDI011' },
+    { id_user: 12, id_karyawan: 13, kode_user: 'TIAR008', username: 'TIAR008', email: 'tiara@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Tiara', jabatan: 'Teknisi', kode_karyawan: 'TIAR008' },
+    { id_user: 13, id_karyawan: 14, kode_user: 'CITRA009', username: 'CITRA009', email: 'citra@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Citra', jabatan: 'IT', kode_karyawan: 'CITRA009' },
+    { id_user: 14, id_karyawan: 15, kode_user: 'ANIS010', username: 'ANIS010', email: 'anisa@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Anisa Fitriani', jabatan: 'Teknisi', kode_karyawan: 'ANIS010' },
+    { id_user: 17, id_karyawan: 21, kode_user: 'PUTRI012', username: 'PUTRI012', email: 'putricantika012@jamkerja.com', kata_sandi: '123456', peran: 'karyawan', aktif: 1, nama: 'Putri Cantika', jabatan: 'sistem Analisis', kode_karyawan: 'PUTRI012' }
   ],
   pekerjaan: [],
   penugasan: [],
@@ -124,7 +151,22 @@ export async function safeFetchJson(url, options = {}) {
       if (rawUser) {
         const u = JSON.parse(rawUser);
         const role = String(u.peran || u.role || '').toLowerCase();
-        const userId = u.id_user || u.id || (role === 'admin' ? 1 : (u.employeeId || 2));
+        let userId = u.id_user || u.id;
+        const uCode = (u.kode_karyawan || u.username || u.name || '').toUpperCase();
+        if (role !== 'admin' && uCode && !uCode.includes('BUDI')) {
+          const matchU = (INITIAL_DATA.user || []).find(
+            (usr) =>
+              (usr.kode_user && usr.kode_user.toUpperCase() === uCode) ||
+              (usr.username && usr.username.toUpperCase() === uCode) ||
+              (usr.nama && usr.nama.toUpperCase().includes(uCode)),
+          );
+          if (matchU) {
+            userId = matchU.id_user;
+          }
+        }
+        if (!userId) {
+          userId = role === 'admin' ? 1 : (u.employeeId || 2);
+        }
         authHeader = {
           'Authorization': `Bearer ${userId}`,
           'X-User-Id': String(userId),
@@ -244,7 +286,9 @@ export const AuthService = {
       return (
         (u.email && u.email.toLowerCase() === ident) ||
         (u.username && u.username.toLowerCase() === ident) ||
-        (k && k.kode_karyawan && k.kode_karyawan.toLowerCase() === ident)
+        (k && k.kode_karyawan && k.kode_karyawan.toLowerCase() === ident) ||
+        (k && k.nama && k.nama.toLowerCase().includes(ident)) ||
+        (k && k.nama && ident.includes(k.nama.toLowerCase()))
       );
     });
     if (!user) {
@@ -859,13 +903,14 @@ export const AbsensiService = {
   async absenMasuk({ id_pekerjaan, id_karyawan, tanggal, jam_masuk, catatan, titik_lokasi, foto_lokasi }) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/absensi.php?action=masuk`, {
+      const { data: resData, ok, status } = await safeFetchJson(`${API_BASE}/absensi.php?action=masuk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_pekerjaan, id_karyawan, tanggal, jam_masuk, catatan, titik_lokasi, foto_lokasi })
       });
       if (resData && resData.success) return resData;
-      if (resData && !resData.success) throw new Error(resData.message);
+      if (resData && !resData.success) throw new Error(resData.message || 'Gagal menyimpan absensi.');
+      if (!ok) throw new Error(`Server backend gagal memproses absensi (HTTP ${status}). Silakan coba kembali.`);
     }
 
     const db = getLocalData();
@@ -947,13 +992,14 @@ export const AbsensiService = {
     };
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/absensi.php?action=pulang`, {
+      const { data: resData, ok, status } = await safeFetchJson(`${API_BASE}/absensi.php?action=pulang`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (resData && resData.success) return resData;
-      if (resData && !resData.success) throw new Error(resData.message);
+      if (resData && !resData.success) throw new Error(resData.message || 'Gagal menyimpan absensi pulang.');
+      if (!ok) throw new Error(`Server backend gagal memproses absensi pulang (HTTP ${status}). Silakan coba kembali.`);
     }
 
     const db = getLocalData();
@@ -1713,9 +1759,10 @@ export const PengeluaranService = {
       if (!isFormData) {
         options.headers = { 'Content-Type': 'application/json' };
       }
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=tambah_dana`, options);
+      const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=tambah_dana`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
+      if (!ok) throw new Error(resData?.message || 'Gagal menyimpan transaksi dana ke database');
     }
     return { success: true, message: 'Dana kantor dicatat (offline mode)' };
   },

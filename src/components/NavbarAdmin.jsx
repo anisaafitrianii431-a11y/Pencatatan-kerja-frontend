@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import AdminAvatar from './AdminAvatar.jsx'
+import AvatarAdmin from './AvatarAdmin.jsx'
 
 function Icon({ name, className = 'h-5 w-5' }) {
   const paths = {
@@ -269,7 +269,7 @@ function NavbarAdmin({
             onClick={() => setIsProfileOpen((isOpen) => !isOpen)}
             type="button"
           >
-            <AdminAvatar
+            <AvatarAdmin
               className="h-10 w-10 text-xs ring-2 ring-white"
               name={adminProfile.nama || 'Admin'}
               tone="brand"
@@ -381,7 +381,7 @@ function NavbarAdmin({
             )}
 
             <div className="mt-5 flex items-center gap-4">
-              <AdminAvatar
+              <AvatarAdmin
                 className="h-14 w-14 text-sm ring-4 ring-blue-50"
                 name={adminProfile.nama || 'Admin'}
                 tone="brand"

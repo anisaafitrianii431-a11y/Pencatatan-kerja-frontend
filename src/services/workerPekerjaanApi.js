@@ -12,8 +12,24 @@ export async function getPekerjaanTersedia(workerId = null) {
 
 export { ambilPekerjaan }
 
+function getActiveUserFromStorage() {
+  try {
+    const raw = localStorage.getItem('ruangkerja_user')
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return null
+}
+
 export async function getPekerjaanSaya(employeeId, employeeName = '') {
-  const normalizedEmployeeId = Number(employeeId)
+  const activeUser = getActiveUserFromStorage()
+  const rawEmpId = Number(employeeId)
+  const normalizedEmployeeId =
+    Number.isInteger(rawEmpId) && rawEmpId > 0 && rawEmpId < 1000000
+      ? rawEmpId
+      : Number(activeUser?.id_karyawan || activeUser?.employeeId) || 0
+
+  const effectiveName = employeeName || activeUser?.nama || activeUser?.name || ''
+  const effectiveCode = activeUser?.kode_karyawan || activeUser?.username || ''
 
   const [employees, jobs, assignments] = await Promise.all([
     getKaryawan(),
@@ -21,56 +37,131 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
     getPenugasan(),
   ])
 
-  // 1. Cocokkan berdasarkan id_karyawan numerik terlebih dahulu agar identitas worker selalu akurat
+  // 1. Cocokkan berdasarkan kode_karyawan atau username terlebih dahulu (identitas paling unik dan akurat)
   let worker = null
-  if (
-    Number.isInteger(normalizedEmployeeId) &&
-    normalizedEmployeeId > 0 &&
-    normalizedEmployeeId < 1000000
-  ) {
-    worker = employees.find((emp) => emp.id_karyawan === normalizedEmployeeId) || null
+  if (effectiveCode) {
+    const targetCode = effectiveCode.trim().toUpperCase()
+    worker =
+      employees.find((emp) => {
+        const code = (emp.kode_karyawan || '').toUpperCase()
+        const uName = (emp.username || '').toUpperCase()
+        return (
+          code === targetCode ||
+          uName === targetCode ||
+          (code && targetCode.startsWith(code)) ||
+          (targetCode && code.startsWith(targetCode))
+        )
+      }) || null
   }
 
-  // 2. Jika belum ditemukan via ID, cari berdasarkan kecocokan nama pekerja
-  if (!worker && employeeName) {
-    const searchName = employeeName.trim().toLowerCase()
+  // 2. Cocokkan berdasarkan nama pekerja jika belum ditemukan
+  if (!worker && effectiveName) {
+    const searchName = effectiveName.trim().toLowerCase()
     const firstName = searchName.split(/\s+/)[0]
     worker =
       employees.find((emp) => (emp.nama || '').trim().toLowerCase() === searchName) ||
       employees.find((emp) => {
         const empName = (emp.nama || '').trim().toLowerCase()
         const empFirst = empName.split(/\s+/)[0]
+        const code = (emp.kode_karyawan || '').toLowerCase()
         return (
+          empName === searchName ||
+          code === searchName ||
+          empFirst === firstName ||
           empName.includes(searchName) ||
-          searchName.includes(empName) ||
-          (firstName.length >= 3 && empFirst === firstName)
+          searchName.includes(empName)
         )
       }) ||
       null
   }
 
-  // 3. Fallback aman: jika data karyawan belum terdaftar di tabel, tetap gunakan identitas user yang login
-  if (!worker) {
-    worker = {
-      id_karyawan: normalizedEmployeeId || (employees[0]?.id_karyawan ?? 1),
-      nama: employeeName || (employees[0]?.nama ?? 'Pekerja'),
-      jabatan: employees[0]?.jabatan || 'Staff Lapangan',
-      tarif_per_jam: employees[0]?.tarif_per_jam || 0,
+  // 3. Cocokkan berdasarkan id_karyawan numerik (HANYA jika tidak berkonflik dengan nama/kode user login)
+  if (!worker && normalizedEmployeeId > 0) {
+    const candidate = employees.find((emp) => Number(emp.id_karyawan) === normalizedEmployeeId)
+    if (candidate) {
+      if (candidate.id_karyawan === 1) {
+        // Jangan pernah ambil Budi Santoso jika user yang login jelas bukan Budi
+        const isBudi =
+          effectiveCode.toUpperCase().includes('BUDI') ||
+          effectiveName.toLowerCase().includes('budi')
+        if (isBudi) worker = candidate
+      } else {
+        worker = candidate
+      }
     }
   }
 
-  const targetWorkerId = worker.id_karyawan
+  // 4. Fallback aman: gunakan identitas user yang login jika belum terdaftar di master karyawan (BUKAN Budi Santoso)
+  if (!worker) {
+    worker = {
+      id_karyawan: normalizedEmployeeId || 0,
+      kode_karyawan: effectiveCode || '—',
+      nama: effectiveName || 'Pekerja',
+      jabatan: activeUser?.jabatan || 'Staff Lapangan',
+      tarif_per_jam: Number(activeUser?.tarif_per_jam) || 0,
+    }
+  }
+
+  // 5. Self-Healing: Jika worker ditemukan dari master karyawan dan berbeda dari storage lama, sinkronkan storage
+  if (
+    worker &&
+    activeUser &&
+    (Number(activeUser.id_karyawan) !== Number(worker.id_karyawan) ||
+      activeUser.nama !== worker.nama ||
+      activeUser.name !== worker.nama)
+  ) {
+    try {
+      activeUser.id_karyawan = Number(worker.id_karyawan)
+      activeUser.employeeId = Number(worker.id_karyawan)
+      activeUser.nama = worker.nama
+      activeUser.name = worker.nama
+      activeUser.kode_karyawan = worker.kode_karyawan
+      activeUser.jabatan = worker.jabatan || activeUser.jabatan
+      activeUser.tarif_per_jam = worker.tarif_per_jam ?? activeUser.tarif_per_jam
+      localStorage.setItem('ruangkerja_user', JSON.stringify(activeUser))
+      localStorage.setItem(
+        'jam_kerja_auth',
+        JSON.stringify({
+          id_user: activeUser.id_user || activeUser.id || 2,
+          id_karyawan: Number(worker.id_karyawan),
+          peran: 'karyawan',
+          email: activeUser.email || worker.email,
+          nama: worker.nama,
+        }),
+      )
+    } catch {
+      // ignore
+    }
+  }
+
+  const targetWorkerId = Number(worker.id_karyawan)
   const jobsById = new Map(
     jobs.map((job) => [job.id_pekerjaan, job]),
   )
 
-  // Hanya penugasan aktif (bukan yang dibatalkan) untuk Pekerjaan Saya
-  const assignedJobs = assignments
-    .filter(
-      (assignment) =>
-        Number(assignment.id_karyawan) === targetWorkerId &&
-        (assignment.status_penugasan ?? 'aktif') !== 'dibatalkan',
+  // Filter penugasan aktif
+  let rawAssigned = assignments.filter((assignment) => {
+    if ((assignment.status_penugasan ?? 'aktif') === 'dibatalkan') return false
+    if (targetWorkerId > 0 && assignment.id_karyawan) {
+      return Number(assignment.id_karyawan) === targetWorkerId
+    }
+    return true
+  })
+
+  // Jika worker belum memiliki id_karyawan tetapi penugasan dari backend sudah difilter per karyawan yang login
+  if (targetWorkerId <= 0 && rawAssigned.length === 0 && assignments.length > 0) {
+    const activeAssignments = assignments.filter(
+      (a) => (a.status_penugasan ?? 'aktif') !== 'dibatalkan',
     )
+    if (activeAssignments.length > 0) {
+      rawAssigned = activeAssignments
+      if ((!worker.id_karyawan || worker.id_karyawan <= 0) && activeAssignments[0].id_karyawan) {
+        worker.id_karyawan = Number(activeAssignments[0].id_karyawan)
+      }
+    }
+  }
+
+  const assignedJobs = rawAssigned
     .map((assignment) => {
       const matchedJob = jobsById.get(assignment.id_pekerjaan) ?? null
       const fallbackJob =
@@ -103,7 +194,15 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
 }
 
 export async function getRiwayatPekerjaanSaya(employeeId, employeeName = '') {
-  const normalizedEmployeeId = Number(employeeId)
+  const activeUser = getActiveUserFromStorage()
+  const rawEmpId = Number(employeeId)
+  const normalizedEmployeeId =
+    Number.isInteger(rawEmpId) && rawEmpId > 0 && rawEmpId < 1000000
+      ? rawEmpId
+      : Number(activeUser?.id_karyawan || activeUser?.employeeId) || 0
+
+  const effectiveName = employeeName || activeUser?.nama || activeUser?.name || ''
+  const effectiveCode = activeUser?.kode_karyawan || activeUser?.username || ''
 
   const [employees, jobs, assignments] = await Promise.all([
     getKaryawan(),
@@ -111,44 +210,60 @@ export async function getRiwayatPekerjaanSaya(employeeId, employeeName = '') {
     getPenugasan(),
   ])
 
-  let worker =
-    Number.isInteger(normalizedEmployeeId) &&
-    normalizedEmployeeId > 0 &&
-    normalizedEmployeeId < 1000000
-      ? employees.find((emp) => emp.id_karyawan === normalizedEmployeeId)
-      : null
+  let worker = null
+  if (normalizedEmployeeId > 0) {
+    worker = employees.find((emp) => Number(emp.id_karyawan) === normalizedEmployeeId) || null
+  }
 
-  if (!worker && employeeName) {
-    const searchName = employeeName.trim().toLowerCase()
+  if (!worker && effectiveCode) {
+    const targetCode = effectiveCode.trim().toUpperCase()
+    worker =
+      employees.find(
+        (emp) =>
+          (emp.kode_karyawan || '').toUpperCase() === targetCode ||
+          (emp.username || '').toUpperCase() === targetCode,
+      ) || null
+  }
+
+  if (!worker && effectiveName) {
+    const searchName = effectiveName.trim().toLowerCase()
     const firstName = searchName.split(/\s+/)[0]
     worker =
+      employees.find((emp) => (emp.nama || '').trim().toLowerCase() === searchName) ||
       employees.find((emp) => {
-        const empName = emp.nama.toLowerCase()
+        const empName = (emp.nama || '').trim().toLowerCase()
         const empFirst = empName.split(/\s+/)[0]
         return (
           empName.includes(searchName) ||
           searchName.includes(empName) ||
-          (firstName.length > 2 && empFirst === firstName)
+          (firstName.length >= 3 && empFirst === firstName)
         )
-      }) || null
+      }) ||
+      null
   }
 
-  if (!worker && employees.length > 0) {
-    worker = employees[0]
+  if (!worker) {
+    worker = {
+      id_karyawan: normalizedEmployeeId || 0,
+      kode_karyawan: effectiveCode || '—',
+      nama: effectiveName || 'Pekerja',
+      jabatan: activeUser?.jabatan || 'Staff Lapangan',
+      tarif_per_jam: Number(activeUser?.tarif_per_jam) || 0,
+    }
   }
 
-  const targetWorkerId = worker?.id_karyawan ?? 1
+  const targetWorkerId = Number(worker.id_karyawan)
   const jobsById = new Map(
     jobs.map((job) => [job.id_pekerjaan, job]),
   )
 
-  // Riwayat mencakup:
-  // 1. Penugasan yang dibatalkan
-  // 2. Pekerjaan yang sudah selesai
   const historyJobs = assignments
-    .filter(
-      (assignment) => Number(assignment.id_karyawan) === targetWorkerId,
-    )
+    .filter((assignment) => {
+      if (targetWorkerId > 0 && assignment.id_karyawan) {
+        return Number(assignment.id_karyawan) === targetWorkerId
+      }
+      return true
+    })
     .map((assignment) => {
       const job = jobsById.get(assignment.id_pekerjaan) ?? null
       const isCanceled = (assignment.status_penugasan ?? 'aktif') === 'dibatalkan'

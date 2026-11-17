@@ -11,8 +11,8 @@ import {
   syncNtpTime,
 } from '../../services/absensiApi.js'
 import { getFileUrl } from '../../services/api.js'
-import CameraCapture from '../../components/CameraCapture.jsx'
-import AbsensiInspectionDialog from '../../components/AbsensiInspectionDialog.jsx'
+import KameraAbsensi from '../../components/KameraAbsensi.jsx'
+import ModalPeriksaAbsensi from '../../components/ModalPeriksaAbsensi.jsx'
 import {
   formatWeekdayAndDate,
   getGoogleMapsUrl,
@@ -146,8 +146,8 @@ function JobStatusBadge({ status }) {
 }
 
 export default function RekapAbsensiPekerja({
-  workerId = 1,
-  workerName = 'Budi Santoso',
+  workerId,
+  workerName = '',
   defaultTab = 'absen',
 }) {
   const [activeTab, setActiveTab] = useState(defaultTab === 'rekap' ? 'rekap' : 'absen')
@@ -155,6 +155,23 @@ export default function RekapAbsensiPekerja({
   useEffect(() => {
     setActiveTab(defaultTab === 'rekap' ? 'rekap' : 'absen')
   }, [defaultTab])
+
+  const storedUser = (() => {
+    try {
+      const raw = localStorage.getItem('ruangkerja_user')
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  })()
+
+  const normalizedWorkerId =
+    Number(workerId) ||
+    Number(storedUser?.id_karyawan) ||
+    Number(storedUser?.employeeId) ||
+    0
+  const effectiveWorkerName =
+    workerName || storedUser?.nama || storedUser?.name || 'Pekerja'
 
   const [jobs, setJobs] = useState([])
   const [assignments, setAssignments] = useState([])
@@ -194,8 +211,6 @@ export default function RekapAbsensiPekerja({
   const [filterJob, setFilterJob] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-
-  const normalizedWorkerId = Number(workerId) || 1
 
   const loadWorkerData = async () => {
     setIsLoading(true)
@@ -384,7 +399,7 @@ export default function RekapAbsensiPekerja({
     const assignment = assignmentByJobId.get(Number(item.id_pekerjaan)) || null
     setSelectedDetail({
       ...item,
-      nama_karyawan: item.nama_karyawan || workerName,
+      nama_karyawan: item.nama_karyawan || effectiveWorkerName,
       jenis_penugasan: item.jenis_penugasan || assignment?.jenis_penugasan || '',
       job,
     })
@@ -439,7 +454,7 @@ export default function RekapAbsensiPekerja({
   return (
     <div className="worker-theme min-h-screen bg-slate-50 text-slate-800">
       {cameraSession && (
-        <CameraCapture
+        <KameraAbsensi
           mode={cameraSession.mode}
           job={cameraSession.job}
           isSubmitting={isSubmitting}
@@ -452,7 +467,7 @@ export default function RekapAbsensiPekerja({
         />
       )}
 
-      <AbsensiInspectionDialog
+      <ModalPeriksaAbsensi
         attendance={selectedDetail}
         job={selectedDetail?.job}
         readOnly
@@ -473,7 +488,7 @@ export default function RekapAbsensiPekerja({
                 Absensi
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Halo, <strong>{workerName}</strong>. Lakukan absensi sesuai pekerjaan yang Anda ambil dengan kamera &amp; titik GPS, lalu tinjau detailnya pada Rekap Absen hingga disetujui Admin.
+                Halo, <strong>{effectiveWorkerName}</strong>. Lakukan absensi sesuai pekerjaan yang Anda ambil dengan kamera &amp; titik GPS, lalu tinjau detailnya pada Rekap Absen hingga disetujui Admin.
               </p>
             </div>
             <button

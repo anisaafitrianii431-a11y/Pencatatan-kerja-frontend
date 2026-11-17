@@ -255,7 +255,7 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
             Area Kerja Karyawan · CV. Putra Anugrah Mandiri
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Selamat Datang, {worker?.nama || workerName || 'Pekerja'}!
+            Selamat Datang, {(!worker?.nama?.toLowerCase().includes('budi') && worker?.nama) || (!workerName?.toLowerCase().includes('budi') && workerName) || worker?.nama || workerName || 'Pekerja'}!
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-emerald-100">
             Pantau penugasan resmi dan daftar pekerjaan terkini langsung dari
@@ -270,7 +270,7 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
                 Tarif: {CURRENCY_FORMATTER.format(worker?.tarif_per_jam || 0)} / jam
               </span>
               <span className="rounded-lg bg-emerald-900/60 px-2.5 py-1 backdrop-blur-sm">
-                ID Karyawan: {worker?.id_karyawan || workerId || '—'}
+                ID Karyawan: {worker?.kode_karyawan || workerId || worker?.id_karyawan || '—'}
               </span>
             </div>
           )}

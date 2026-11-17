@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import AdminPageBanner from '../../components/AdminPageBanner.jsx'
-import AdminAvatar from '../../components/AdminAvatar.jsx'
+import BannerHalamanAdmin from '../../components/BannerHalamanAdmin.jsx'
+import AvatarAdmin from '../../components/AvatarAdmin.jsx'
 
 const ADMIN_PROFILE_KEY = 'pam_admin_profile'
 const DEFAULT_ADMIN_PROFILE = {
@@ -100,7 +100,7 @@ function ProfilAdmin({ onNavigate = () => {} }) {
 
   return (
     <div className="admin-profile-page mx-auto w-full max-w-[1440px] space-y-6">
-      <AdminPageBanner
+      <BannerHalamanAdmin
         description="Kelola informasi identitas akun utama administrator sistem CV. Putra Anugrah Mandiri."
         icon={
           <svg
@@ -154,7 +154,7 @@ function ProfilAdmin({ onNavigate = () => {} }) {
         <div className="border-b border-slate-100 bg-gradient-to-r from-blue-50/60 to-transparent p-6 sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4 sm:gap-5">
-              <AdminAvatar
+              <AvatarAdmin
                 className="h-16 w-16 text-lg ring-4 ring-blue-100"
                 name={profile.nama || 'Admin'}
                 tone="brand"

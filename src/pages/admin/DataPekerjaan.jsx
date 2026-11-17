@@ -21,7 +21,7 @@ import {
   tambahPekerjaKePekerjaan,
 } from '../../services/pekerjaanApi.js'
 import { getKaryawan } from '../../services/karyawanApi.js'
-import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog.jsx'
+import ModalKonfirmasiHapus from '../../components/ModalKonfirmasiHapus.jsx'
 
 const PAGE_SIZE = 8
 
@@ -264,6 +264,18 @@ function InteractiveMapPicker({
       })
 
       mapInstanceRef.current = map
+
+      // Pastikan Leaflet merender ukuran sebenarnya di dalam modal
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize()
+        }
+      }, 250)
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize()
+        }
+      }, 600)
     }
 
     return () => {
@@ -352,23 +364,33 @@ function InteractiveMapPicker({
 
       // Fallback ke OpenStreetMap Nominatim Geocoding
       setGeocoderStatus('Mencari lokasi via OpenStreetMap...')
-      const osmResp = await fetch(
+      let osmResp = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           query,
         )}&limit=1`,
         { headers: { 'Accept-Language': 'id,en' } },
       )
-      const osmData = await osmResp.json()
+      let osmData = await osmResp.json()
+      if ((!osmData || osmData.length === 0) && !query.toLowerCase().includes('indonesia')) {
+        const osmResp2 = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query + ', Indonesia',
+          )}&limit=1`,
+          { headers: { 'Accept-Language': 'id,en' } },
+        )
+        osmData = await osmResp2.json()
+      }
+
       if (osmData && osmData.length > 0) {
         const lat = Number(parseFloat(osmData[0].lat).toFixed(7))
         const lng = Number(parseFloat(osmData[0].lon).toFixed(7))
         onCoordinateChange(lat, lng)
         setGeocoderStatus(`Lokasi ditemukan: ${osmData[0].display_name}`)
       } else {
-        setGeocoderStatus('Lokasi tidak ditemukan. Coba ketik nama kota atau klik langsung di peta.')
+        setGeocoderStatus('Lokasi spesifik belum ditemukan di peta global. Anda dapat langsung mengklik atau menggeser pin di peta untuk menetapkan titik presensi.')
       }
     } catch (err) {
-      setGeocoderStatus(`Pencarian gagal: ${err.message}`)
+      setGeocoderStatus(`Pencarian gagal: ${err.message}. Anda tetap bisa mengklik atau menggeser pin langsung di peta.`)
     } finally {
       setIsSearching(false)
     }
@@ -389,7 +411,7 @@ function InteractiveMapPicker({
                 handleSearchAddress()
               }
             }}
-            placeholder="Ketik alamat / nama gedung untuk mencari lokasi..."
+            placeholder="Ketik alamat / nama kota / jalan untuk mencari..."
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
@@ -425,17 +447,11 @@ function InteractiveMapPicker({
           📍 Klik peta atau geser pin untuk menentukan titik presensi
         </div>
 
-        {/* Indikator Google Maps API Key */}
+        {/* Indikator Peta */}
         <div className="absolute bottom-2 left-2 z-[500] pointer-events-none rounded-md bg-slate-900/80 px-2 py-0.5 text-[10px] text-white shadow-xs backdrop-blur-xs">
-          {googleMapsApiKey ? '🗺️ Google Maps API: Aktif' : '🗺️ OpenStreetMap / Nominatim'}
+          🗺️ Peta Interaktif Presensi
         </div>
       </div>
-
-      {!googleMapsApiKey && (
-        <p className="text-[11px] text-slate-500 italic">
-          💡 Catatan: Google Maps API Key belum disetel di <code className="font-mono text-slate-700">.env</code> (<code className="font-mono text-slate-700">VITE_GOOGLE_MAPS_API_KEY</code>). Sistem otomatis menggunakan peta dan geocoding OpenStreetMap interaktif bawaan.
-        </p>
-      )}
     </div>
   )
 }
@@ -623,8 +639,8 @@ function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
             </p>
           </div>
 
-          {/* Tanggal & Jadwal */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+          {/* Tanggal, Batas Waktu & Tarif Upah */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
             <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-xs">
               <span className="text-slate-500 font-medium">Jadwal Mulai</span>
               <p className="mt-1 text-sm font-semibold text-slate-900">
@@ -641,6 +657,20 @@ function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
                   ⚠️ Melewati batas waktu pengerjaan
                 </p>
               )}
+            </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 shadow-xs">
+              <span className="text-emerald-800 font-medium flex items-center gap-1">
+                <span>💰</span> Tarif Upah Pekerjaan
+              </span>
+              <p className="mt-1 text-sm font-bold text-emerald-950">
+                {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(job?.nominal_upah) || 0)}
+                <span className="text-xs font-semibold text-emerald-700 ml-1">
+                  {job?.jenis_upah === 'per_hari' ? '/ hari' : job?.jenis_upah === 'per_bulan' ? '/ bulan' : '/ jam'}
+                </span>
+              </p>
+              <span className="text-[10px] text-emerald-700/90 font-medium">
+                {job?.jenis_upah === 'per_hari' ? 'Upah Harian' : job?.jenis_upah === 'per_bulan' ? 'Gaji Bulanan' : 'Upah Per Jam'}
+              </span>
             </div>
           </div>
 
@@ -1207,7 +1237,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       status_pengambilan:
         values.metode_penentuan === 'langsung' ? 'ditutup' : values.status_pengambilan || 'terbuka',
       id_karyawan_list:
-        values.metode_penentuan === 'langsung' || values.metode_penentuan === 'gabungan'
+        values.metode_penentuan === 'langsung'
           ? values.id_karyawan_list
           : [],
     }
@@ -1228,31 +1258,8 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       normalized.metode_penentuan === 'langsung' &&
       normalized.id_karyawan_list.length === 0
     ) {
-      setValidationMessage('Pilih minimal satu pekerja untuk metode Admin Menentukan Pekerja.')
+      setValidationMessage('Pilih minimal satu pekerja untuk metode Ditugaskan oleh Admin.')
       return
-    }
-    if (normalized.metode_penentuan === 'gabungan') {
-      if (normalized.id_karyawan_list.length === 0) {
-        setValidationMessage(
-          'Pilih minimal satu pekerja awal pilihan Admin untuk metode Gabungan.',
-        )
-        return
-      }
-      if (!values.is_unlimited_kuota) {
-        const kuotaNum = Number(values.kuota_pekerja)
-        if (!kuotaNum || kuotaNum <= 0) {
-          setValidationMessage(
-            'Masukkan jumlah kuota pekerja yang valid (angka positif) atau centang Tanpa Batas Kuota.',
-          )
-          return
-        }
-        if (kuotaNum <= normalized.id_karyawan_list.length) {
-          setValidationMessage(
-            `Total kuota (${kuotaNum} orang) harus lebih besar dari jumlah pekerja pilihan Admin (${normalized.id_karyawan_list.length} orang) agar tersisa slot untuk pekerja mandiri.`,
-          )
-          return
-        }
-      }
     }
     if (normalized.metode_penentuan === 'terbuka' && !values.is_unlimited_kuota) {
       const kuotaNum = Number(values.kuota_pekerja)
@@ -1485,20 +1492,200 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
             </div>
           </div>
 
-          <section className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Tarif Gaji Pekerjaan</h3>
-              <p className="mt-1 text-xs text-slate-500">Tarif ini dipakai menghitung upah karyawan pada proyek berdasarkan absensi yang disetujui.</p>
+          {/* ======================================================== */}
+          {/* SEKSI: TARIF & SKEMA UPAH PEKERJAAN                      */}
+          {/* ======================================================== */}
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 font-bold text-xs shadow-2xs">
+                    💰
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Tarif &amp; Skema Upah Pekerjaan
+                  </h3>
+                </div>
+                <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                  Pilih salah satu satuan upah untuk pekerjaan ini. Tiap pekerja di proyek ini akan menerima bayaran berdasarkan akumulasi absensi yang disetujui Admin.
+                </p>
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-semibold text-slate-700">Perhitungan Upah
-                <select value={values.jenis_upah} onChange={(e) => updateField('jenis_upah', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                  <option value="per_jam">Per Jam</option><option value="per_hari">Per Hari</option><option value="per_bulan">Per Bulan</option>
-                </select>
+
+            {/* Pilihan 3 Satuan Upah (Radio Cards Sesuai Arahan Pembimbing) */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">
+                Pilih Satuan Lama Kerja <span className="text-rose-500">*</span>
               </label>
-              <label className="block text-xs font-semibold text-slate-700">Nominal Gaji (Rp)
-                <input type="number" min="0" value={values.nominal_upah} onChange={(e) => updateField('nominal_upah', e.target.value)} placeholder="Contoh: 150000" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {/* 1. Per Jam */}
+                <button
+                  type="button"
+                  onClick={() => updateField('jenis_upah', 'per_jam')}
+                  className={`flex flex-col text-left p-3 rounded-xl border-2 transition cursor-pointer ${
+                    values.jenis_upah === 'per_jam'
+                      ? 'border-emerald-600 bg-white ring-2 ring-emerald-500/10 shadow-xs'
+                      : 'border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-white text-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold text-slate-900">Upah Per Jam</span>
+                    <span
+                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                        values.jenis_upah === 'per_jam'
+                          ? 'border-emerald-600 bg-emerald-600 text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    >
+                      {values.jenis_upah === 'per_jam' && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      )}
+                    </span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-slate-500 leading-snug">
+                    Dihitung dari total jam kerja absensi.
+                  </span>
+                </button>
+
+                {/* 2. Per Hari */}
+                <button
+                  type="button"
+                  onClick={() => updateField('jenis_upah', 'per_hari')}
+                  className={`flex flex-col text-left p-3 rounded-xl border-2 transition cursor-pointer ${
+                    values.jenis_upah === 'per_hari'
+                      ? 'border-emerald-600 bg-white ring-2 ring-emerald-500/10 shadow-xs'
+                      : 'border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-white text-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold text-slate-900">Upah Per Hari</span>
+                    <span
+                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                        values.jenis_upah === 'per_hari'
+                          ? 'border-emerald-600 bg-emerald-600 text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    >
+                      {values.jenis_upah === 'per_hari' && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      )}
+                    </span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-slate-500 leading-snug">
+                    Dibayar per hari kehadiran yang disetujui.
+                  </span>
+                </button>
+
+                {/* 3. Per Bulan */}
+                <button
+                  type="button"
+                  onClick={() => updateField('jenis_upah', 'per_bulan')}
+                  className={`flex flex-col text-left p-3 rounded-xl border-2 transition cursor-pointer ${
+                    values.jenis_upah === 'per_bulan'
+                      ? 'border-emerald-600 bg-white ring-2 ring-emerald-500/10 shadow-xs'
+                      : 'border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-white text-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold text-slate-900">Gaji Bulanan</span>
+                    <span
+                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                        values.jenis_upah === 'per_bulan'
+                          ? 'border-emerald-600 bg-emerald-600 text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    >
+                      {values.jenis_upah === 'per_bulan' && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      )}
+                    </span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-slate-500 leading-snug">
+                    Gaji tetap bulanan / proporsi kehadiran.
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Input Nominal Sesuai Pilihan */}
+            <div className="space-y-1.5">
+              <label htmlFor="job-nominal-upah" className="block text-xs font-semibold text-slate-700">
+                {values.jenis_upah === 'per_hari'
+                  ? 'Besar Upah Per Hari (Rp)'
+                  : values.jenis_upah === 'per_bulan'
+                  ? 'Besar Gaji Per Bulan (Rp)'
+                  : 'Besar Upah Per Jam (Rp)'}{' '}
+                <span className="text-rose-500">*</span>
               </label>
+              <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-2xs focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10 transition">
+                <span className="pl-3.5 pr-1 text-xs font-bold text-slate-500 select-none">
+                  Rp
+                </span>
+                <input
+                  id="job-nominal-upah"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={values.nominal_upah}
+                  onChange={(e) => updateField('nominal_upah', e.target.value)}
+                  placeholder={
+                    values.jenis_upah === 'per_hari'
+                      ? 'contoh: 150000'
+                      : values.jenis_upah === 'per_bulan'
+                      ? 'contoh: 3000000'
+                      : 'contoh: 25000'
+                  }
+                  className="w-full bg-transparent px-2 py-2.5 text-sm font-semibold text-slate-900 outline-none"
+                />
+                <span className="pr-3.5 pl-1 text-xs font-medium text-slate-400 select-none">
+                  {values.jenis_upah === 'per_hari'
+                    ? '/ hari'
+                    : values.jenis_upah === 'per_bulan'
+                    ? '/ bulan'
+                    : '/ jam'}
+                </span>
+              </div>
+            </div>
+
+            {/* Live Preview & Panduan Perhitungan Dinamis */}
+            <div className="rounded-xl border border-emerald-200/80 bg-white p-3 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Format Tampilan Tarif:</span>
+                <span className="font-bold text-emerald-700">
+                  {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(values.nominal_upah) || 0)}{' '}
+                  <span className="text-slate-500 font-normal">
+                    {values.jenis_upah === 'per_hari'
+                      ? '/ hari'
+                      : values.jenis_upah === 'per_bulan'
+                      ? '/ bulan'
+                      : '/ jam'}
+                  </span>
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed border-t border-slate-100 pt-1.5">
+                {values.jenis_upah === 'per_hari' ? (
+                  <>
+                    💡 <strong>Simulasi</strong>: Jika pekerja hadir bekerja <strong>5 hari</strong> dan disetujui, maka pekerja tersebut memperoleh upah sebesar{' '}
+                    <strong className="text-emerald-800">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format((Number(values.nominal_upah) || 0) * 5)}
+                    </strong>.
+                  </>
+                ) : values.jenis_upah === 'per_bulan' ? (
+                  <>
+                    💡 <strong>Simulasi</strong>: Pekerja menerima gaji flat bulanan sebesar{' '}
+                    <strong className="text-emerald-800">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(values.nominal_upah) || 0)}
+                    </strong> / bulan.
+                  </>
+                ) : (
+                  <>
+                    💡 <strong>Simulasi</strong>: Jika pekerja menyelesaikan <strong>8 jam kerja</strong> dan disetujui, maka pekerja tersebut memperoleh upah sebesar{' '}
+                    <strong className="text-emerald-800">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format((Number(values.nominal_upah) || 0) * 8)}
+                    </strong>.
+                  </>
+                )}
+              </p>
             </div>
           </section>
 
@@ -1598,17 +1785,17 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
             </div>
           </div>
 
-          {/* Siapa yang Menentukan Pekerja? (3 Metode) */}
+          {/* Siapa yang Menentukan Pekerja? (2 Metode) */}
           <div className="space-y-2 pt-1">
             <span className="block text-xs font-semibold text-slate-700">
-              Siapa yang Menentukan Pekerja? <span className="text-rose-500">*</span>
+              Cara Penentuan Pekerja <span className="text-rose-500">*</span>
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {/* A. Admin Menentukan Pekerja */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* A. Ditugaskan oleh Admin */}
               <label
-                className={`flex cursor-pointer flex-col rounded-xl border p-3 transition ${
+                className={`flex cursor-pointer flex-col rounded-xl border p-3.5 transition ${
                   values.metode_penentuan === 'langsung'
-                    ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                    ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs'
                     : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
               >
@@ -1621,20 +1808,20 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                     onChange={() => updateField('metode_penentuan', 'langsung')}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs font-bold text-slate-800">
-                    Admin Menentukan
+                  <span className="text-xs font-bold text-slate-900">
+                    Ditugaskan oleh Admin
                   </span>
                 </div>
-                <p className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
-                  Admin memilih satu atau beberapa karyawan. Penugasan langsung masuk ke Pekerjaan Saya.
+                <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed pl-6">
+                  Admin memilih langsung karyawan yang mengerjakan tugas ini. Pekerjaan otomatis masuk ke daftar tugas karyawan terkait.
                 </p>
               </label>
 
-              {/* B. Pekerja Memilih Sendiri */}
+              {/* B. Diambil Mandiri oleh Pekerja */}
               <label
-                className={`flex cursor-pointer flex-col rounded-xl border p-3 transition ${
+                className={`flex cursor-pointer flex-col rounded-xl border p-3.5 transition ${
                   values.metode_penentuan === 'terbuka'
-                    ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                    ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs'
                     : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
               >
@@ -1647,55 +1834,26 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                     onChange={() => updateField('metode_penentuan', 'terbuka')}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs font-bold text-slate-800">
-                    Pekerja Memilih Sendiri
+                  <span className="text-xs font-bold text-slate-900">
+                    Diambil Mandiri oleh Pekerja
                   </span>
                 </div>
-                <p className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
-                  Tampil di menu Pekerjaan Tersedia. Diambil mandiri oleh pekerja hingga kuota penuh.
-                </p>
-              </label>
-
-              {/* C. Gabungan Admin dan Pekerja */}
-              <label
-                className={`flex cursor-pointer flex-col rounded-xl border p-3 transition ${
-                  values.metode_penentuan === 'gabungan'
-                    ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="metode_penentuan"
-                    value="gabungan"
-                    checked={values.metode_penentuan === 'gabungan'}
-                    onChange={() => updateField('metode_penentuan', 'gabungan')}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-xs font-bold text-slate-800">
-                    Gabungan Admin &amp; Pekerja
-                  </span>
-                </div>
-                <p className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
-                  Admin memilih pekerja awal, dan sisa kuota dibuka untuk diambil mandiri oleh pekerja lain.
+                <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed pl-6">
+                  Pekerjaan dibuka untuk seluruh karyawan di menu "Pekerjaan Tersedia". Karyawan dapat mendaftar/mengambil pekerjaan ini sendiri hingga kuota terpenuhi.
                 </p>
               </label>
             </div>
           </div>
 
-          {/* Checklist Karyawan (Jika Admin Menentukan atau Gabungan) */}
-          {(values.metode_penentuan === 'langsung' || values.metode_penentuan === 'gabungan') && (
+          {/* Checklist Karyawan (Jika Ditugaskan oleh Admin) */}
+          {values.metode_penentuan === 'langsung' && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-700">
-                  {values.metode_penentuan === 'gabungan'
-                    ? 'Pilih Karyawan Ditentukan Admin di Awal'
-                    : 'Pilih Karyawan yang Ditugaskan Langsung'}{' '}
-                  <span className="text-rose-500">*</span>
+                  Pilih Karyawan yang Ditugaskan <span className="text-rose-500">*</span>
                 </span>
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
-                  {values.id_karyawan_list.length} dipilih
+                  {values.id_karyawan_list.length} karyawan dipilih
                 </span>
               </div>
 
@@ -1737,13 +1895,18 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
             </div>
           )}
 
-          {/* Pengaturan Kuota Pekerja (Jika Pekerja Memilih Sendiri atau Gabungan) */}
-          {(values.metode_penentuan === 'terbuka' || values.metode_penentuan === 'gabungan') && (
+          {/* Pengaturan Kuota Pekerja (Jika Diambil Mandiri) */}
+          {values.metode_penentuan === 'terbuka' && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-800">
-                  Pengaturan Kuota &amp; Pendaftaran Tim
-                </span>
+                <div>
+                  <span className="block text-xs font-bold text-slate-800">
+                    Batas Kuota Pekerja yang Dibutuhkan
+                  </span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Tentukan berapa banyak pekerja yang boleh mengambil pekerjaan ini secara mandiri.
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
@@ -1771,49 +1934,15 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                       onChange={(e) => updateField('is_unlimited_kuota', e.target.checked)}
                       className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <span>Tanpa Batas Kuota (Bebas Kuota)</span>
+                    <span>Bebas Kuota (Tanpa Batas Jumlah)</span>
                   </label>
                 </div>
               </div>
 
-              {/* Pratinjau Alokasi Kuota Khusus Metode Gabungan */}
-              {values.metode_penentuan === 'gabungan' && (
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 text-xs text-indigo-950 space-y-2">
-                  <p className="font-bold flex items-center gap-1.5 text-indigo-900">
-                    <span>📊</span> Pratinjau Alokasi Kuota Tim Gabungan:
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-white/90 rounded-lg p-2 border border-indigo-200/50 shadow-2xs">
-                      <span className="text-slate-500 block text-[10px]">Total Kuota</span>
-                      <strong className="text-indigo-700 text-xs sm:text-sm font-bold">
-                        {values.is_unlimited_kuota ? 'Tanpa Batas' : `${values.kuota_pekerja || 0} Orang`}
-                      </strong>
-                    </div>
-                    <div className="bg-white/90 rounded-lg p-2 border border-indigo-200/50 shadow-2xs">
-                      <span className="text-slate-500 block text-[10px]">Dipilih Admin</span>
-                      <strong className="text-blue-700 text-xs sm:text-sm font-bold">
-                        {adminSelectedCount} Orang
-                      </strong>
-                    </div>
-                    <div className="bg-white/90 rounded-lg p-2 border border-indigo-200/50 shadow-2xs">
-                      <span className="text-slate-500 block text-[10px]">Slot Pekerja Mandiri</span>
-                      <strong className="text-emerald-700 text-xs sm:text-sm font-bold">
-                        {remainingOpenSlots} {values.is_unlimited_kuota ? '' : 'Slot'}
-                      </strong>
-                    </div>
-                  </div>
-                  {!values.is_unlimited_kuota && totalKuotaNum <= adminSelectedCount && (
-                    <p className="text-[11px] font-semibold text-rose-600 pt-0.5">
-                      ⚠️ Kuota harus lebih besar dari jumlah pekerja yang dipilih Admin ({adminSelectedCount} orang) agar ada slot untuk pekerja mandiri.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Status Pendaftaran Mandiri */}
+              {/* Status Penerimaan Mandiri */}
               <div className="pt-1">
                 <span className="block text-[11px] font-medium text-slate-600 mb-1">
-                  Status Pengambilan Mandiri Saat Ini
+                  Status Penerimaan Pekerja Mandiri
                 </span>
                 <div className="flex items-center gap-4 text-xs">
                   <label className="flex items-center gap-1.5 cursor-pointer">
@@ -1825,7 +1954,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                       onChange={() => updateField('status_pengambilan', 'terbuka')}
                       className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="font-semibold text-emerald-700">Pendaftaran Terbuka</span>
+                    <span className="font-semibold text-emerald-700">Buka Pendaftaran (Dapat Diambil)</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -1836,7 +1965,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                       onChange={() => updateField('status_pengambilan', 'ditutup')}
                       className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="font-semibold text-amber-700">Pendaftaran Ditutup</span>
+                    <span className="font-semibold text-amber-700">Tutup Pendaftaran</span>
                   </label>
                 </div>
               </div>
@@ -3126,9 +3255,8 @@ function DataPekerjaan() {
                 className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50/60 py-2 pl-3 pr-8 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10 cursor-pointer"
               >
                 <option value="">Semua Cara Penentuan</option>
-                <option value="langsung">Admin Menentukan Pekerja</option>
-                <option value="terbuka">Pekerja Memilih Sendiri</option>
-                <option value="gabungan">Gabungan Admin &amp; Pekerja</option>
+                <option value="langsung">Ditugaskan oleh Admin</option>
+                <option value="terbuka">Diambil Mandiri oleh Pekerja</option>
                 <option value="kuota_penuh">Kuota Penuh</option>
                 <option value="expired">Melewati Batas Waktu</option>
               </select>
@@ -3617,7 +3745,7 @@ function DataPekerjaan() {
 
       {/* Dialog Konfirmasi Hapus */}
       {pendingDelete && (
-        <DeleteConfirmationDialog
+        <ModalKonfirmasiHapus
           description="Anda yakin ingin menghapus data pekerjaan ini? Penugasan yang terkait dengan pekerjaan ini juga akan dibatalkan."
           isProcessing={isSaving}
           itemName={`${pendingDelete.nama_pekerjaan} (#${pendingDelete.id_pekerjaan})`}

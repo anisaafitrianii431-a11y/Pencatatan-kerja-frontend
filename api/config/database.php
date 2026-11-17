@@ -24,10 +24,9 @@ if (session_status() === PHP_SESSION_NONE) {
     @session_start();
 }
 
-// CORS Headers terbatas
-$allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost'];
+// CORS Headers
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if (in_array($origin, $allowedOrigins)) {
+if (!empty($origin)) {
     header("Access-Control-Allow-Origin: $origin");
 } else {
     header("Access-Control-Allow-Origin: http://localhost:5173");
@@ -97,20 +96,20 @@ function ensureAbsensiSchema($pdo) {
         if ($colStatus && ($colStatus['Default'] ?? '') !== 'menunggu') {
             $pdo->exec("ALTER TABLE absensi MODIFY COLUMN status_verifikasi ENUM('menunggu', 'disetujui', 'ditolak') NOT NULL DEFAULT 'menunggu'");
         }
-        if (!$pdo->query("SHOW COLUMNS FROM absensi LIKE 'foto_pulang'")->fetch()) {
-            $pdo->exec("ALTER TABLE absensi ADD COLUMN foto_pulang VARCHAR(255) DEFAULT NULL AFTER foto_lokasi");
-        }
-        if (!$pdo->query("SHOW COLUMNS FROM absensi LIKE 'titik_pulang'")->fetch()) {
-            $pdo->exec("ALTER TABLE absensi ADD COLUMN titik_pulang VARCHAR(100) DEFAULT NULL AFTER titik_lokasi");
-        }
-        if (!$pdo->query("SHOW COLUMNS FROM absensi LIKE 'jarak_masuk'")->fetch()) {
-            $pdo->exec("ALTER TABLE absensi ADD COLUMN jarak_masuk INT DEFAULT NULL AFTER titik_pulang");
-        }
-        if (!$pdo->query("SHOW COLUMNS FROM absensi LIKE 'jarak_pulang'")->fetch()) {
-            $pdo->exec("ALTER TABLE absensi ADD COLUMN jarak_pulang INT DEFAULT NULL AFTER jarak_masuk");
-        }
-        if (!$pdo->query("SHOW COLUMNS FROM absensi LIKE 'catatan_admin'")->fetch()) {
-            $pdo->exec("ALTER TABLE absensi ADD COLUMN catatan_admin VARCHAR(255) DEFAULT NULL AFTER catatan");
+        $cols = [
+            'foto_lokasi' => "VARCHAR(255) DEFAULT NULL",
+            'foto_pulang' => "VARCHAR(255) DEFAULT NULL",
+            'titik_lokasi' => "VARCHAR(100) DEFAULT NULL",
+            'titik_pulang' => "VARCHAR(100) DEFAULT NULL",
+            'jarak_masuk' => "INT DEFAULT NULL",
+            'jarak_pulang' => "INT DEFAULT NULL",
+            'catatan' => "VARCHAR(255) DEFAULT NULL",
+            'catatan_admin' => "VARCHAR(255) DEFAULT NULL",
+        ];
+        foreach ($cols as $col => $def) {
+            if (!$pdo->query("SHOW COLUMNS FROM absensi LIKE '$col'")->fetch()) {
+                $pdo->exec("ALTER TABLE absensi ADD COLUMN $col $def");
+            }
         }
     } catch (Exception $e) {
         error_log("Absensi schema migration error: " . $e->getMessage());
@@ -149,6 +148,12 @@ function ensureKaryawanProfileSchema($pdo) {
         if (!$pdo->query("SHOW COLUMNS FROM `user` LIKE 'username'")->fetch()) {
             $pdo->exec("ALTER TABLE `user` ADD COLUMN username VARCHAR(50) DEFAULT NULL AFTER email");
         }
+        if (!$pdo->query("SHOW COLUMNS FROM `user` LIKE 'kode_user'")->fetch()) {
+            $pdo->exec("ALTER TABLE `user` ADD COLUMN kode_user VARCHAR(30) DEFAULT NULL AFTER id_user");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM `user` LIKE 'created_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE `user` ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER aktif");
+        }
         if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'catatan_admin'")->fetch()) {
             $pdo->exec("ALTER TABLE penugasan ADD COLUMN catatan_admin VARCHAR(255) DEFAULT NULL AFTER peran_tugas");
         }
@@ -175,6 +180,13 @@ function ensureKaryawanProfileSchema($pdo) {
             ) ENGINE=InnoDB;
         ");
 
+        try {
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY id_penanggung_jawab INT NULL DEFAULT NULL");
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY sumber_dana VARCHAR(100) NULL DEFAULT 'Kas Perusahaan'");
+        } catch (PDOException $e) {
+            // Kolom sudah diubah
+        }
+
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS pengembalian_dana (
                 id_pengembalian INT AUTO_INCREMENT PRIMARY KEY,
@@ -196,6 +208,13 @@ function ensureKaryawanProfileSchema($pdo) {
             ) ENGINE=InnoDB;
         ");
 
+        try {
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY id_penanggung_jawab INT NULL DEFAULT NULL");
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY sumber_dana VARCHAR(100) NULL DEFAULT 'Kas Perusahaan'");
+        } catch (PDOException $e) {
+            // Kolom sudah diubah
+        }
+
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS pembayaran_reimbursement (
                 id_pembayaran INT AUTO_INCREMENT PRIMARY KEY,
@@ -212,6 +231,13 @@ function ensureKaryawanProfileSchema($pdo) {
                 INDEX (id_pengeluaran)
             ) ENGINE=InnoDB;
         ");
+
+        try {
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY id_penanggung_jawab INT NULL DEFAULT NULL");
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY sumber_dana VARCHAR(100) NULL DEFAULT 'Kas Perusahaan'");
+        } catch (PDOException $e) {
+            // Kolom sudah diubah
+        }
 
         $pengeluaranCols = [
             'nomor_transaksi' => "ALTER TABLE pengeluaran ADD COLUMN nomor_transaksi VARCHAR(50) DEFAULT NULL AFTER id_pengeluaran",
@@ -264,6 +290,13 @@ function ensureKaryawanProfileSchema($pdo) {
                 INDEX (id_gaji)
             ) ENGINE=InnoDB;
         ");
+
+        try {
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY id_penanggung_jawab INT NULL DEFAULT NULL");
+            $pdo->exec("ALTER TABLE dana_kantor MODIFY sumber_dana VARCHAR(100) NULL DEFAULT 'Kas Perusahaan'");
+        } catch (PDOException $e) {
+            // Kolom sudah diubah
+        }
 
         // Pastikan kolom baru tabel gaji tersedia
         $gajiCols = [
@@ -512,8 +545,8 @@ function fetchAuthUserRecord($pdo, int $userId) {
     if (!$pdo || $userId <= 0) return null;
     ensureKaryawanProfileSchema($pdo);
     $stmt = $pdo->prepare("
-        SELECT u.id_user, u.id_karyawan, u.email, u.peran, u.aktif,
-               k.nama, k.jabatan, k.tarif_per_jam,
+        SELECT u.id_user, u.id_karyawan, u.email, u.username, u.peran, u.aktif,
+               k.kode_karyawan, k.nama, k.jabatan, k.tarif_per_jam,
                k.no_hp, k.alamat, k.foto_profil, k.kontak_darurat, k.nama_bank, k.no_rekening
         FROM `user` u
         LEFT JOIN karyawan k ON u.id_karyawan = k.id_karyawan
@@ -725,6 +758,7 @@ function ensurePekerjaanPenugasanSchema($pdo) {
             $pdo->exec("ALTER TABLE pekerjaan ADD COLUMN nominal_upah DECIMAL(12, 2) NOT NULL DEFAULT 0.00 AFTER jenis_upah");
         }
         $jobExtraColumns = [
+            'titik_lokasi' => "ALTER TABLE pekerjaan ADD COLUMN titik_lokasi VARCHAR(100) DEFAULT NULL AFTER lokasi",
             'latitude' => "ALTER TABLE pekerjaan ADD COLUMN latitude DECIMAL(10, 7) DEFAULT NULL",
             'longitude' => "ALTER TABLE pekerjaan ADD COLUMN longitude DECIMAL(10, 7) DEFAULT NULL",
             'radius_meter' => "ALTER TABLE pekerjaan ADD COLUMN radius_meter INT NOT NULL DEFAULT 100",
@@ -734,8 +768,17 @@ function ensurePekerjaanPenugasanSchema($pdo) {
         foreach ($jobExtraColumns as $column => $sql) {
             if (!$pdo->query("SHOW COLUMNS FROM pekerjaan LIKE '{$column}'")->fetch()) $pdo->exec($sql);
         }
+        if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'peran_tugas'")->fetch()) {
+            $pdo->exec("ALTER TABLE penugasan ADD COLUMN peran_tugas VARCHAR(100) DEFAULT 'Anggota Tim Pelaksana' AFTER id_karyawan");
+        }
         if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'jenis_penugasan'")->fetch()) {
             $pdo->exec("ALTER TABLE penugasan ADD COLUMN jenis_penugasan ENUM('admin', 'mandiri') NOT NULL DEFAULT 'admin' AFTER peran_tugas");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'status_baca'")->fetch()) {
+            $pdo->exec("ALTER TABLE penugasan ADD COLUMN status_baca ENUM('belum', 'sudah') NOT NULL DEFAULT 'belum' AFTER jenis_penugasan");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM penugasan LIKE 'created_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE penugasan ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
         }
     } catch (Exception $e) {
         error_log("Pekerjaan/penugasan schema migration error: " . $e->getMessage());
@@ -845,7 +888,8 @@ function uploadReceiptImage(array $fieldKeys, $prefix = 'kuitansi_') {
         jsonResponse(false, "Format file tidak valid ($mimeType). Hanya format JPG, PNG, atau WEBP yang diperbolehkan.", null, 400);
     }
 
-    $uploadDir = __DIR__ . '/../uploads/';
+    $subFolder = 'uploads/kwitansi/';
+    $uploadDir = __DIR__ . '/../' . $subFolder;
     if (!is_dir($uploadDir)) {
         @mkdir($uploadDir, 0755, true);
     }
@@ -907,7 +951,7 @@ function uploadReceiptImage(array $fieldKeys, $prefix = 'kuitansi_') {
     }
 
     if ($saved) {
-        return 'uploads/' . $filename;
+        return $subFolder . $filename;
     }
 
     jsonResponse(false, "Gagal mengunggah dan mengompresi file bukti gambar ke server.", null, 500);
@@ -1058,7 +1102,8 @@ function saveBase64ProofImage($dataUrl, $prefix = 'bukti_gaji_') {
         jsonResponse(false, "Ukuran foto bukti pembayaran melebihi batas maksimal 5 MB.", null, 400);
     }
 
-    $uploadDir = __DIR__ . '/../uploads/';
+    $subFolder = ($prefix === 'bukti_gaji_') ? 'uploads/bukti_gaji/' : 'uploads/bukti_bayar/';
+    $uploadDir = __DIR__ . '/../' . $subFolder;
     if (!is_dir($uploadDir)) {
         @mkdir($uploadDir, 0755, true);
     }
@@ -1104,7 +1149,7 @@ function saveBase64ProofImage($dataUrl, $prefix = 'bukti_gaji_') {
     }
 
     if ($saved) {
-        return 'uploads/' . $filename;
+        return $subFolder . $filename;
     }
 
     jsonResponse(false, "Gagal menyimpan file bukti pembayaran ke server.", null, 500);
