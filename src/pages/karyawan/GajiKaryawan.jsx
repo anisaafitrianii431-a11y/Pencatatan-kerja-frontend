@@ -222,7 +222,7 @@ export default function GajiKaryawan({ currentUser }) {
   };
 
   const upahKerja = isFilteredByJob
-    ? wageForHoursAndDays(visibleHours, visibleDays, totalJobAttendanceDays)
+    ? Number(activeJob?.estimasi_upah ?? wageForHoursAndDays(visibleHours, visibleDays, totalJobAttendanceDays))
     : Number(pekerjaanSummary.reduce((sum, job) => sum + Number(job.estimasi_upah || 0), 0).toFixed(2));
 
   const totalReimburse = isFilteredByJob
@@ -646,7 +646,7 @@ export default function GajiKaryawan({ currentUser }) {
                   const jobSelected = String(job.id_pekerjaan) === String(selectedPekerjaanId);
                   const jobRows = allAbsensi.filter((item) => String(item.id_pekerjaan) === String(job.id_pekerjaan));
                   const jobDaysCount = countWorkDays(jobRows);
-                  const jobPay = wageForHoursAndDays(Number(job.total_jam_disetujui || 0), jobDaysCount, totalJobAttendanceDays);
+                  const jobPay = Number(job.estimasi_upah ?? 0);
                   const jobRate = Number(job.nominal_upah || 0);
                   const jobRateType = job.jenis_upah === 'per_hari' ? 'hari' : job.jenis_upah === 'per_bulan' ? 'bulan' : 'jam';
                   return (
@@ -719,7 +719,7 @@ export default function GajiKaryawan({ currentUser }) {
                       const statusMeta = JOB_STATUS_META[job.status_pekerjaan] || JOB_STATUS_META.berjalan;
                       const jobAbsensi = allAbsensi.filter((item) => String(item.id_pekerjaan) === String(job.id_pekerjaan));
                       const jobDays = countWorkDays(jobAbsensi);
-                      const jobWage = wageForHoursAndDays(Number(job.total_jam_disetujui || 0), jobDays, totalJobAttendanceDays);
+                      const jobWage = Number(job.estimasi_upah ?? 0);
                       return (
                         <tr
                           key={job.id_pekerjaan}
