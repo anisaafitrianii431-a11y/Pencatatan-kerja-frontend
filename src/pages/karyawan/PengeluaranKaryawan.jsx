@@ -731,15 +731,19 @@ export default function PengeluaranKaryawan({ currentUser }) {
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('id_pekerjaan', formJobId);
-      formData.append('id_karyawan', currentUser?.id_karyawan);
-      formData.append('tanggal', formTanggal);
+      if (formJobId) {
+        formData.append('id_pekerjaan', formJobId);
+      }
+      if (currentUser?.id_karyawan) {
+        formData.append('id_karyawan', currentUser.id_karyawan);
+      }
+      formData.append('tanggal', formTanggal || new Date().toISOString().slice(0, 10));
       formData.append('nominal', formNominal);
-      formData.append('jenis_dana', formJenisDana);
+      formData.append('jenis_dana', formJenisDana || 'pribadi');
       if (formJenisDana === 'kantor' && formIdKas) {
         formData.append('id_dana', formIdKas);
       }
-      formData.append('keterangan', formKeterangan);
+      formData.append('keterangan', formKeterangan || '');
       if (selectedFile) {
         formData.append('foto_kwitansi', selectedFile);
       }
@@ -810,9 +814,20 @@ export default function PengeluaranKaryawan({ currentUser }) {
       )}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Rincian sumber dana</h2><p className="text-sm text-slate-600">Dana pribadi yang akan direimburse: <strong>{formatRupiah(summaryStats.pribadi.filter((item) => item.status_verifikasi === 'disetujui' && item.status_ganti !== 'sudah').reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</strong></p></div>
-        <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-slate-100"><div className="bg-blue-600" style={{ width: `${summaryStats.total ? (summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} /><div className="bg-amber-700" style={{ width: `${summaryStats.total ? (summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} /></div>
-        <div className="mt-3 flex flex-wrap gap-5 text-sm"><span><b className="rounded-full bg-blue-100 px-3 py-1 text-blue-800">Uang Kantor</b> {formatRupiah(summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.kantor.length} transaksi</span><span><b className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">Pribadi · Reimburs</b> {formatRupiah(summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.pribadi.length} transaksi</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold text-slate-900">Rincian Sumber Dana Belanja</h2>
+          <p className="text-sm text-slate-600">
+            Uang pribadi yang akan diganti di gaji: <strong className="text-amber-700 font-extrabold">{formatRupiah(summaryStats.pribadi.filter((item) => item.status_verifikasi === 'disetujui' && item.status_ganti !== 'sudah').reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</strong>
+          </p>
+        </div>
+        <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-slate-100">
+          <div className="bg-blue-600" style={{ width: `${summaryStats.total ? (summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} />
+          <div className="bg-amber-600" style={{ width: `${summaryStats.total ? (summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-5 text-sm">
+          <span><b className="rounded-full bg-blue-100 px-3 py-1 text-blue-800">Uang Kas Kantor</b> {formatRupiah(summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.kantor.length} nota</span>
+          <span><b className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">Uang Pribadi (Talangan)</b> {formatRupiah(summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.pribadi.length} nota</span>
+        </div>
       </section>
 
       {summaryStats.missingReceipt.length > 0 && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><p><strong>{summaryStats.missingReceipt.length} transaksi belum ada foto nota.</strong> Lengkapi agar lebih cepat diperiksa.</p><button type="button" onClick={() => { setActiveTab('riwayat'); setSummaryStatus('semua'); setSummaryFund('semua'); setSummaryReceipt('tanpa-foto'); setSummaryQuery(''); const next = new URLSearchParams(searchParams); next.delete('pekerjaan'); setSearchParams(next); window.setTimeout(() => document.getElementById('riwayat-pengeluaran-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100); }} className="rounded-xl border border-amber-300 bg-white px-4 py-2 font-semibold">Tampilkan transaksi itu</button></section>}
@@ -1388,10 +1403,10 @@ export default function PengeluaranKaryawan({ currentUser }) {
             </div>
           </div>
 
-          <fieldset className="space-y-1.5">
-            <legend className="block text-xs font-semibold text-slate-700 mb-1">Sumber Pendanaan *</legend>
-            <div className="grid grid-cols-2 gap-2">
-              <label className={`flex items-center space-x-2 min-h-[44px] px-3 py-2 rounded-xl border cursor-pointer transition ${formJenisDana === 'pribadi' ? 'border-amber-500 bg-amber-50/50 text-amber-900 font-bold' : 'border-slate-200 hover:bg-slate-50 text-slate-700 text-xs'
+          <fieldset className="space-y-2">
+            <legend className="block text-xs font-bold text-slate-800 mb-1">Belanja Pakai Uang Siapa? *</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <label className={`flex items-start space-x-2.5 p-3 rounded-xl border cursor-pointer transition ${formJenisDana === 'pribadi' ? 'border-amber-500 bg-amber-50/70 text-amber-950 ring-1 ring-amber-400 font-bold' : 'border-slate-200 hover:bg-slate-50 text-slate-700 text-xs'
                 }`}>
                 <input
                   type="radio"
@@ -1402,12 +1417,17 @@ export default function PengeluaranKaryawan({ currentUser }) {
                     setFormJenisDana('pribadi');
                     setKasSelectTouched(false);
                   }}
-                  className="text-amber-600 focus:ring-amber-500"
+                  className="mt-0.5 text-amber-600 focus:ring-amber-500"
                 />
-                <span className="text-xs">Uang Pribadi</span>
+                <div className="flex-1">
+                  <span className="text-xs font-bold block">Uang Pribadi (Talangan)</span>
+                  <span className="text-[11px] text-amber-800/80 block mt-0.5 font-normal">
+                    Bayar pakai dompet sendiri. Uang ini otomatis diganti di slip gaji Anda.
+                  </span>
+                </div>
               </label>
 
-              <label className={`flex items-center space-x-2 min-h-[44px] px-3 py-2 rounded-xl border cursor-pointer transition ${formJenisDana === 'kantor' ? 'border-blue-500 bg-blue-50/50 text-blue-900 font-bold' : 'border-slate-200 hover:bg-slate-50 text-slate-700 text-xs'
+              <label className={`flex items-start space-x-2.5 p-3 rounded-xl border cursor-pointer transition ${formJenisDana === 'kantor' ? 'border-blue-500 bg-blue-50/70 text-blue-950 ring-1 ring-blue-400 font-bold' : 'border-slate-200 hover:bg-slate-50 text-slate-700 text-xs'
                 }`}>
                 <input
                   type="radio"
@@ -1415,9 +1435,14 @@ export default function PengeluaranKaryawan({ currentUser }) {
                   value="kantor"
                   checked={formJenisDana === 'kantor'}
                   onChange={() => setFormJenisDana('kantor')}
-                  className="text-blue-600 focus:ring-blue-500"
+                  className="mt-0.5 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-xs">Uang Kantor</span>
+                <div className="flex-1">
+                  <span className="text-xs font-bold block">Uang Kas Kantor / Proyek</span>
+                  <span className="text-[11px] text-blue-800/80 block mt-0.5 font-normal">
+                    Pakai uang kas proyek yang dipegang PJ. Cukup lapor foto nota belanja.
+                  </span>
+                </div>
               </label>
             </div>
           </fieldset>

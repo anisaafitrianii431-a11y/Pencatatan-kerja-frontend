@@ -329,62 +329,76 @@ export default function KameraAbsensi({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-200/80 bg-white p-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                Titik Lokasi Pekerjaan
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Lokasi Proyek Kerja
               </p>
-              <p className="mt-0.5 font-semibold text-slate-800">
-                {isWfh ? 'WFH · lokasi bebas' : (job?.lokasi || 'Alamat lokasi belum diisi')}
+              <p className="font-bold text-slate-800 text-xs">
+                {isWfh ? 'WFH · Lokasi Bebas' : (job?.lokasi || 'Alamat lokasi belum diisi')}
               </p>
-              {!isWfh && job?.titik_lokasi ? (
-                <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[11px] text-slate-600">
-                  <span className="truncate">{job.titik_lokasi}</span>
+              {!isWfh && (
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                  <span>Batas Radius: <strong className="text-slate-700">{radiusMeters} meter</strong></span>
                   {jobMapUrl && (
                     <a
                       href={jobMapUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="shrink-0 font-sans font-semibold text-emerald-700 hover:underline"
+                      className="font-semibold text-emerald-700 hover:underline"
                     >
-                      Peta
+                      Buka Peta Proyek ↗
                     </a>
                   )}
                 </div>
-              ) : !isWfh ? (
-                <p className="mt-1 text-[11px] text-slate-400">Koordinat target belum disetel</p>
-              ) : null}
-              {!isWfh && <p className="mt-1 text-[10px] font-medium text-slate-500">Radius absensi: {radiusMeters} meter</p>}
+              )}
             </div>
 
-            <div className="rounded-lg border border-slate-200/80 bg-white p-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                Titik GPS Anda Sekarang
+            <div className={`rounded-xl border p-3 space-y-1 ${
+              loadingLokasi
+                ? 'border-slate-200 bg-white'
+                : isLocationAllowed
+                  ? 'border-emerald-200 bg-emerald-50/50'
+                  : 'border-rose-200 bg-rose-50/50'
+            }`}>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Posisi Anda Saat Ini
               </p>
               {loadingLokasi ? (
-                <p className="mt-1 text-[11px] font-medium text-slate-500">
-                  Mengambil koordinat satelit GPS...
+                <p className="text-[11px] font-medium text-slate-500 animate-pulse">
+                  📡 Sedang menghubungkan GPS HP Anda...
                 </p>
               ) : lokasi ? (
                 <>
-                  <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-700">{lokasi.alamat}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[11px] text-emerald-700">
-                    <span className="truncate">{lokasi.coordText}</span>
-                    {workerMapUrl && (
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    {isLocationAllowed ? (
+                      <span className="text-emerald-700">✓ Berada di Lokasi Proyek</span>
+                    ) : (
+                      <span className="text-rose-700">⚠ Di Luar Radius Proyek</span>
+                    )}
+                    {distanceMeters !== null && !isWfh && (
+                      <span className="text-[11px] font-normal text-slate-600">
+                        ({distanceMeters} m dari titik)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-600 line-clamp-1">{lokasi.alamat || 'Alamat terdeteksi'}</p>
+                  {workerMapUrl && (
+                    <div className="pt-0.5">
                       <a
                         href={workerMapUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="shrink-0 font-sans font-semibold text-emerald-700 hover:underline"
+                        className="text-[11px] font-semibold text-blue-600 hover:underline"
                       >
-                        Peta
+                        Lihat Posisi Saya di Google Maps ↗
                       </a>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </>
               ) : (
-                <p className="mt-1 text-[11px] font-medium text-rose-600">
-                  {lokasiError || 'Koordinat GPS belum tersedia.'}
+                <p className="text-[11px] font-medium text-rose-600">
+                  {lokasiError || 'GPS belum aktif. Aktifkan lokasi di HP Anda.'}
                 </p>
               )}
             </div>

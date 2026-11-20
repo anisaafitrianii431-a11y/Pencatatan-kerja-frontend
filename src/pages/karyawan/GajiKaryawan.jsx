@@ -467,7 +467,7 @@ export default function GajiKaryawan({ currentUser }) {
           </div>
 
           {/* KARTU IDENTITAS & STATUS PEMBAYARAN (LAYAR WEB ONLY) */}
-          <div className="no-print hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="grid min-w-0 flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
                 <div className="min-w-0">
@@ -498,7 +498,7 @@ export default function GajiKaryawan({ currentUser }) {
                     ) : isCalculated ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
                         <Hourglass className="h-3.5 w-3.5" aria-hidden="true" />
-                        Menunggu Bayar
+                        Menunggu Transfer
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
@@ -511,7 +511,7 @@ export default function GajiKaryawan({ currentUser }) {
                     {isPaid && slipGaji?.tanggal_bayar
                       ? `Dibayar ${formatTanggalIndo(slipGaji.tanggal_bayar)}`
                       : isCalculated
-                        ? 'Sudah dihitung Admin'
+                        ? 'Siap ditransfer Admin'
                         : 'Dari jam & nota disetujui'}
                   </div>
                 </div>
@@ -535,7 +535,7 @@ export default function GajiKaryawan({ currentUser }) {
                     <button
                       type="button"
                       onClick={() => setPreviewImage(getFileUrl(slipGaji.bukti_bayar))}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 shadow-2xs transition hover:bg-emerald-50"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 shadow-2xs transition hover:bg-emerald-50 cursor-pointer"
                     >
                       <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                       <span>Lihat Bukti Transfer</span>
@@ -546,55 +546,27 @@ export default function GajiKaryawan({ currentUser }) {
             </div>
           </div>
 
-          {/* BANNER MODE FILTER PEKERJAAN TERTENTU */}
-          {isFilteredByJob && activeJob && (
-            <div className="no-print flex flex-col justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-5 py-3.5 sm:flex-row sm:items-center">
-              <div className="flex items-start gap-2.5 text-xs text-emerald-900">
-                <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
-                <div>
-                  <span className="font-bold">Menampilkan Slip Berdasarkan Pekerjaan: {activeJob.nama_pekerjaan}</span>
-                  <p className="mt-0.5 text-emerald-800/90">
-                    Angka di bawah menghitung upah jam kerja disetujui dan reimbursement pribadi khusus dari proyek ini ({porsiJamPersen}% dari total jam periode). Bonus & potongan kasbon hanya dihitung pada slip bulanan keseluruhan.
-                  </p>
-                </div>
+          {/* BANNER RUMUS HITUNGAN GAJI TRANSPARAN */}
+          <div className="no-print rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
+                <Wallet className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>Rumus Total Diterima:</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedPekerjaanId('semua')}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Lihat Semua Pekerjaan</span>
-              </button>
-            </div>
-          )}
-
-          {/* BANNER INFORMASI JAM/PENGELUARAN MENUNGGU APPROVAL OR SYNC */}
-          {(pendingSummary.absensi_menunggu > 0 || pendingSummary.pengeluaran_menunggu > 0 || hasHoursOutOfSync) && (
-            <div className="no-print hidden flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-              <div className="space-y-0.5">
-                {pendingSummary.absensi_menunggu > 0 && (
-                  <p>
-                    Terdapat <strong>{pendingSummary.absensi_menunggu} sesi absensi</strong> ({pendingSummary.jam_menunggu} jam) yang masih menunggu persetujuan Admin dan belum masuk perhitungan upah resmi.
-                  </p>
-                )}
-                {pendingSummary.pengeluaran_menunggu > 0 && (
-                  <p>
-                    Terdapat <strong>{pendingSummary.pengeluaran_menunggu} nota talangan pribadi</strong> senilai <strong>{formatRupiah(pendingSummary.nominal_menunggu)}</strong> yang menunggu verifikasi Admin.
-                  </p>
-                )}
-                {hasHoursOutOfSync && (
-                  <p>
-                    Rekap absensi disetujui saat ini berjumlah <strong>{approvedHoursAll} jam</strong> (hitungan draf terakhir Admin: {Number(slipGaji.total_jam).toFixed(2)} jam) dan akan diperbarui saat Admin menghitung ulang periode ini.
-                  </p>
-                )}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-emerald-900 font-semibold">
+                <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200">Upah Kerja: {formatRupiah(upahKerja)}</span>
+                <span>+</span>
+                <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-amber-900">Uang Nota Diganti: +{formatRupiah(totalReimburse)}</span>
+                {bonus > 0 && <><span>+</span><span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-800">Bonus: +{formatRupiah(bonus)}</span></>}
+                {potongan > 0 && <><span>-</span><span className="bg-white px-2.5 py-1 rounded-lg border border-rose-200 text-rose-800">Potongan: -{formatRupiah(potongan)}</span></>}
+                <span>=</span>
+                <span className="bg-emerald-700 text-white px-3 py-1 rounded-lg font-black text-sm shadow-xs">{formatRupiah(totalDibayar)}</span>
               </div>
             </div>
-          )}
+          </div>
 
           {/* 4 KARTU RINGKASAN PENGHASILAN */}
-          <div className="no-print hidden grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="no-print grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">Upah Jam Kerja</span>
@@ -608,7 +580,7 @@ export default function GajiKaryawan({ currentUser }) {
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">Reimbursement Pribadi</span>
+                <span className="text-xs font-semibold text-slate-500">Uang Pengganti Nota Pribadi</span>
                 <Receipt className="h-4 w-4 text-amber-600" aria-hidden="true" />
               </div>
               <div className="mt-2 text-2xl font-extrabold text-amber-700">+{formatRupiah(totalReimburse)}</div>
@@ -655,10 +627,10 @@ export default function GajiKaryawan({ currentUser }) {
               <div className="mt-2 text-2xl font-black tracking-tight">{formatRupiah(totalDibayar)}</div>
               <div className="mt-1 text-xs text-emerald-100">
                 {isFilteredByJob
-                  ? 'Upah kerja + reimbursement proyek'
+                  ? 'Upah kerja + ganti nota proyek'
                   : isPaid
                     ? 'Lunas sesuai slip periode'
-                    : 'Upah + Reimburse + Bonus - Potongan'}
+                    : 'Upah + Ganti Nota + Bonus - Potongan'}
               </div>
             </div>
           </div>
