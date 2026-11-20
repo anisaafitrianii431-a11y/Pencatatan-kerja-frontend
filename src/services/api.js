@@ -9,6 +9,9 @@ export function getFileUrl(path) {
   if (!path) return '';
   if (/^(https?:|data:|blob:)/i.test(path)) return path;
   const cleanPath = String(path).replace(/^\/+/, '');
+  if (cleanPath.startsWith('uploads/')) {
+    return `/${cleanPath}`;
+  }
   if (cleanPath.startsWith('api/')) {
     return `/${cleanPath}`;
   }
@@ -1147,7 +1150,13 @@ export const PengeluaranService = {
   async getAll(filter = {}) {
     const live = await checkBackendStatus();
     if (live) {
-      const params = new URLSearchParams(filter).toString();
+      const cleanFilter = {};
+      Object.keys(filter).forEach(k => {
+        if (filter[k] !== undefined && filter[k] !== null && filter[k] !== 'undefined') {
+          cleanFilter[k] = filter[k];
+        }
+      });
+      const params = new URLSearchParams(cleanFilter).toString();
       const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?${params}`);
       if (data && data.success) return sortNewestFirst(data.data);
     }
@@ -2078,7 +2087,10 @@ export const GajiService = {
   async getHistory() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=riwayat`);
+      const current = AuthService.getCurrentUser();
+      const kId = Number(current?.id_karyawan || 0);
+      const url = kId ? `${API_BASE}/gaji.php?action=riwayat&id_karyawan=${kId}` : `${API_BASE}/gaji.php?action=riwayat`;
+      const { data } = await safeFetchJson(url);
       if (data && data.success) return sortNewestFirst(data.data);
     }
 
@@ -2555,8 +2567,12 @@ function mapRestPathToPhp(path) {
   if (path === '/pekerjaan' || path.startsWith('/pekerjaan?')) {
     return '/pekerjaan.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
   }
+  const pekIdMatch = path.match(/^\/pekerjaan\/(\d+)\/?$/);
+  if (pekIdMatch) {
+    return `/pekerjaan.php?id_pekerjaan=${pekIdMatch[1]}`;
+  }
   if (path.startsWith('/pekerjaan/')) {
-    return `/pekerjaan.php?id_pekerjaan=${path.replace('/pekerjaan/', '')}`;
+    return path;
   }
   if (path === '/penugasan' || path.startsWith('/penugasan?')) {
     return '/penugasan.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
