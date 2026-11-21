@@ -24,6 +24,7 @@ import DashboardPekerja from './pages/karyawan/DashboardPekerja.jsx'
 import RekapAbsensiAdmin from './pages/admin/RekapAbsensiAdmin.jsx'
 import RekapAbsensiPekerja from './pages/karyawan/RekapAbsensiPekerja.jsx'
 import DataKaryawan from './pages/admin/DataKaryawan.jsx'
+import MasterRole from './pages/admin/MasterRole.jsx'
 import ManajemenPengguna from './pages/admin/ManajemenPengguna.jsx'
 import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
 import Penugasan from './pages/admin/Penugasan.jsx'
@@ -512,6 +513,8 @@ function AdminLayoutWrapper() {
     activeItem = 'Data Pekerjaan'
   } else if (path.startsWith('/admin/karyawan')) {
     activeItem = 'Data Karyawan'
+  } else if (path.startsWith('/admin/master-role')) {
+    activeItem = 'Master Role'
   } else if (path.startsWith('/admin/pengguna')) {
     activeItem = 'Manajemen Pengguna'
   } else if (path.startsWith('/admin/profil')) {
@@ -528,6 +531,7 @@ function AdminLayoutWrapper() {
     else if (item === 'Gaji' || item === 'Penggajian Karyawan' || item === 'Penggajian') navigate('/admin/gaji')
     else if (item === 'Data Pekerjaan') navigate('/admin/pekerjaan')
     else if (item === 'Data Karyawan') navigate('/admin/karyawan')
+    else if (item === 'Master Role' || item === 'Master Role & Hierarki') navigate('/admin/master-role')
     else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
     else if (item === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
     else if (item === 'Profil Administrator') navigate('/admin/profil')
@@ -703,6 +707,7 @@ function AppRoutes() {
             <Route path="/admin" element={<DashboardAdminPage />} />
             <Route path="/admin/dashboard" element={<DashboardAdminPage />} />
             <Route path="/admin/karyawan" element={<DataKaryawan />} />
+            <Route path="/admin/master-role" element={<MasterRole />} />
             <Route path="/admin/pekerjaan" element={<DataPekerjaan />} />
             <Route path="/admin/penugasan" element={<Penugasan />} />
             <Route path="/admin/rekap-absensi" element={<RekapAbsensiAdmin />} />

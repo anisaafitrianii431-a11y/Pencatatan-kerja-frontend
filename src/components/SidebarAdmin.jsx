@@ -88,6 +88,14 @@ const iconContent = {
       <path d="M6 12h.01M18 12h.01" />
     </>
   ),
+  role: (
+    <>
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <rect x="3" y="15" width="6" height="4" rx="1" />
+      <rect x="15" y="15" width="6" height="4" rx="1" />
+      <path d="M12 7v4M6 15v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
+    </>
+  ),
   menu: (
     <>
       <path d="M4 6h16M4 12h16M4 18h16" />
@@ -160,6 +168,11 @@ const menuItems = [
     label: 'Data Karyawan', 
     icon: 'employees', 
     match: (p) => p.startsWith('/admin/karyawan') 
+  },
+  { 
+    label: 'Master Role', 
+    icon: 'role', 
+    match: (p) => p.startsWith('/admin/master-role') 
   },
   { 
     label: 'Manajemen Pengguna', 
