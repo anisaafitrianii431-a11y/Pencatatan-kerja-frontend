@@ -41,6 +41,17 @@ function normalizeJob(job) {
     nama_karyawan_list: job.nama_karyawan_list ?? '',
     id_karyawan_list: job.id_karyawan_list ?? '',
     already_joined: Boolean(job.already_joined),
+    kode_pekerjaan: job.kode_pekerjaan ?? '',
+    hari_kerja_per_bulan: job.hari_kerja_per_bulan !== undefined && job.hari_kerja_per_bulan !== null ? Number(job.hari_kerja_per_bulan) : 22,
+    jam_kerja_per_hari: job.jam_kerja_per_hari !== undefined && job.jam_kerja_per_hari !== null ? Number(job.jam_kerja_per_hari) : 8,
+    jam_masuk_standar: job.jam_masuk_standar ?? '08:00',
+    jam_pulang_standar: job.jam_pulang_standar ?? '17:00',
+    tanggal_cutoff: job.tanggal_cutoff !== undefined && job.tanggal_cutoff !== null ? Number(job.tanggal_cutoff) : 25,
+    tanggal_pencairan: job.tanggal_pencairan !== undefined && job.tanggal_pencairan !== null ? Number(job.tanggal_pencairan) : 28,
+    toleransi_terlambat_menit: job.toleransi_terlambat_menit !== undefined && job.toleransi_terlambat_menit !== null ? Number(job.toleransi_terlambat_menit) : 15,
+    lembur_diizinkan: Number(job.lembur_diizinkan) === 1 || job.lembur_diizinkan === true,
+    buffer_lembur_persen: job.buffer_lembur_persen !== undefined && job.buffer_lembur_persen !== null ? Number(job.buffer_lembur_persen) : 10,
+    role_budgets: Array.isArray(job.role_budgets) ? job.role_budgets : [],
   }
 }
 
@@ -114,4 +125,20 @@ export async function setujuiPekerjaanLaporan(laporanId, catatan = '') {
 
 export async function tolakPekerjaanLaporan(laporanId, catatan = '') {
   return apiPost(`/pekerjaan/laporan/${laporanId}/tolak`, { catatan })
+}
+
+export async function getPekerjaanBlueprint(jobId) {
+  return apiGet(`/pekerjaan/${jobId}/blueprint`)
+}
+
+export async function updatePekerjaanBlueprint(jobId, roleBudgets) {
+  return apiPut(`/pekerjaan/${jobId}/blueprint`, { role_budgets: roleBudgets })
+}
+
+export async function getPekerjaanBudgetSummary(jobId) {
+  return apiGet(`/pekerjaan/${jobId}/budget-summary`)
+}
+
+export async function getPekerjaanKandidatKaryawan(jobId) {
+  return apiGet(`/pekerjaan/${jobId}/kandidat-karyawan`)
 }

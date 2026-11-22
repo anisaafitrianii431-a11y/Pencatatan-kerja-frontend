@@ -5,22 +5,20 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: {
+   server: {
     host: true,
     port: 5173,
     watch: {
-      ignored: ['**/api/**', '**/uploads/**', '**/node_modules/**'],
+      ignored: ['api/**', 'backend/**', '**/uploads/**', '**/node_modules/**'],
     },
     proxy: {
       '/api': {
-        target: 'http://localhost/Pencatatan-kerja/api',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/uploads': {
-        target: 'http://localhost/Pencatatan-kerja/api/uploads',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/uploads/, ''),
       },
     },
   },

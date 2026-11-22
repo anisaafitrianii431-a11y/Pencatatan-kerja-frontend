@@ -25,6 +25,7 @@ import {
 import { PengeluaranService, PekerjaanService } from '../../services/api';
 import { compressImage, formatBytes } from '../../utils/imageCompressor';
 import Modal from '../../components/Modal';
+import { useAuth } from '../../auth/useAuth.js';
 
 const MONTH_OPTIONS = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -32,6 +33,7 @@ const MONTH_OPTIONS = [
 ].map((label, index) => ({ value: String(index + 1).padStart(2, '0'), label }));
 
 export default function PengeluaranKaryawan({ currentUser }) {
+  const { canCreate, canUpdate, canDelete } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1010,24 +1012,28 @@ export default function PengeluaranKaryawan({ currentUser }) {
                             </span>
                           ) : (
                             <div className="inline-flex items-center space-x-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(p)}
-                                aria-label={`Edit pengeluaran ${p.keterangan || p.id_pengeluaran}`}
-                                title="Edit Catatan Pengeluaran"
-                                className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-xs"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(p)}
-                                aria-label={`Hapus pengeluaran ${p.keterangan || p.id_pengeluaran}`}
-                                title="Hapus Catatan Pengeluaran"
-                                className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition cursor-pointer shadow-xs"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canUpdate('pengeluaran') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(p)}
+                                  aria-label={`Edit pengeluaran ${p.keterangan || p.id_pengeluaran}`}
+                                  title="Edit Catatan Pengeluaran"
+                                  className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-xs"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canDelete('pengeluaran') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(p)}
+                                  aria-label={`Hapus pengeluaran ${p.keterangan || p.id_pengeluaran}`}
+                                  title="Hapus Catatan Pengeluaran"
+                                  className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition cursor-pointer shadow-xs"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -1336,6 +1342,20 @@ export default function PengeluaranKaryawan({ currentUser }) {
         title={editingId ? 'Edit Catatan Pengeluaran' : 'Form Catat Pengeluaran & Bukti Nota'}
       >
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          {currentUser && (
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200/80 p-2.5 text-xs">
+              <span className="text-slate-500 font-medium">Pengaju Nota:</span>
+              <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                <span>{currentUser.nama}</span>
+                {currentUser.jabatan && (
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-blue-600/20">
+                    {currentUser.jabatan}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {modalError && (
             <div role="alert" className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-start space-x-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -1366,7 +1386,7 @@ export default function PengeluaranKaryawan({ currentUser }) {
               >
                 {pekerjaanList.map(j => (
                   <option key={j.id_pekerjaan} value={j.id_pekerjaan}>
-                    {j.nama_pekerjaan} {j.lokasi ? `(${j.lokasi})` : ''}
+                    {j.kode_pekerjaan ? `[${j.kode_pekerjaan}] ` : ''}{j.nama_pekerjaan} {j.lokasi ? `(${j.lokasi})` : ''}
                   </option>
                 ))}
               </select>

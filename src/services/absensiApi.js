@@ -1,4 +1,4 @@
-import { AbsensiService, apiGet, apiPost, apiPut, hitungDurasi } from './api.js'
+import { apiGet, apiPost, apiPut, hitungDurasi } from './api.js'
 import {
   getNtpSyncState,
   getSyncedJakartaNow,
@@ -72,71 +72,22 @@ export async function getAbsensi(params = {}) {
   if (params.status_verifikasi) query.set('status_verifikasi', params.status_verifikasi)
 
   const queryString = query.toString() ? `?${query.toString()}` : ''
-  let records = []
-
-  try {
-    const res = await apiGet(`/absensi${queryString}`)
-    if (Array.isArray(res) && res.length > 0) {
-      records = res
-    }
-  } catch {
-    // Backend API offline / fallback
-  }
-
-  try {
-    const localRecords = await AbsensiService.getAll(params)
-    if (Array.isArray(localRecords) && localRecords.length > 0) {
-      const serverKeys = new Set(
-        records.map(
-          (r) =>
-            `${r.id_karyawan}-${r.id_pekerjaan}-${r.tanggal}-${(r.jam_masuk || '').slice(0, 5)}`
-        )
-      )
-      const unsynced = localRecords.filter(
-        (r) =>
-          !serverKeys.has(
-            `${r.id_karyawan}-${r.id_pekerjaan}-${r.tanggal}-${(r.jam_masuk || '').slice(0, 5)}`
-          )
-      )
-      records = [...unsynced, ...records]
-    }
-  } catch {
-    // ignore
-  }
-
+  const result = await apiGet(`/absensi${queryString}`)
+  const records = Array.isArray(result) ? result : []
   return records.map(normalizeAbsensi)
 }
 
 export async function createAbsensi(data) {
-  try {
-    const res = await apiPost('/absensi', data)
-    return res
-  } catch (err) {
-    console.warn('apiPost /absensi fallback:', err)
-  }
-  return AbsensiService.absenMasuk(data)
+  return apiPost('/absensi', data)
 }
 
 export async function checkoutAbsensi(id, jamPulang, extra = {}) {
-  try {
-    const res = await apiPut(`/absensi/${id}`, { jam_pulang: jamPulang, ...extra })
-    return res
-  } catch (err) {
-    console.warn('apiPut /absensi checkout fallback:', err)
-  }
-  return AbsensiService.absenPulang(id, jamPulang, false, extra)
+  return apiPut(`/absensi/${id}`, { jam_pulang: jamPulang, ...extra })
 }
 
 export async function getAbsensiById(id) {
-  try {
-    const record = await apiGet(`/absensi/${id}`)
-    if (record) return normalizeAbsensi(record)
-  } catch {
-    // fallback
-  }
-  const all = await AbsensiService.getAll()
-  const found = all.find((a) => Number(a.id_absensi) === Number(id))
-  return found ? normalizeAbsensi(found) : null
+  const record = await apiGet(`/absensi/${id}`)
+  return record ? normalizeAbsensi(record) : null
 }
 
 export async function absenMasuk(payload) {
@@ -148,15 +99,10 @@ export async function absenPulang(idAbsensi, jamPulang = '', isOvernight = false
 }
 
 export async function verifikasiAbsensi(id, statusVerifikasi, catatanAdmin = '') {
-  try {
-    await apiPut(`/absensi/${id}/verifikasi`, {
-      status_verifikasi: statusVerifikasi,
-      catatan_admin: catatanAdmin,
-    })
-  } catch {
-    // fallback
-  }
-  return AbsensiService.verifikasi(id, statusVerifikasi, catatanAdmin)
+  return apiPut(`/absensi/${id}/verifikasi`, {
+    status_verifikasi: statusVerifikasi,
+    catatan_admin: catatanAdmin,
+  })
 }
 
 export function getJakartaNowFormatted() {

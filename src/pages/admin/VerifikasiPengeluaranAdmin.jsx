@@ -181,8 +181,15 @@ export default function VerifikasiPengeluaranAdmin({ currentUser }) {
                 pengeluaranList.map((item) => (
                   <tr key={item.id_pengeluaran} className="hover:bg-slate-50/70 transition">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900 text-sm">{item.nama_karyawan}</div>
-                      <div className="text-[11px] text-slate-400">{item.nama_pekerjaan || 'Operasional Lapangan'}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">{item.nama_karyawan}</span>
+                        {item.jabatan && (
+                          <span className="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                            {item.jabatan}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{item.nama_pekerjaan || 'Operasional Lapangan'}</div>
                     </td>
                     <td className="px-6 py-4 font-semibold text-slate-700 max-w-xs">
                       {item.keterangan || '-'}
@@ -286,8 +293,15 @@ export default function VerifikasiPengeluaranAdmin({ currentUser }) {
             {/* Rincian Singkat Nota */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
               <div>
-                <span className="text-slate-400 text-[10px] uppercase font-semibold">Pekerja</span>
-                <div className="font-bold text-slate-900 mt-0.5">{selectedItemModal.nama_karyawan}</div>
+                <span className="text-slate-400 text-[10px] uppercase font-semibold">Pekerja Pengaju</span>
+                <div className="font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                  <span>{selectedItemModal.nama_karyawan}</span>
+                  {selectedItemModal.jabatan && (
+                    <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-blue-600/20">
+                      {selectedItemModal.jabatan}
+                    </span>
+                  )}
+                </div>
               </div>
               <div>
                 <span className="text-slate-400 text-[10px] uppercase font-semibold">Nominal Klaim</span>

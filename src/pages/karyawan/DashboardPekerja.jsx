@@ -34,7 +34,8 @@ const WORK_STATUS_PRESENTATION = {
 
 function formatDate(value) {
   if (!value) return '—'
-  const date = new Date(`${value}T00:00:00`)
+  const clean = String(value).slice(0, 10)
+  const date = new Date(`${clean}T00:00:00`)
   return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
 }
 

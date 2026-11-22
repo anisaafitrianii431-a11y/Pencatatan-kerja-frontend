@@ -524,8 +524,8 @@ export default function MasterRole() {
                   </label>
                   <input
                     type="number"
-                    min="1"
-                    step="10000"
+                    min="0"
+                    step="any"
                     required
                     value={formData.default_gaji_min_bulanan}
                     onChange={(e) => setFormData({ ...formData, default_gaji_min_bulanan: e.target.value })}
@@ -539,8 +539,8 @@ export default function MasterRole() {
                   </label>
                   <input
                     type="number"
-                    min="1"
-                    step="10000"
+                    min="0"
+                    step="any"
                     required
                     value={formData.default_gaji_max_bulanan}
                     onChange={(e) => setFormData({ ...formData, default_gaji_max_bulanan: e.target.value })}

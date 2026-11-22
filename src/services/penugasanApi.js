@@ -9,7 +9,13 @@ function normalizeAssignment(assignment) {
     jenis_penugasan: assignment.jenis_penugasan ?? 'admin',
     tanggal_penugasan: assignment.tanggal_penugasan ?? '',
     jabatan: assignment.jabatan ?? '',
+    deskripsi: assignment.deskripsi ?? '',
     lokasi: assignment.lokasi ?? '',
+    titik_lokasi: assignment.titik_lokasi ?? '',
+    metode_lokasi: assignment.metode_lokasi ?? 'titik',
+    latitude: assignment.latitude ?? '',
+    longitude: assignment.longitude ?? '',
+    radius_meter: assignment.radius_meter ? Number(assignment.radius_meter) : 100,
     tanggal_mulai: assignment.tanggal_mulai ?? '',
     target_selesai: assignment.target_selesai ?? '',
     status_pekerjaan: assignment.status_pekerjaan ?? '',
@@ -23,14 +29,24 @@ export async function getPenugasan() {
 }
 
 export async function getPenugasanById(id) {
-  return normalizeAssignment(await apiGet(`/penugasan/${id}`))
+  const res = await apiGet(`/penugasan/${id}`)
+  const raw = Array.isArray(res) ? (res.find((a) => Number(a.id_penugasan) === Number(id)) || res[0]) : res
+  return normalizeAssignment(raw || {})
 }
 
 export async function createPenugasan(values) {
-  return normalizeAssignment(await apiPost('/penugasan', {
+  const payload = {
     id_karyawan: Number(values.id_karyawan),
     id_pekerjaan: Number(values.id_pekerjaan),
-  }))
+  }
+  if (values.id_role_budget) payload.id_role_budget = Number(values.id_role_budget)
+  if (values.jenis_upah) payload.jenis_upah = values.jenis_upah
+  if (values.nominal_upah !== undefined && values.nominal_upah !== '') payload.nominal_upah = Number(values.nominal_upah)
+  if (values.tanggal_penugasan) payload.tanggal_penugasan = values.tanggal_penugasan
+  if (values.tanggal_selesai_tugas) payload.tanggal_selesai_tugas = values.tanggal_selesai_tugas
+  if (values.izinkan_bentrok !== undefined) payload.izinkan_bentrok = Boolean(values.izinkan_bentrok)
+
+  return normalizeAssignment(await apiPost('/penugasan', payload))
 }
 
 export async function updatePenugasan(id, values) {
@@ -42,4 +58,17 @@ export async function updatePenugasan(id, values) {
 
 export function deletePenugasan(id) {
   return apiDelete(`/penugasan/${id}`)
+}
+
+export async function cekKetersediaanKaryawan(params = {}) {
+  const query = new URLSearchParams(params).toString()
+  return apiGet(query ? `/penugasan/cek-ketersediaan?${query}` : '/penugasan/cek-ketersediaan')
+}
+
+export async function getPenugasanGajiRiwayat(idPenugasan) {
+  return apiGet(`/penugasan/${idPenugasan}/gaji-riwayat`)
+}
+
+export async function createPenugasanGajiRiwayat(idPenugasan, payload) {
+  return apiPost(`/penugasan/${idPenugasan}/gaji-riwayat`, payload)
 }

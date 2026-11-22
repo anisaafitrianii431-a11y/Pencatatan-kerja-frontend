@@ -13,9 +13,10 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { RekapService } from '../services/api';
+import { isAdminRole } from '../utils/roles.js'
 
 export default function BerandaDashboard({ currentUser, onNavigate }) {
-  const isAdmin = currentUser?.peran === 'admin';
+  const isAdmin = isAdminRole(currentUser?.peran || currentUser?.role);
   const [stats, setStats] = useState({
     total_pekerja: 0,
     pekerjaan_aktif: 0,

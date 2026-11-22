@@ -26,6 +26,7 @@ dist-ssr
 *.sw?
 
 # Backend uploads and sessions
+backend/
 api/sessions/sess_*
 api/uploads/*.jpg
 !api/sessions/.htaccess

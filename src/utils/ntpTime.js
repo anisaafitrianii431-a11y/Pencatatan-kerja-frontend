@@ -1,12 +1,11 @@
 /**
- * Utilitas sinkronisasi waktu otoritatif berbasis NTP (Server PHP -> UDP NTP Pool).
+ * Utilitas sinkronisasi waktu otoritatif melalui endpoint waktu backend Express.
  * Offset dihitung terhadap `performance.now()` (timer monotonik peramban), sehingga
  * perubahan jam sistem pada laptop/HP klien tidak memengaruhi jam & tanggal absensi.
  */
 
 const NTP_ENDPOINTS = [
-  '/api/auth.php?action=ntp_time',
-  '/api/absensi.php?action=ntp_time',
+  '/api/auth/ntp-time',
 ]
 
 const JAKARTA_PARTS_FORMATTER = new Intl.DateTimeFormat('en-GB', {

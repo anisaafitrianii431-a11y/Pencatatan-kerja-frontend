@@ -1,4 +1,4 @@
-import { getKaryawan } from './karyawanApi.js'
+import { getKaryawanMe } from './karyawanApi.js'
 import {
   ambilPekerjaan,
   getPekerjaan,
@@ -31,11 +31,12 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
   const effectiveName = employeeName || activeUser?.nama || activeUser?.name || ''
   const effectiveCode = activeUser?.kode_karyawan || activeUser?.username || ''
 
-  const [employees, jobs, assignments] = await Promise.all([
-    getKaryawan(),
+  const [currentEmployee, jobs, assignments] = await Promise.all([
+    getKaryawanMe(),
     getPekerjaan(),
     getPenugasan(),
   ])
+  const employees = currentEmployee ? [currentEmployee] : []
 
   // 1. Cocokkan berdasarkan kode_karyawan atau username terlebih dahulu (identitas paling unik dan akurat)
   let worker = null
@@ -163,7 +164,12 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
 
   const assignedJobs = rawAssigned
     .map((assignment) => {
-      const matchedJob = jobsById.get(assignment.id_pekerjaan) ?? null
+      const matchedJob = jobsById.get(Number(assignment.id_pekerjaan)) ?? null
+      const combinedTitikLokasi = matchedJob?.titik_lokasi || assignment.titik_lokasi || (
+        (matchedJob?.latitude || assignment.latitude) && (matchedJob?.longitude || assignment.longitude)
+          ? `${matchedJob?.latitude || assignment.latitude}, ${matchedJob?.longitude || assignment.longitude}`
+          : ''
+      )
       const fallbackJob =
         !matchedJob && assignment.nama_pekerjaan
           ? {
@@ -171,6 +177,11 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
               nama_pekerjaan: assignment.nama_pekerjaan,
               deskripsi: assignment.deskripsi ?? '',
               lokasi: assignment.lokasi ?? '',
+              titik_lokasi: combinedTitikLokasi,
+              metode_lokasi: assignment.metode_lokasi ?? 'titik',
+              latitude: assignment.latitude ?? '',
+              longitude: assignment.longitude ?? '',
+              radius_meter: assignment.radius_meter ? Number(assignment.radius_meter) : 100,
               tanggal_mulai: assignment.tanggal_mulai ?? '',
               target_selesai: assignment.target_selesai ?? '',
               status: assignment.status_pekerjaan || 'belum_mulai',
@@ -178,9 +189,20 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
             }
           : null
 
+      const finalJob = matchedJob
+        ? {
+            ...matchedJob,
+            deskripsi: matchedJob.deskripsi || assignment.deskripsi || '',
+            lokasi: matchedJob.lokasi || assignment.lokasi || '',
+            titik_lokasi: combinedTitikLokasi,
+            metode_lokasi: matchedJob.metode_lokasi || assignment.metode_lokasi || 'titik',
+            radius_meter: matchedJob.radius_meter || assignment.radius_meter || 100,
+          }
+        : fallbackJob
+
       return {
         assignment,
-        job: matchedJob ?? fallbackJob,
+        job: finalJob,
       }
     })
     .sort((left, right) => {
@@ -204,11 +226,12 @@ export async function getRiwayatPekerjaanSaya(employeeId, employeeName = '') {
   const effectiveName = employeeName || activeUser?.nama || activeUser?.name || ''
   const effectiveCode = activeUser?.kode_karyawan || activeUser?.username || ''
 
-  const [employees, jobs, assignments] = await Promise.all([
-    getKaryawan(),
+  const [currentEmployee, jobs, assignments] = await Promise.all([
+    getKaryawanMe(),
     getPekerjaan(),
     getPenugasan(),
   ])
+  const employees = currentEmployee ? [currentEmployee] : []
 
   let worker = null
   if (normalizedEmployeeId > 0) {

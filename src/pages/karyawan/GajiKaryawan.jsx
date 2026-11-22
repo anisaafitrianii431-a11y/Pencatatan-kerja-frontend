@@ -436,8 +436,15 @@ export default function GajiKaryawan({ currentUser }) {
                     <td className="w-1/4 px-3 py-2 font-bold text-slate-900">{formatPeriodeIndo(selectedPeriode)}</td>
                   </tr>
                   <tr className="border-b border-slate-200">
-                    <td className="bg-slate-100 px-3 py-2 font-bold text-slate-600">Jabatan / Profesi</td>
-                    <td className="px-3 py-2">{jabatanKaryawan}</td>
+                    <td className="bg-slate-100 px-3 py-2 font-bold text-slate-600">Jabatan &amp; Master Role</td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-bold">{slipGaji?.nama_role || jabatanKaryawan}</span>
+                        <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 border border-indigo-200">
+                          Level {slipGaji?.hierarchy_level || 1} • Master Role
+                        </span>
+                      </div>
+                    </td>
                     <td className="bg-slate-100 px-3 py-2 font-bold text-slate-600">Tarif Upah / {labelJenisUpahEfektif}</td>
                     <td className="px-3 py-2 font-bold text-slate-900">{formatRupiah(tarifEfektif)} / {labelJenisUpahEfektif}</td>
                   </tr>
@@ -473,7 +480,12 @@ export default function GajiKaryawan({ currentUser }) {
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nama Pekerja</div>
                   <div className="mt-1 truncate text-sm font-bold text-slate-900">{namaKaryawan}</div>
-                  <div className="truncate text-xs text-slate-500">{jabatanKaryawan}</div>
+                  <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                    <span className="truncate text-xs text-slate-600 font-medium">{slipGaji?.nama_role || jabatanKaryawan}</span>
+                    <span className="inline-flex items-center text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                      Level {slipGaji?.hierarchy_level || 1}
+                    </span>
+                  </div>
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tarif Dasar</div>
@@ -554,7 +566,17 @@ export default function GajiKaryawan({ currentUser }) {
                 <span>Rumus Total Diterima:</span>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-emerald-900 font-semibold">
-                <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200">Upah Kerja: {formatRupiah(upahKerja)}</span>
+                <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200" title="Sesuai Master Role">
+                  Upah Pokok: {formatRupiah(slipGaji?.total_upah_pokok !== undefined ? slipGaji.total_upah_pokok : (upahKerja - (slipGaji?.total_upah_lembur || 0)))}
+                </span>
+                {slipGaji?.lembur_diizinkan === 1 && Number(slipGaji?.total_upah_lembur || 0) > 0 && (
+                  <>
+                    <span>+</span>
+                    <span className="bg-amber-100/90 text-amber-950 px-2.5 py-1 rounded-lg border border-amber-300 font-bold" title="Lembur disetujui Admin Proyek">
+                      ⚡ Lembur ({slipGaji.total_jam_lembur}j): +{formatRupiah(slipGaji.total_upah_lembur)}
+                    </span>
+                  </>
+                )}
                 <span>+</span>
                 <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-amber-900">Uang Nota Diganti: +{formatRupiah(totalReimburse)}</span>
                 {bonus > 0 && <><span>+</span><span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-800">Bonus: +{formatRupiah(bonus)}</span></>}
@@ -651,7 +673,26 @@ export default function GajiKaryawan({ currentUser }) {
                   const jobRateType = job.jenis_upah === 'per_hari' ? 'hari' : job.jenis_upah === 'per_bulan' ? 'bulan' : 'jam';
                   return (
                     <button key={job.id_pekerjaan} type="button" aria-pressed={jobSelected} onClick={() => { setSelectedPekerjaanId(jobSelected ? 'semua' : String(job.id_pekerjaan)); setActiveTab('slip'); }} className={`rounded-xl border-2 bg-white p-4 text-left shadow-sm transition hover:border-emerald-400 ${jobSelected ? 'border-emerald-600 ring-2 ring-emerald-100' : 'border-slate-200'}`}>
-                      <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-base font-bold text-slate-900">{job.nama_pekerjaan}</h3><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${jobSelected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{jobSelected ? 'Sedang dilihat' : 'Lihat rincian'}</span></div>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900">{job.nama_pekerjaan}</h3>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="inline-flex items-center text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                              Role: {job.nama_role || job.peran_tugas} (Level {job.hierarchy_level || 1})
+                            </span>
+                            {job.lembur_diizinkan === 1 ? (
+                              <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                ⚡ Lembur Diizinkan {job.jam_lembur > 0 ? `(${job.jam_lembur}j)` : ''}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                Lembur Ditutup
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${jobSelected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{jobSelected ? 'Sedang dilihat' : 'Lihat rincian'}</span>
+                      </div>
                       <p className="mt-1.5 text-xs text-slate-600">Tarif {formatRupiah(jobRate)} / {jobRateType} · {job.jenis_upah === 'per_hari' ? `${jobDaysCount} hari kerja` : `${Number(job.total_jam_disetujui || 0).toFixed(2)} jam kerja`}</p>
                       <div className="mt-3 grid grid-cols-2 gap-3 border-b border-slate-200 pb-3 text-sm"><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Upah absensi</p><p className="mt-0.5 font-bold text-slate-900">{formatRupiah(jobPay)}</p></div><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reimbursement disetujui</p><p className="mt-0.5 font-bold text-amber-700">{formatRupiah(job.reimbursement_disetujui)}</p>{Number(job.reimbursement_menunggu || 0) > 0 && <p className="text-[11px] text-amber-700">Menunggu {formatRupiah(job.reimbursement_menunggu)}</p>}</div></div>
                       <div className="mt-2.5 flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-700">Total gaji proyek</span><strong className="text-lg text-slate-900">{formatRupiah(jobPay + Number(job.reimbursement_disetujui || 0))}</strong></div>
@@ -727,15 +768,24 @@ export default function GajiKaryawan({ currentUser }) {
                         >
                           <th scope="row" className="px-5 py-3.5 text-left font-normal">
                             <div className="font-bold text-slate-900">{job.nama_pekerjaan}</div>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
+                              <span className="inline-flex items-center text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                                Role: {job.nama_role || job.peran_tugas} (Level {job.hierarchy_level || 1})
+                              </span>
+                              {job.lembur_diizinkan === 1 ? (
+                                <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                  ✓ Lembur Diizinkan {job.jam_lembur > 0 ? `(${job.jam_lembur}j)` : ''}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                  ✕ Lembur Ditutup
+                                </span>
+                              )}
                               {job.lokasi && (
                                 <span className="inline-flex items-center gap-1">
                                   <MapPin className="h-3 w-3 text-slate-400" aria-hidden="true" />
                                   {job.lokasi}
                                 </span>
-                              )}
-                              {job.peran_tugas && (
-                                <span className="text-emerald-700 font-medium">Peran: {job.peran_tugas}</span>
                               )}
                             </div>
                           </th>
@@ -810,10 +860,48 @@ export default function GajiKaryawan({ currentUser }) {
             </div>
 
             <div className="divide-y divide-slate-100 text-xs sm:text-sm">
+              {/* Rincian Segmen Gaji Multi-Satuan / Prorata jika ada */}
+              {detailData?.slip?.rincian_segmen_gaji && detailData.slip.rincian_segmen_gaji.length > 0 && (
+                <div className="bg-blue-50/50 p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-blue-950 flex items-center gap-1.5">
+                      <span>📊</span> Rincian Perhitungan per Segmen Gaji &amp; Prorata
+                    </span>
+                    {detailData.slip.info_cutoff && (
+                      <span className="text-[10px] text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full font-medium">
+                        Cut-off: Tgl {detailData.slip.info_cutoff.cutoff_tanggal}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {detailData.slip.rincian_segmen_gaji.map((seg, sIdx) => (
+                      <div key={sIdx} className="bg-white rounded-xl p-2.5 border border-blue-100 shadow-2xs space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-800">
+                              Segmen {sIdx + 1}: {seg.segmen_mulai} s/d {seg.segmen_selesai}
+                            </span>
+                            {seg.is_prorata && (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.2 text-[10px] font-bold text-amber-800">
+                                Prorata
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-bold text-slate-900">{formatRupiah(seg.subtotal_upah)}</span>
+                        </div>
+                        <p className="text-[11px] font-mono text-blue-900 bg-slate-50 p-1.5 rounded border border-slate-100">
+                          {seg.rumus_teks}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-4 px-5 py-3">
                 <div>
-                  <span className="font-semibold text-slate-800">
-                    1. Upah Berdasarkan {jenisUpah === 'per_jam' ? 'Jam' : jenisUpah === 'per_hari' ? 'Hari' : 'Bulan'} Kerja Terverifikasi
+                  <span className="font-semibold text-slate-800 block">
+                    1. Upah Pokok Pekerjaan Terverifikasi
                   </span>
                   <span className="block text-xs text-slate-500">
                     {jenisUpahEfektif === 'per_jam'
@@ -821,15 +909,50 @@ export default function GajiKaryawan({ currentUser }) {
                       : jenisUpahEfektif === 'per_hari'
                         ? `${visibleDays} Hari hadir × ${formatRupiah(tarifEfektif)} / Hari`
                         : `${visibleDays} dari ${totalJobAttendanceDays} hari kerja proyek × ${formatRupiah(tarifEfektif)} / Bulan`}
+                    {' '}(Sesuai penetapan Master Role)
                   </span>
                 </div>
-                <span className="font-bold text-slate-900">{formatRupiah(upahKerja)}</span>
+                <span className="font-bold text-slate-900">
+                  {formatRupiah(slipGaji?.total_upah_pokok !== undefined ? slipGaji.total_upah_pokok : (upahKerja - (slipGaji?.total_upah_lembur || 0)))}
+                </span>
+              </div>
+
+              {/* Komponen Upah Lembur (Jika diizinkan Admin) */}
+              <div className="flex items-center justify-between gap-4 px-5 py-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-800">
+                      2. Upah Lembur Proyek
+                    </span>
+                    {slipGaji?.lembur_diizinkan === 1 ? (
+                      <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                        Diizinkan Admin Proyek
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                        Tidak Diizinkan Admin
+                      </span>
+                    )}
+                  </div>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    {slipGaji?.lembur_diizinkan === 1
+                      ? Number(slipGaji?.total_upah_lembur || 0) > 0
+                        ? `${slipGaji.total_jam_lembur} Jam lembur disetujui kebijakan proyek`
+                        : 'Belum ada akumulasi jam lembur yang tercatat'
+                      : 'Kebijakan proyek menonaktifkan kompensasi jam lembur'}
+                  </span>
+                </div>
+                <span className={`font-bold ${Number(slipGaji?.total_upah_lembur || 0) > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
+                  {slipGaji?.lembur_diizinkan === 1 && Number(slipGaji?.total_upah_lembur || 0) > 0
+                    ? `+${formatRupiah(slipGaji.total_upah_lembur)}`
+                    : 'Rp 0'}
+                </span>
               </div>
 
               <div className="flex items-center justify-between gap-4 px-5 py-3">
                 <div>
                   <span className="font-semibold text-slate-800">
-                    2. Penggantian Uang Pribadi (Reimbursement Disetujui)
+                    3. Penggantian Uang Pribadi (Reimbursement Disetujui)
                   </span>
                   <span className="block text-xs text-slate-500">
                     {visibleExpenses.length} nota pembelian disetujui Admin

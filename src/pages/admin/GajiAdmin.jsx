@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { GajiService, KaryawanService, formatRupiah, getFileUrl } from '../../services/api';
 import Modal from '../../components/Modal';
+import { useAuth } from '../../auth/useAuth.js';
 import KopSuratCetak from '../../components/KopSuratCetak';
 import TandaTanganCetak from '../../components/TandaTanganCetak';
 import { 
@@ -46,6 +47,7 @@ import {
 } from '../../utils/printHelpers';
 
 export default function GajiAdmin({ currentUser }) {
+  const { canUpdate } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -994,10 +996,12 @@ export default function GajiAdmin({ currentUser }) {
                               <span>{row.nama_karyawan}</span>
                               <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
                             </button>
-                            <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
                               <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100">{row.kode_karyawan}</span>
                               <span>•</span>
-                              <span>{row.jabatan}</span>
+                              <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 border border-indigo-200" title="Terhubung dengan Master Role">
+                                Level {row.hierarchy_level || 1} • {row.nama_role || row.jabatan}
+                              </span>
                             </div>
                           </td>
 
@@ -1030,13 +1034,35 @@ export default function GajiAdmin({ currentUser }) {
                                 ? (row.total_hari > 0 ? `${row.total_hari} Hari • 1 Bulan` : '0 Hari (Belum Hadir)')
                                 : `${row.total_jam} Jam • ${row.total_hari} Hari`}
                             </div>
-                            <div className="text-[10px] text-slate-400">
-                              {row.total_sesi} sesi presensi valid
+                            <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                              <span className="text-[10px] text-slate-400">
+                                {row.total_sesi} sesi valid
+                              </span>
+                              {row.total_jam_lembur > 0 && row.lembur_diizinkan === 1 ? (
+                                <span className="inline-flex items-center text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                  +{row.total_jam_lembur}j Lembur
+                                </span>
+                              ) : row.lembur_diizinkan === 1 ? (
+                                <span className="inline-flex items-center text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-100">
+                                  Lembur Diizinkan
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-[9px] font-medium text-slate-400 bg-slate-50 px-1 py-0.2 rounded border border-slate-200">
+                                  Lembur Ditutup
+                                </span>
+                              )}
                             </div>
                           </td>
 
-                          <td className="px-4 py-3 text-right font-medium text-slate-700">
-                            {formatRupiah(row.total_upah)}
+                          <td className="px-4 py-3 text-right">
+                            <div className="font-semibold text-slate-900">
+                              {formatRupiah(row.total_upah_pokok !== undefined ? row.total_upah_pokok : row.total_upah)}
+                            </div>
+                            {Number(row.total_upah_lembur || 0) > 0 && row.lembur_diizinkan === 1 && (
+                              <div className="text-[10px] font-bold text-amber-700 mt-0.5">
+                                + Lembur: {formatRupiah(row.total_upah_lembur)}
+                              </div>
+                            )}
                           </td>
 
                           <td className="px-4 py-3 text-right">
@@ -1394,19 +1420,21 @@ export default function GajiAdmin({ currentUser }) {
                           <td className="px-4 py-3 text-center">
                             <div className="inline-flex items-center gap-2">
                               {/* Tombol Bayar Gaji */}
-                              <button
-                                onClick={() => handleOpenBayarModal(row)}
-                                disabled={isLunas}
-                                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition duration-150 flex items-center gap-1.5 shadow-xs cursor-pointer ${
-                                  isLunas
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                }`}
-                                title={isLunas ? 'Gaji sudah lunas' : 'Catat Pembayaran Gaji'}
-                              >
-                                <CreditCard className="w-3.5 h-3.5" />
-                                <span>Bayar Gaji</span>
-                              </button>
+                              {canUpdate('gaji') && (
+                                <button
+                                  onClick={() => handleOpenBayarModal(row)}
+                                  disabled={isLunas}
+                                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition duration-150 flex items-center gap-1.5 shadow-xs cursor-pointer ${
+                                    isLunas
+                                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  }`}
+                                  title={isLunas ? 'Gaji sudah lunas' : 'Catat Pembayaran Gaji'}
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  <span>Bayar Gaji</span>
+                                </button>
+                              )}
 
                               {/* Tombol Lihat Riwayat Transaksi */}
                               {Number(row.jumlah_transaksi_bayar || 0) > 0 && (
@@ -2245,11 +2273,26 @@ export default function GajiAdmin({ currentUser }) {
                       <td className="px-3 py-2 font-mono font-bold text-blue-700 w-1/4">{slipModal.kode_karyawan}</td>
                     </tr>
                     <tr className="border-b border-slate-200">
-                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Jabatan</td>
-                      <td className="px-3 py-2 text-slate-800">{slipModal.jabatan}</td>
-                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Skema Upah</td>
-                      <td className="px-3 py-2 font-semibold text-slate-800">
-                        {slipModal.jenis_upah === 'multi' ? 'Multi Proyek' : slipModal.jenis_upah === 'per_jam' ? 'Upah Per Jam' : slipModal.jenis_upah === 'per_hari' ? 'Upah Per Hari' : 'Gaji Bulanan Tetap'}
+                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Jabatan &amp; Role</td>
+                      <td className="px-3 py-2 text-slate-800">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-bold">{slipModal.nama_role || slipModal.jabatan}</span>
+                          <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
+                            Level {slipModal.hierarchy_level || 1} • Master Role
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Kebijakan Lembur Proyek</td>
+                      <td className="px-3 py-2 font-semibold">
+                        {slipModal.lembur_diizinkan === 1 ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            ✓ Diizinkan Admin Proyek
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                            ✕ Dinonaktifkan Admin
+                          </span>
+                        )}
                       </td>
                     </tr>
                     <tr>
@@ -2258,6 +2301,11 @@ export default function GajiAdmin({ currentUser }) {
                       <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Total Durasi Kerja</td>
                       <td className="px-3 py-2 font-semibold text-slate-800">
                         {slipModal.total_jam} Jam ({slipModal.total_hari} Hari)
+                        {slipModal.total_jam_lembur > 0 && slipModal.lembur_diizinkan === 1 && (
+                          <span className="ml-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                            +{slipModal.total_jam_lembur}j Lembur
+                          </span>
+                        )}
                       </td>
                     </tr>
                   </tbody>
@@ -2279,10 +2327,11 @@ export default function GajiAdmin({ currentUser }) {
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[11px]">
                     <tr>
                       <th className="px-3 py-2 text-center w-10">No</th>
-                      <th className="px-3 py-2">Nama Pekerjaan</th>
+                      <th className="px-3 py-2">Nama Pekerjaan &amp; Role</th>
                       <th className="px-3 py-2 text-center">Satuan Upah</th>
                       <th className="px-3 py-2 text-right">Tarif Satuan</th>
                       <th className="px-3 py-2 text-center">Lama Bekerja</th>
+                      <th className="px-3 py-2 text-center">Aturan Lembur</th>
                       <th className="px-3 py-2 text-right">Subtotal Upah</th>
                     </tr>
                   </thead>
@@ -2291,7 +2340,12 @@ export default function GajiAdmin({ currentUser }) {
                       slipData.pekerjaan_summary.map((job, jIdx) => (
                         <tr key={jIdx} className="hover:bg-slate-50">
                           <td className="px-3 py-2 text-center text-slate-400 font-medium">{jIdx + 1}</td>
-                          <td className="px-3 py-2 font-bold text-slate-900">{job.nama_pekerjaan}</td>
+                          <td className="px-3 py-2">
+                            <span className="font-bold text-slate-900 block">{job.nama_pekerjaan}</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 mt-0.5">
+                              Role: {job.nama_role || job.peran_tugas} (Level {job.hierarchy_level || 1})
+                            </span>
+                          </td>
                           <td className="px-3 py-2 text-center">
                             {renderBadgeUpah(job.jenis_upah)}
                           </td>
@@ -2304,6 +2358,17 @@ export default function GajiAdmin({ currentUser }) {
                           <td className="px-3 py-2 text-center font-bold text-blue-700">
                             {job.lama_bekerja || (job.jenis_upah === 'per_hari' ? `${job.total_hari} Hari` : `${job.total_jam} Jam`)}
                           </td>
+                          <td className="px-3 py-2 text-center">
+                            {job.lembur_diizinkan === 1 ? (
+                              <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                Diizinkan {job.jam_lembur > 0 ? `(${job.jam_lembur}j)` : ''}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center text-[10px] font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                Ditutup
+                              </span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-right font-bold text-slate-900">
                             {formatRupiah(job.subtotal_upah)}
                           </td>
@@ -2314,6 +2379,9 @@ export default function GajiAdmin({ currentUser }) {
                         <td className="px-3 py-2 text-center text-slate-400 font-medium">1</td>
                         <td className="px-3 py-2 font-bold text-slate-900">
                           {slipModal.jenis_upah === 'per_jam' ? 'Tugas Operasional Lapangan' : slipModal.jenis_upah === 'per_hari' ? 'Proyek Harian' : 'Gaji Pokok Bulanan'}
+                          <span className="block text-[10px] font-normal text-indigo-700 mt-0.5">
+                            Role: {slipModal.nama_role || slipModal.jabatan} (Level {slipModal.hierarchy_level || 1})
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           {renderBadgeUpah(slipModal.jenis_upah)}
@@ -2324,6 +2392,17 @@ export default function GajiAdmin({ currentUser }) {
                         <td className="px-3 py-2 text-center font-bold text-blue-700">
                           {slipModal.jenis_upah === 'per_hari' ? `${slipModal.total_hari} Hari` : `${slipModal.total_jam} Jam`}
                         </td>
+                        <td className="px-3 py-2 text-center">
+                          {slipModal.lembur_diizinkan === 1 ? (
+                            <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              Diizinkan
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center text-[10px] font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                              Ditutup
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-2 text-right font-bold text-slate-900">
                           {formatRupiah(slipModal.total_upah)}
                         </td>
@@ -2332,7 +2411,7 @@ export default function GajiAdmin({ currentUser }) {
                   </tbody>
                   <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
                     <tr>
-                      <td colSpan="5" className="px-3 py-2 text-right text-xs">
+                      <td colSpan="6" className="px-3 py-2 text-right text-xs">
                         TOTAL UPAH PEKERJAAN:
                       </td>
                       <td className="px-3 py-2 text-right text-xs text-blue-900">
@@ -2342,6 +2421,58 @@ export default function GajiAdmin({ currentUser }) {
                   </tfoot>
                 </table>
               </div>
+
+              {/* Rincian Perhitungan per Segmen Riwayat Gaji & Prorata */}
+              {((slipModal?.rincian_segmen_gaji && slipModal.rincian_segmen_gaji.length > 0) || (slipData?.rincian_segmen_gaji && slipData.rincian_segmen_gaji.length > 0)) && (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/40 p-3 text-xs space-y-2">
+                  <div className="flex items-center justify-between border-b border-blue-100 pb-1.5">
+                    <span className="font-bold text-blue-950 flex items-center gap-1.5">
+                      <span>📊</span> Rincian Perhitungan per Segmen Gaji &amp; Master Role
+                    </span>
+                    {(slipModal?.info_cutoff || slipData?.info_cutoff) && (
+                      <span className="text-[10px] text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full font-medium">
+                        Cut-off: Tgl {(slipModal?.info_cutoff || slipData?.info_cutoff).cutoff_tanggal} (Periode {(slipModal?.info_cutoff || slipData?.info_cutoff).range_absensi})
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {(slipModal?.rincian_segmen_gaji || slipData?.rincian_segmen_gaji || []).map((seg, sIdx) => (
+                      <div key={sIdx} className="bg-white rounded-lg p-2.5 border border-blue-100 shadow-2xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-slate-800">
+                              Segmen {sIdx + 1}: {seg.segmen_mulai} s/d {seg.segmen_selesai}
+                            </span>
+                            {seg.role_nama && (
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 border border-indigo-100">
+                                {seg.role_nama} (Lvl {seg.role_level || 1})
+                              </span>
+                            )}
+                            {seg.lembur_diizinkan === 1 ? (
+                              <span className="rounded bg-emerald-50 px-1.5 py-0.2 text-[10px] font-semibold text-emerald-700 border border-emerald-100">
+                                Lembur Diizinkan
+                              </span>
+                            ) : (
+                              <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-500">
+                                Lembur Nonaktif
+                              </span>
+                            )}
+                            {seg.is_prorata && (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.2 text-[10px] font-bold text-amber-800">
+                                Prorata
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-bold text-slate-900">{formatRupiah(seg.subtotal_upah)}</span>
+                        </div>
+                        <p className="text-[11px] font-mono text-blue-900 bg-slate-50 p-1.5 rounded border border-slate-100">
+                          {seg.rumus_teks}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Rincian Komponen Gaji: 2 Kolom (Penerimaan vs Potongan) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 text-xs">
@@ -2356,11 +2487,49 @@ export default function GajiAdmin({ currentUser }) {
                       <div>
                         <span className="font-semibold text-slate-800 block">Upah Pokok Pekerjaan</span>
                         <span className="text-[10px] text-slate-400">
-                          Akumulasi seluruh sesi absensi disetujui
+                          Sesuai standar Master Role &amp; durasi absensi disetujui
                         </span>
                       </div>
-                      <span className="font-bold text-slate-900">{formatRupiah(slipModal.total_upah)}</span>
+                      <span className="font-bold text-slate-900">
+                        {formatRupiah(slipModal.total_upah_pokok !== undefined ? slipModal.total_upah_pokok : (slipModal.total_upah - (slipModal.total_upah_lembur || 0)))}
+                      </span>
                     </div>
+
+                    {slipModal.lembur_diizinkan === 1 ? (
+                      Number(slipModal.total_upah_lembur || 0) > 0 ? (
+                        <div className="flex justify-between py-1 bg-amber-50/70 -mx-1 px-1 rounded border border-amber-100">
+                          <div>
+                            <span className="font-semibold text-amber-900 block flex items-center gap-1.5">
+                              <span>⚡ Upah Lembur ({slipModal.total_jam_lembur || 0} Jam)</span>
+                              <span className="text-[9px] bg-amber-200 text-amber-800 px-1.5 py-0.2 rounded font-bold">
+                                Disetujui Admin Proyek
+                              </span>
+                            </span>
+                            <span className="text-[10px] text-amber-700">
+                              Lembur resmi diizinkan kebijakan proyek
+                            </span>
+                          </div>
+                          <span className="font-bold text-amber-800">
+                            +{formatRupiah(slipModal.total_upah_lembur)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between py-1 text-[11px] text-slate-500">
+                          <div>
+                            <span className="font-medium text-slate-700 block">Upah Lembur</span>
+                            <span className="text-[10px] text-emerald-600 font-medium">
+                              Diizinkan Admin Proyek • 0 Jam tercatat
+                            </span>
+                          </div>
+                          <span className="font-medium text-slate-400">Rp 0</span>
+                        </div>
+                      )
+                    ) : (
+                      <div className="py-1 px-1.5 rounded bg-slate-50 text-[10px] text-slate-500 border border-dashed border-slate-200 flex items-center justify-between">
+                        <span>Kebijakan Lembur:</span>
+                        <span className="font-bold text-slate-600">Tidak Diizinkan Admin Proyek</span>
+                      </div>
+                    )}
 
                     {Number(slipModal.total_ganti || 0) > 0 && (
                       <div className="flex justify-between py-1">

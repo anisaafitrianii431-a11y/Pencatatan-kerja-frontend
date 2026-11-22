@@ -30,19 +30,23 @@ import DataPekerjaan from './pages/admin/DataPekerjaan.jsx'
 import Penugasan from './pages/admin/Penugasan.jsx'
 import ProfilAdmin from './pages/admin/ProfilAdmin.jsx'
 import PengaturanAdmin from './pages/admin/PengaturanAdmin.jsx'
+import HakAksesAdmin from './pages/admin/HakAksesAdmin.jsx'
 import PekerjaanSaya from './pages/karyawan/PekerjaanSaya.jsx'
 import ProfilPekerja from './pages/karyawan/ProfilPekerja.jsx'
 import PengaturanPekerja from './pages/karyawan/PengaturanPekerja.jsx'
+import { isAdminRole } from './utils/roles.js'
 
 import './index.css'
 import './App.css'
 
 function roleHome(role) {
-  return role === 'admin' ? '/admin' : '/karyawan'
+  return isAdminRole(role) ? '/admin' : '/karyawan'
 }
 
 function roleLabel(role) {
-  return role === 'admin' ? 'Admin' : 'Pekerja'
+  if (role === 'super_admin') return 'Super Admin'
+  if (role === 'admin') return 'Admin'
+  return 'Pekerja'
 }
 
 function isWorkerRole(role) {
@@ -104,9 +108,9 @@ function LoginPage() {
       const requestedPath = location.state?.from?.pathname
       let targetPath = roleHome(authenticatedUser.role)
       if (requestedPath && !requestedPath.startsWith('/login') && !requestedPath.startsWith('/register')) {
-        if (authenticatedUser.role === 'admin' && requestedPath.startsWith('/admin')) {
+        if (isAdminRole(authenticatedUser.role) && requestedPath.startsWith('/admin')) {
           targetPath = requestedPath
-        } else if (authenticatedUser.role !== 'admin' && requestedPath.startsWith('/karyawan')) {
+        } else if (!isAdminRole(authenticatedUser.role) && requestedPath.startsWith('/karyawan')) {
           targetPath = requestedPath
         }
       }
@@ -321,9 +325,10 @@ function AppLayout() {
   const [switchingAccount, setSwitchingAccount] = useState(false)
   const links = [
     { to: roleHome(user.role), label: 'Dashboard', icon: '▦' },
-    ...(user.role === 'admin'
+    ...(isAdminRole(user.role)
       ? [
           { to: '/admin/pengguna', label: 'Manajemen Pengguna', icon: '👥' },
+          ...(user.role === 'super_admin' ? [{ to: '/admin/hak-akses', label: 'Pengaturan Hak Akses', icon: '🛡️' }] : []),
           { to: '/admin/karyawan', label: 'Data Karyawan', icon: '👔' },
           { to: '/admin/pekerjaan', label: 'Data Pekerjaan', icon: '💼' },
           { to: '/admin/penugasan', label: 'Penugasan', icon: '📋' },
@@ -517,6 +522,8 @@ function AdminLayoutWrapper() {
     activeItem = 'Master Role'
   } else if (path.startsWith('/admin/pengguna')) {
     activeItem = 'Manajemen Pengguna'
+  } else if (path.startsWith('/admin/hak-akses')) {
+    activeItem = 'Pengaturan Hak Akses'
   } else if (path.startsWith('/admin/profil')) {
     activeItem = 'Profil Administrator'
   } else if (path.startsWith('/admin/pengaturan')) {
@@ -533,6 +540,7 @@ function AdminLayoutWrapper() {
     else if (item === 'Data Karyawan') navigate('/admin/karyawan')
     else if (item === 'Master Role' || item === 'Master Role & Hierarki') navigate('/admin/master-role')
     else if (item === 'Manajemen Pengguna') navigate('/admin/pengguna')
+    else if (item === 'Pengaturan Hak Akses') navigate('/admin/hak-akses')
     else if (item === 'Pemasukan & Kas Kantor') navigate('/admin/pemasukan')
     else if (item === 'Profil Administrator') navigate('/admin/profil')
     else if (item === 'Pengaturan') navigate('/admin/pengaturan')
@@ -551,6 +559,7 @@ function AdminLayoutWrapper() {
     <TataLetakAdmin
       activeItem={activeItem}
       adminName={user?.name || 'Administrator'}
+      isSuperAdmin={user?.role === 'super_admin'}
       onLogout={handleLogout}
       onSelectMenuItem={handleSelectMenuItem}
     >
@@ -605,16 +614,6 @@ function DashboardPekerjaPage({ mappedUser }) {
   )
 }
 
-function RiwayatPengajuanPage({ mappedUser }) {
-  const navigate = useNavigate()
-  return (
-    <RiwayatPengajuan
-      workerId={mappedUser?.id_karyawan}
-      workerName={mappedUser?.nama}
-      onNavigate={(target) => navigateWorkerTarget(navigate, target)}
-    />
-  )
-}
 
 function PekerjaLayoutWrapper({ mappedUser }) {
   const { user, signOut } = useAuth()
@@ -701,8 +700,8 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route element={<ProtectedRoute />}>
-        {/* Rute khusus Admin: Menggunakan TataLetakAdmin asli tanpa tabrakan AppLayout */}
-        <Route element={<ProtectedRoute roles={['admin']} />}>
+        {/* Rute khusus Admin & Super Admin: Menggunakan TataLetakAdmin asli tanpa tabrakan AppLayout */}
+        <Route element={<ProtectedRoute roles={['admin', 'super_admin']} />}>
           <Route element={<AdminLayoutWrapper />}>
             <Route path="/admin" element={<DashboardAdminPage />} />
             <Route path="/admin/dashboard" element={<DashboardAdminPage />} />
@@ -712,6 +711,7 @@ function AppRoutes() {
             <Route path="/admin/penugasan" element={<Penugasan />} />
             <Route path="/admin/rekap-absensi" element={<RekapAbsensiAdmin />} />
             <Route path="/admin/pengguna" element={<ManajemenPengguna />} />
+            <Route path="/admin/hak-akses" element={<HakAksesAdmin />} />
             <Route
               path="/admin/approval-absensi"
               element={<VerifikasiAbsensiAdmin currentUser={mappedUser} />}

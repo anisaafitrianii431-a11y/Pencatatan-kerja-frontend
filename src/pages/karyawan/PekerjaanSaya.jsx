@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import HeaderHalamanKaryawan from '../../components/HeaderHalamanKaryawan.jsx'
 import { STATUS_PEKERJAAN, STATUS_PEKERJAAN_OPTIONS } from '../../data/pekerjaan.js'
 import { getPekerjaanSaya } from '../../services/workerPekerjaanApi.js'
+import { useAuth } from '../../auth/useAuth.js'
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
@@ -239,6 +240,10 @@ function WorkDetails({ job, assignment, onClose }) {
             />
             <DetailItem label="ID Penugasan" value={assignment?.id_penugasan ?? '—'} />
             <DetailItem label="Peran pada pekerjaan" value={assignment?.peran_tugas || assignment?.peran_saya || 'Anggota'} />
+            <DetailItem 
+              label="Kebijakan Lembur Proyek" 
+              value={Number(job.lembur_diizinkan) === 1 ? '⚡ Diizinkan oleh Admin (Upah lembur berlaku)' : '✕ Tidak diizinkan oleh Admin'} 
+            />
             <DetailItem label="Jumlah anggota tim" value={`${job.total_pekerja_aktif || job.total_pekerja || 1} orang`} />
             <DetailItem label="Kuota pekerja" value={job.kuota_pekerja ? `${job.total_pekerja_aktif || job.total_pekerja || 0} dari ${job.kuota_pekerja} orang` : 'Tidak dibatasi'} />
             <DetailItem label="Status pengambilan" value={job.status_pengambilan === 'ditutup' ? 'Pengambilan ditutup' : 'Terbuka'} />
@@ -265,6 +270,7 @@ function WorkDetails({ job, assignment, onClose }) {
 }
 
 function WorkCard({ job, assignment, onOpen, onRecordExpense }) {
+  const { canCreate } = useAuth()
   if (!job) {
     return (
       <article className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 sm:p-6">
@@ -300,6 +306,20 @@ function WorkCard({ job, assignment, onOpen, onRecordExpense }) {
       <h2 className="mt-4 text-lg font-semibold leading-6 text-slate-900">{job.nama_pekerjaan}</h2>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 border border-indigo-200">
+          Peran: {assignment?.peran_tugas || 'Pelaksana'}
+        </span>
+
+        {Number(job.lembur_diizinkan) === 1 ? (
+          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+            ⚡ Lembur Diizinkan
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 border border-slate-200">
+            Lembur Ditutup
+          </span>
+        )}
+
         {Number(job.total_pekerja_aktif || job.total_pekerja || 1) > 1 && (
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
             👥 {job.total_pekerja_aktif || job.total_pekerja} Anggota Tim
@@ -341,15 +361,17 @@ function WorkCard({ job, assignment, onOpen, onRecordExpense }) {
           <span>Lihat Detail</span>
         </button>
 
-        <button
-          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 px-3 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
-          onClick={() => onRecordExpense?.(job)}
-          type="button"
-          title="Catat nota belanja untuk proyek ini"
-        >
-          <Icon className="h-4 w-4" name="receipt" />
-          <span>💰 Catat Belanja</span>
-        </button>
+        {canCreate('pengeluaran') && (
+          <button
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 px-3 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+            onClick={() => onRecordExpense?.(job)}
+            type="button"
+            title="Catat nota belanja untuk proyek ini"
+          >
+            <Icon className="h-4 w-4" name="receipt" />
+            <span>💰 Catat Belanja</span>
+          </button>
+        )}
       </div>
     </article>
   )

@@ -43,7 +43,8 @@ const STATUS_PRESENTATION = {
 
 function formatDate(value) {
   if (!value) return '—'
-  const date = new Date(`${value}T00:00:00`)
+  const clean = String(value).slice(0, 10)
+  const date = new Date(`${clean}T00:00:00`)
   return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
 }
 
@@ -449,7 +450,7 @@ function DeadlineWarningSection({ jobs = [], onNavigate }) {
     return jobs
       .filter((job) => job.status !== 'selesai' && Boolean(job.target_selesai))
       .map((job) => {
-        const target = new Date(`${job.target_selesai}T00:00:00`)
+        const target = new Date(`${String(job.target_selesai).slice(0, 10)}T00:00:00`)
         const curr = new Date(`${today}T00:00:00`)
         const diffDays = Math.round((target - curr) / (1000 * 60 * 60 * 24))
         return { ...job, diffDays }

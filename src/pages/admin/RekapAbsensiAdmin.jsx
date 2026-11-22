@@ -14,7 +14,8 @@ const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
 
 function formatDate(value) {
   if (!value) return '—'
-  const date = new Date(`${value}T00:00:00`)
+  const clean = String(value).slice(0, 10)
+  const date = new Date(`${clean}T00:00:00`)
   return Number.isNaN(date.getTime()) ? '—' : DATE_FORMATTER.format(date)
 }
 
@@ -176,6 +177,33 @@ function StatusBadge({ status }) {
   )
 }
 
+function KeterlambatanBadge({ statusKeterlambatan, menitTerlambat, jamStandar }) {
+  if (!statusKeterlambatan) return null
+  if (statusKeterlambatan === 'tepat_waktu') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
+        title={`Masuk tepat waktu (Standar: ${jamStandar || '08:00'})`}
+      >
+        <span className="h-1 w-1 rounded-full bg-emerald-500" />
+        Tepat Waktu
+      </span>
+    )
+  }
+  if (statusKeterlambatan === 'terlambat') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/20"
+        title={`Terlambat ${menitTerlambat || 0} menit dari jam masuk standar (${jamStandar || '08:00'})`}
+      >
+        <span className="h-1 w-1 rounded-full bg-rose-500" />
+        Terlambat (+{menitTerlambat || 0} mnt)
+      </span>
+    )
+  }
+  return null
+}
+
 function JobStatusBadge({ status }) {
   if (status === 'berjalan') {
     return (
@@ -210,9 +238,9 @@ export default function RekapAbsensiAdmin() {
   const paramPekerjaan = searchParams.get('pekerjaan')
   const paramKaryawan = searchParams.get('karyawan')
 
-  const initialTab = paramTab || (paramTanggal ? 'kehadiran' : paramPekerjaan ? 'riwayat' : 'operasional')
+  const initialTab = paramTab || (paramTanggal ? 'kehadiran' : paramPekerjaan ? 'operasional' : 'riwayat')
 
-  const [activeTab, setActiveTab] = useState(initialTab) // 'operasional' | 'kehadiran' | 'riwayat'
+  const [activeTab, setActiveTab] = useState(initialTab) // 'riwayat' | 'kehadiran' | 'operasional'
 
   // Data states
   const [employees, setEmployees] = useState([])
@@ -262,6 +290,13 @@ export default function RekapAbsensiAdmin() {
   const [selectedJobDuration, setSelectedJobDuration] = useState(null) // Modal Detail Total Durasi
   const [selectedSummaryCard, setSelectedSummaryCard] = useState(null) // Modal Detail Kartu Kehadiran
   const [selectedAttendance, setSelectedAttendance] = useState(null) // Modal Detail & Verifikasi Absensi
+  const [adminNote, setAdminNote] = useState('')
+
+  useEffect(() => {
+    if (selectedAttendance) {
+      setAdminNote(selectedAttendance.catatan_admin || '')
+    }
+  }, [selectedAttendance])
 
   const loadAllData = async () => {
     setIsLoading(true)
@@ -305,17 +340,17 @@ export default function RekapAbsensiAdmin() {
     setTimeout(() => setNotification(null), 4000)
   }
 
-  const handleVerify = async (id_absensi, status) => {
+  const handleVerify = async (id_absensi, status, note = adminNote) => {
     try {
-      await verifikasiAbsensi(id_absensi, status)
+      await verifikasiAbsensi(id_absensi, status, note)
       showNotice('success', `Status presensi berhasil diubah menjadi "${status}".`)
       setAttendances((prev) =>
         prev.map((item) =>
-          item.id_absensi === id_absensi ? { ...item, status_verifikasi: status } : item,
+          item.id_absensi === id_absensi ? { ...item, status_verifikasi: status, catatan_admin: note } : item,
         ),
       )
       if (selectedAttendance && selectedAttendance.id_absensi === id_absensi) {
-        setSelectedAttendance((prev) => ({ ...prev, status_verifikasi: status }))
+        setSelectedAttendance((prev) => ({ ...prev, status_verifikasi: status, catatan_admin: note }))
       }
       // Sinkronisasi data ke Dashboard Admin & Modul Penggajian secara otomatis
       window.dispatchEvent(new CustomEvent('absensi_updated'))
@@ -656,8 +691,69 @@ export default function RekapAbsensiAdmin() {
         {/* ============================================================== */}
         {/* 4 KARTU RINGKASAN METRIK EKSEKUTIF (KPI CARDS)                */}
         {/* ============================================================== */}
+        {/* ============================================================== */}
+        {/* 4 KARTU RINGKASAN METRIK UTAMA (KPI CARDS PRIORITAS ADMIN)     */}
+        {/* ============================================================== */}
         <div className="mb-6 grid grid-cols-2 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: Total Jam Kerja */}
+          {/* Card 1: Verifikasi Kehadiran (Prioritas Tertinggi Admin) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('riwayat')
+              if (operationalStats.pendingCount > 0) setFilterStatus('menunggu')
+            }}
+            className={`group rounded-2xl border p-4 text-left transition shadow-xs cursor-pointer ${
+              activeTab === 'riwayat'
+                ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
+                : 'border-slate-200/80 bg-white hover:border-amber-300 hover:bg-slate-50/50'
+            }`}
+            title="Klik untuk membuka verifikasi presensi"
+          >
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>Perlu Verifikasi Presensi</span>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-xl transition group-hover:scale-110 ${
+                operationalStats.pendingCount > 0 ? 'bg-amber-100 text-amber-700 animate-pulse' : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                <Icon name="shieldCheck" className="h-4 w-4" />
+              </div>
+            </div>
+            <div className={`mt-2 text-2xl font-black tracking-tight ${
+              operationalStats.pendingCount > 0 ? 'text-amber-700' : 'text-emerald-700'
+            }`}>
+              {operationalStats.pendingCount > 0 ? `${operationalStats.pendingCount} Menunggu` : '100% Tuntas'}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">
+              {operationalStats.pendingCount > 0 ? 'Sesi butuh approval Admin →' : 'Semua sesi sudah diverifikasi'}
+            </div>
+          </button>
+
+          {/* Card 2: Teknisi Hadir Hari Ini */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('kehadiran')}
+            className={`group rounded-2xl border p-4 text-left transition shadow-xs cursor-pointer ${
+              activeTab === 'kehadiran'
+                ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/20'
+                : 'border-slate-200/80 bg-white hover:border-emerald-300 hover:bg-slate-50/50'
+            }`}
+            title="Klik untuk memantau kehadiran harian teknisi"
+          >
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>Teknisi Hadir Hari Ini</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition group-hover:scale-110">
+                <Icon name="users" className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 text-2xl font-black tracking-tight text-emerald-700">
+              {kehadiranStats.totalPresent}{' '}
+              <span className="text-xs font-bold text-slate-400">/ {employees.length} Teknisi</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">
+              {kehadiranStats.totalAbsent} belum absen hari ini
+            </div>
+          </button>
+
+          {/* Card 3: Total Jam Kerja Proyek */}
           <button
             type="button"
             onClick={() => setActiveTab('operasional')}
@@ -680,11 +776,11 @@ export default function RekapAbsensiAdmin() {
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
               <span className="font-semibold text-blue-700">{operationalStats.approvedCount} sesi valid</span>
               <span>•</span>
-              <span>Klik rincian</span>
+              <span>Rincian jam proyek →</span>
             </div>
           </button>
 
-          {/* Card 2: Proyek Berjalan */}
+          {/* Card 4: Proyek Sedang Berjalan */}
           <button
             type="button"
             onClick={() => {
@@ -696,11 +792,11 @@ export default function RekapAbsensiAdmin() {
           >
             <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
               <span>Pekerjaan Sedang Berjalan</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition group-hover:scale-110">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-100 text-teal-700 transition group-hover:scale-110">
                 <Icon name="briefcase" className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-2 text-2xl font-black tracking-tight text-emerald-700">
+            <div className="mt-2 text-2xl font-black tracking-tight text-teal-700">
               {operationalStats.berjalan}{' '}
               <span className="text-xs font-bold text-slate-400">/ {operationalStats.totalPekerjaan} Proyek</span>
             </div>
@@ -709,87 +805,34 @@ export default function RekapAbsensiAdmin() {
               <span>{operationalStats.selesai} selesai • {operationalStats.belumMulai} belum</span>
             </div>
           </button>
-
-          {/* Card 3: Teknisi Terjun Lapangan */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('kehadiran')}
-            className={`group rounded-2xl border p-4 text-left transition shadow-xs cursor-pointer ${
-              activeTab === 'kehadiran'
-                ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20'
-                : 'border-slate-200/80 bg-white hover:border-indigo-300 hover:bg-slate-50/50'
-            }`}
-            title="Klik untuk memantau kehadiran harian teknisi"
-          >
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-              <span>Teknisi Aktif Lapangan</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 transition group-hover:scale-110">
-                <Icon name="users" className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-2 text-2xl font-black tracking-tight text-indigo-900">
-              {operationalStats.totalWorkerAktif}{' '}
-              <span className="text-xs font-bold text-slate-400">/ {employees.length} Teknisi</span>
-            </div>
-            <div className="mt-1 text-[11px] text-slate-400">
-              Personil tercatat di absensi
-            </div>
-          </button>
-
-          {/* Card 4: Status Verifikasi Presensi */}
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('riwayat')
-              if (operationalStats.pendingCount > 0) setFilterStatus('menunggu')
-            }}
-            className={`group rounded-2xl border p-4 text-left transition shadow-xs cursor-pointer ${
-              activeTab === 'riwayat'
-                ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
-                : 'border-slate-200/80 bg-white hover:border-amber-300 hover:bg-slate-50/50'
-            }`}
-            title="Klik untuk membuka verifikasi presensi"
-          >
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-              <span>Verifikasi Kehadiran</span>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-xl transition group-hover:scale-110 ${
-                operationalStats.pendingCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-              }`}>
-                <Icon name="shieldCheck" className="h-4 w-4" />
-              </div>
-            </div>
-            <div className={`mt-2 text-2xl font-black tracking-tight ${
-              operationalStats.pendingCount > 0 ? 'text-amber-700' : 'text-emerald-700'
-            }`}>
-              {operationalStats.pendingCount > 0 ? `${operationalStats.pendingCount} Menunggu` : '100% Tuntas'}
-            </div>
-            <div className="mt-1 text-[11px] text-slate-400">
-              {operationalStats.pendingCount > 0 ? 'Sesi presensi butuh persetujuan' : 'Semua sesi sudah diverifikasi'}
-            </div>
-          </button>
         </div>
 
         {/* ============================================================== */}
-        {/* TAB NAVIGASI HORIZONTAL: TEPAT DI BAWAH JUDUL & DESKRIPSI */}
+        {/* TAB NAVIGASI HORIZONTAL DENGAN PRIORITAS JELAS                 */}
         {/* ============================================================== */}
         <div className="mb-6 border-b border-slate-200">
           <div className="flex gap-2 sm:gap-4 overflow-x-auto scrollbar-none">
             <button
               type="button"
-              onClick={() => setActiveTab('operasional')}
+              onClick={() => setActiveTab('riwayat')}
               className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold whitespace-nowrap transition ${
-                activeTab === 'operasional'
+                activeTab === 'riwayat'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
               }`}
             >
-              <Icon name="briefcase" className="h-4 w-4" />
-              <span>A. Jam Kerja Proyek</span>
+              <Icon name="shieldCheck" className="h-4 w-4" />
+              <span>1. Verifikasi & Riwayat Presensi</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                activeTab === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                activeTab === 'riwayat' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
               }`}>
-                {jobs.length}
+                {attendances.length}
               </span>
+              {operationalStats.pendingCount > 0 && (
+                <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
+                  {operationalStats.pendingCount} Review
+                </span>
+              )}
             </button>
 
             <button
@@ -802,29 +845,29 @@ export default function RekapAbsensiAdmin() {
               }`}
             >
               <Icon name="users" className="h-4 w-4" />
-              <span>B. Monitoring Kehadiran Harian</span>
+              <span>2. Monitoring Kehadiran Harian</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                 activeTab === 'kehadiran' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
               }`}>
-                {employees.length}
+                {kehadiranStats.totalPresent}/{employees.length}
               </span>
             </button>
 
             <button
               type="button"
-              onClick={() => setActiveTab('riwayat')}
+              onClick={() => setActiveTab('operasional')}
               className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold whitespace-nowrap transition ${
-                activeTab === 'riwayat'
+                activeTab === 'operasional'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
               }`}
             >
-              <Icon name="history" className="h-4 w-4" />
-              <span>C. Verifikasi & Riwayat Presensi</span>
+              <Icon name="briefcase" className="h-4 w-4" />
+              <span>3. Jam Kerja per Proyek</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                activeTab === 'riwayat' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                activeTab === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
               }`}>
-                {attendances.length}
+                {jobs.length}
               </span>
             </button>
           </div>
@@ -1136,14 +1179,14 @@ export default function RekapAbsensiAdmin() {
         )}
 
         {/* ============================================================== */}
-        {/* SUBSECTION B: KEHADIRAN (6 KARTU RINGKASAN KLIK & DIAGRAM) */}
+        {/* SUBSECTION B: MONITORING KEHADIRAN HARIAN */}
         {/* ============================================================== */}
         {activeTab === 'kehadiran' && (
-          <div className="space-y-6">
-            {/* Filter Tanggal & Karyawan Kehadiran */}
-            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-4">
+            {/* Toolbar Filter & Quick Status Badges */}
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-xs font-bold text-slate-600">Filter Data:</span>
+                <span className="text-xs font-bold text-slate-700">Tanggal:</span>
                 <input
                   type="date"
                   value={kehadiranDate}
@@ -1153,7 +1196,11 @@ export default function RekapAbsensiAdmin() {
                 <button
                   type="button"
                   onClick={() => setKehadiranDate(new Date().toISOString().slice(0, 10))}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                    kehadiranDate === new Date().toISOString().slice(0, 10)
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                  }`}
                 >
                   Hari Ini
                 </button>
@@ -1169,387 +1216,73 @@ export default function RekapAbsensiAdmin() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              {(kehadiranDate || kehadiranWorkerId) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setKehadiranDate('')
-                    setKehadiranWorkerId('')
-                  }}
-                  className="self-start text-xs font-semibold text-blue-600 hover:text-blue-800 sm:self-auto"
-                >
-                  Reset Filter
-                </button>
-              )}
-            </div>
-
-            {/* 6 KARTU RINGKASAN KEHADIRAN (KLIK UNTUK FILTER DAFTAR KEHADIRAN) */}
-            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
-              {/* Kartu 1: Total Karyawan */}
-              <div
-                onClick={() => setKehadiranCardFilter((prev) => (prev === 'total_karyawan' ? '' : 'total_karyawan'))}
-                className={`rounded-2xl border p-4 shadow-sm transition cursor-pointer group ${
-                  kehadiranCardFilter === 'total_karyawan'
-                    ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/30'
-                    : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-500">Total Karyawan</p>
-                  <Icon name="users" className="h-4 w-4 text-blue-500 group-hover:scale-110 transition" />
-                </div>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{kehadiranStats.totalEmployeesCount}</p>
-                <p className="mt-1 text-[11px] font-semibold text-blue-600">
-                  {kehadiranCardFilter === 'total_karyawan' ? '● Filter Aktif' : 'Semua karyawan →'}
-                </p>
-              </div>
-
-              {/* Kartu 2: Karyawan Hadir */}
-              <div
-                onClick={() => setKehadiranCardFilter((prev) => (prev === 'karyawan_hadir' ? '' : 'karyawan_hadir'))}
-                className={`rounded-2xl border p-4 shadow-sm transition cursor-pointer group ${
-                  kehadiranCardFilter === 'karyawan_hadir'
-                    ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/30'
-                    : 'border-emerald-100 bg-emerald-50/40 hover:border-emerald-300 hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-emerald-800">Karyawan Hadir</p>
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-                </div>
-                <p className="mt-2 text-2xl font-bold text-emerald-700">{kehadiranStats.totalPresent}</p>
-                <p className="mt-1 text-[11px] font-semibold text-emerald-600">
-                  {kehadiranCardFilter === 'karyawan_hadir' ? '● Filter Aktif' : 'Tampilkan hadir →'}
-                </p>
-              </div>
-
-              {/* Kartu 3: Belum Absen */}
-              <div
-                onClick={() => setKehadiranCardFilter((prev) => (prev === 'belum_absen' ? '' : 'belum_absen'))}
-                className={`rounded-2xl border p-4 shadow-sm transition cursor-pointer group ${
-                  kehadiranCardFilter === 'belum_absen'
-                    ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/30'
-                    : 'border-amber-100 bg-amber-50/40 hover:border-amber-300 hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-amber-800">Belum Absen</p>
-                  <Icon name="clock" className="h-4 w-4 text-amber-500 group-hover:scale-110 transition" />
-                </div>
-                <p className="mt-2 text-2xl font-bold text-amber-700">{kehadiranStats.totalAbsent}</p>
-                <p className="mt-1 text-[11px] font-semibold text-amber-600">
-                  {kehadiranCardFilter === 'belum_absen' ? '● Filter Aktif' : 'Tampilkan absen →'}
-                </p>
-              </div>
-
-              {/* Kartu 4: Menunggu Review */}
-              <div
-                onClick={() => setKehadiranCardFilter((prev) => (prev === 'menunggu_review' ? '' : 'menunggu_review'))}
-                className={`rounded-2xl border p-4 shadow-sm transition cursor-pointer group ${
-                  kehadiranCardFilter === 'menunggu_review'
-                    ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/30'
-                    : 'border-amber-200 bg-white hover:border-amber-400 hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-amber-700">Menunggu Review</p>
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
-                </div>
-                <p className="mt-2 text-2xl font-bold text-amber-600">{kehadiranStats.waiting}</p>
-                <p className="mt-1 text-[11px] font-semibold text-amber-700">
-                  {kehadiranCardFilter === 'menunggu_review' ? '● Filter Aktif' : 'Perlu review →'}
-                </p>
-              </div>
-
-              {/* Kartu 5: Sesi Disetujui */}
-              <div
-                onClick={() => setKehadiranCardFilter((prev) => (prev === 'sesi_disetujui' ? '' : 'sesi_disetujui'))}
-                className={`rounded-2xl border p-4 shadow-sm transition cursor-pointer group ${
-                  kehadiranCardFilter === 'sesi_disetujui'
-                    ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/30'
-                    : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-emerald-700">Sesi Disetujui</p>
-                  <Icon name="check" className="h-4 w-4 text-emerald-500 group-hover:scale-110 transition" />
-                </div>
-                <p className="mt-2 text-2xl font-bold text-emerald-600">{kehadiranStats.approved}</p>
-                <p className="mt-1 text-[11px] font-semibold text-emerald-600">
-                  {kehadiranCardFilter === 'sesi_disetujui' ? '● Filter Aktif' : 'Sesi valid →'}
-                </p>
-              </div>
-
-              {/* Kartu 6: Sesi Ditolak */}
-              <div
-                onClick={() => setKehadiranCardFilter((prev) => (prev === 'sesi_ditolak' ? '' : 'sesi_ditolak'))}
-                className={`rounded-2xl border p-4 shadow-sm transition cursor-pointer group ${
-                  kehadiranCardFilter === 'sesi_ditolak'
-                    ? 'border-rose-500 bg-rose-50/70 ring-2 ring-rose-500/30'
-                    : 'border-slate-200 bg-white hover:border-rose-300 hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-rose-700">Sesi Ditolak</p>
-                  <Icon name="cross" className="h-4 w-4 text-rose-500 group-hover:scale-110 transition" />
-                </div>
-                <p className="mt-2 text-2xl font-bold text-rose-600">{kehadiranStats.rejected}</p>
-                <p className="mt-1 text-[11px] font-semibold text-rose-600">
-                  {kehadiranCardFilter === 'sesi_ditolak' ? '● Filter Aktif' : 'Sesi ditolak →'}
-                </p>
-              </div>
-            </div>
-
-            {/* BAGIAN ATAS: DIAGRAM DONUT RASIO & PUSAT VERIFIKASI */}
-            <div className="grid gap-6 lg:grid-cols-12">
-              {/* Card Rasio Donut Chart */}
-              <div className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Rasio Status Verifikasi Absensi</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {kehadiranDate
-                      ? `Persentase verifikasi kehadiran tanggal ${formatDate(kehadiranDate)}.`
-                      : 'Persentase persetujuan kehadiran berdasarkan data absensi yang terpilih.'}
-                  </p>
-
-                  <div className="mt-6 flex flex-col items-center justify-around gap-6 sm:flex-row">
-                    {/* SVG Multi-Segment Donut Chart */}
-                    <div className="relative flex h-36 w-36 shrink-0 items-center justify-center">
-                      <svg className="h-36 w-36" viewBox="0 0 120 120">
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r="46"
-                          fill="none"
-                          stroke="#f1f5f9"
-                          strokeWidth="11"
-                        />
-                        {kehadiranStats.totalSessions > 0 && (
-                          <g transform="rotate(-90 60 60)">
-                            {kehadiranStats.approvedLen > 0 && (
-                              <circle
-                                cx="60"
-                                cy="60"
-                                r="46"
-                                fill="none"
-                                stroke="#10b981"
-                                strokeWidth="11"
-                                strokeDasharray={`${kehadiranStats.approvedLen} 289.0265`}
-                                strokeDashoffset={0}
-                                strokeLinecap="butt"
-                                className="transition-all duration-500 ease-out"
-                              >
-                                <title>Disetujui: {kehadiranStats.approved} sesi ({kehadiranStats.approvalRate}%)</title>
-                              </circle>
-                            )}
-                            {kehadiranStats.waitingLen > 0 && (
-                              <circle
-                                cx="60"
-                                cy="60"
-                                r="46"
-                                fill="none"
-                                stroke="#f59e0b"
-                                strokeWidth="11"
-                                strokeDasharray={`${kehadiranStats.waitingLen} 289.0265`}
-                                strokeDashoffset={kehadiranStats.waitingOffset}
-                                strokeLinecap="butt"
-                                className="transition-all duration-500 ease-out"
-                              >
-                                <title>Menunggu Verifikasi: {kehadiranStats.waiting} sesi ({kehadiranStats.waitingRate}%)</title>
-                              </circle>
-                            )}
-                            {kehadiranStats.rejectedLen > 0 && (
-                              <circle
-                                cx="60"
-                                cy="60"
-                                r="46"
-                                fill="none"
-                                stroke="#ef4444"
-                                strokeWidth="11"
-                                strokeDasharray={`${kehadiranStats.rejectedLen} 289.0265`}
-                                strokeDashoffset={kehadiranStats.rejectedOffset}
-                                strokeLinecap="butt"
-                                className="transition-all duration-500 ease-out"
-                              >
-                                <title>Ditolak: {kehadiranStats.rejected} sesi ({kehadiranStats.rejectedRate}%)</title>
-                              </circle>
-                            )}
-                          </g>
-                        )}
-                      </svg>
-
-                      {/* Inner text */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
-                        {kehadiranStats.totalSessions === 0 ? (
-                          <>
-                            <span className="text-2xl font-bold text-slate-400">0%</span>
-                            <span className="text-[10px] font-semibold text-slate-400">Belum Ada Sesi</span>
-                          </>
-                        ) : kehadiranStats.approved > 0 ? (
-                          <>
-                            <span className="text-3xl font-extrabold tracking-tight text-slate-900">
-                              {kehadiranStats.approvalRate}%
-                            </span>
-                            <span className="text-xs font-bold text-emerald-600">Disetujui</span>
-                          </>
-                        ) : kehadiranStats.waiting > 0 ? (
-                          <>
-                            <span className="text-3xl font-extrabold tracking-tight text-amber-600">
-                              {kehadiranStats.waitingRate}%
-                            </span>
-                            <span className="text-xs font-bold text-amber-700">Menunggu</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-3xl font-extrabold tracking-tight text-rose-600">
-                              {kehadiranStats.rejectedRate}%
-                            </span>
-                            <span className="text-xs font-bold text-rose-700">Ditolak</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Breakdown List */}
-                    <div className="w-full space-y-1 sm:w-1/2">
-                      <div
-                        onClick={() => setKehadiranCardFilter((prev) => (prev === 'sesi_disetujui' ? '' : 'sesi_disetujui'))}
-                        className="flex items-center justify-between border-b border-slate-100 py-2.5 text-xs sm:text-sm cursor-pointer hover:bg-slate-50/70 rounded-lg px-2 transition group"
-                        title="Klik untuk filter sesi disetujui"
-                      >
-                        <span className="flex items-center gap-2.5 font-medium text-slate-700">
-                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" />
-                          Disetujui
-                        </span>
-                        <span className="font-bold text-slate-900 group-hover:text-emerald-700 transition">
-                          {kehadiranStats.approved} sesi
-                        </span>
-                      </div>
-
-                      <div
-                        onClick={() => setKehadiranCardFilter((prev) => (prev === 'menunggu_review' ? '' : 'menunggu_review'))}
-                        className="flex items-center justify-between border-b border-slate-100 py-2.5 text-xs sm:text-sm cursor-pointer hover:bg-slate-50/70 rounded-lg px-2 transition group"
-                        title="Klik untuk filter sesi menunggu review"
-                      >
-                        <span className="flex items-center gap-2.5 font-medium text-slate-700">
-                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
-                          Menunggu
-                        </span>
-                        <span className="font-bold text-slate-900 group-hover:text-amber-700 transition">
-                          {kehadiranStats.waiting} sesi
-                        </span>
-                      </div>
-
-                      <div
-                        onClick={() => setKehadiranCardFilter((prev) => (prev === 'sesi_ditolak' ? '' : 'sesi_ditolak'))}
-                        className="flex items-center justify-between border-b border-slate-100 py-2.5 text-xs sm:text-sm cursor-pointer hover:bg-slate-50/70 rounded-lg px-2 transition group"
-                        title="Klik untuk filter sesi ditolak"
-                      >
-                        <span className="flex items-center gap-2.5 font-medium text-slate-700">
-                          <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shrink-0" />
-                          Ditolak
-                        </span>
-                        <span className="font-bold text-slate-900 group-hover:text-rose-700 transition">
-                          {kehadiranStats.rejected} sesi
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-3 text-xs sm:text-sm px-2">
-                        <span className="font-semibold text-slate-800">Total Sesi</span>
-                        <span className="font-bold text-blue-600 font-mono">
-                          {kehadiranStats.totalSessions} sesi
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 mt-4 text-center">
+                {(kehadiranDate || kehadiranWorkerId || kehadiranCardFilter) && (
                   <button
                     type="button"
-                    onClick={() => setSelectedSummaryCard('total_karyawan')}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition"
+                    onClick={() => {
+                      setKehadiranDate('')
+                      setKehadiranWorkerId('')
+                      setKehadiranCardFilter('')
+                    }}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 ml-1 cursor-pointer"
                   >
-                    Buka Rincian Dialog Kehadiran →
+                    Reset Filter
                   </button>
-                </div>
+                )}
               </div>
 
-              {/* Card Pusat Panduan & Antrean Verifikasi */}
-              <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <span>Pusat Verifikasi Absensi Karyawan</span>
-                      {kehadiranStats.waiting > 0 && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-300 animate-pulse">
-                          <span className="h-2 w-2 rounded-full bg-amber-500" />
-                          {kehadiranStats.waiting} Sesi Menunggu Review
-                        </span>
-                      )}
-                    </h3>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Sistem validasi absensi: pastikan karyawan melakukan presensi di lokasi dan jam kerja yang tepat.
-                  </p>
-
-                  {kehadiranStats.waiting > 0 ? (
-                    <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50/80 p-4">
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl shrink-0">⚡</span>
-                        <div className="flex-1">
-                          <h4 className="text-xs font-bold text-amber-900">
-                            Aksi Diperlukan: Terdapat {kehadiranStats.waiting} sesi absensi menunggu persetujuan Anda!
-                          </h4>
-                          <p className="mt-1 text-xs text-amber-800 leading-relaxed">
-                            Karyawan baru saja mengirim absensi. Silakan klik tombol <strong className="rounded bg-amber-200 px-1.5 py-0.5 text-amber-950 font-bold">"⚡ Periksa & Setujui"</strong> pada baris karyawan di tabel bawah untuk memeriksa foto selfie, titik GPS, dan memberikan persetujuan kerja.
-                          </p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setKehadiranCardFilter((prev) => (prev === 'menunggu_review' ? '' : 'menunggu_review'))}
-                              className="rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
-                            >
-                              {kehadiranCardFilter === 'menunggu_review' ? '✓ Sedang Difilter' : '🔍 Tampilkan Hanya Yang Perlu Review'}
-                            </button>
-                            {kehadiranCardFilter && (
-                              <button
-                                type="button"
-                                onClick={() => setKehadiranCardFilter('')}
-                                className="text-xs text-slate-600 hover:text-slate-900 underline font-medium"
-                              >
-                                Tampilkan Semua Karyawan
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl shrink-0">✅</span>
-                        <div>
-                          <h4 className="text-xs font-bold text-emerald-900">
-                            Semua Absensi Sudah Terverifikasi
-                          </h4>
-                          <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
-                            Tidak ada absensi yang tertunda. Anda dapat memantau rincian durasi kerja, jam masuk, jam pulang, dan koordinat GPS karyawan pada tabel di bawah.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 mt-4 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
-                  <span>💡 <strong>Tip Cepat:</strong> Anda dapat mengklik langsung baris karyawan mana saja pada tabel di bawah untuk membuka modal verifikasi.</span>
-                  <span className="font-semibold text-slate-700">Total: {kehadiranStats.totalEmployeesCount} Karyawan</span>
-                </div>
+              {/* Quick Status Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setKehadiranCardFilter('')}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    !kehadiranCardFilter
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Semua ({kehadiranStats.totalEmployeesCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKehadiranCardFilter((prev) => (prev === 'karyawan_hadir' ? '' : 'karyawan_hadir'))}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    kehadiranCardFilter === 'karyawan_hadir'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  }`}
+                >
+                  ✓ Hadir ({kehadiranStats.totalPresent})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKehadiranCardFilter((prev) => (prev === 'belum_absen' ? '' : 'belum_absen'))}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    kehadiranCardFilter === 'belum_absen'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                  }`}
+                >
+                  ⏳ Belum Absen ({kehadiranStats.totalAbsent})
+                </button>
+                {kehadiranStats.waiting > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setKehadiranCardFilter((prev) => (prev === 'menunggu_review' ? '' : 'menunggu_review'))}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer animate-pulse ${
+                      kehadiranCardFilter === 'menunggu_review'
+                        ? 'bg-amber-500 text-white shadow-xs ring-2 ring-amber-300'
+                        : 'border border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200'
+                    }`}
+                  >
+                    ⚡ Perlu Review ({kehadiranStats.waiting})
+                  </button>
+                )}
               </div>
             </div>
+
+
 
             {/* TABEL DAFTAR KEHADIRAN KARYAWAN (FULL WIDTH - LEGA, LUAS, & JELAS) */}
             <div className="w-full rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
@@ -1773,10 +1506,40 @@ export default function RekapAbsensiAdmin() {
         )}
 
         {/* ============================================================== */}
-        {/* SUBSECTION C: RIWAYAT ABSENSI (TABEL DETAIL DENGAN AKSI) */}
+        {/* SUBSECTION C: RIWAYAT & VERIFIKASI PRESENSI */}
         {/* ============================================================== */}
         {activeTab === 'riwayat' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* Banner Notifikasi Presensi Menunggu Approval */}
+            {operationalStats.pendingCount > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white font-bold text-sm shadow-xs">
+                    {operationalStats.pendingCount}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-amber-900">
+                      Ada {operationalStats.pendingCount} presensi teknisi yang menunggu verifikasi Anda
+                    </p>
+                    <p className="text-xs text-amber-700">
+                      Periksa kesesuaian titik GPS dan foto selfie karyawan sebelum menyetujui absensi.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus(filterStatus === 'menunggu' ? '' : 'menunggu')}
+                  className={`shrink-0 rounded-xl px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer ${
+                    filterStatus === 'menunggu'
+                      ? 'bg-amber-600 text-white ring-2 ring-amber-400'
+                      : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100'
+                  }`}
+                >
+                  {filterStatus === 'menunggu' ? '✓ Sedang Ditampilkan' : '⚡ Tampilkan Sesi Menunggu'}
+                </button>
+              </div>
+            )}
+
             {/* Filter Toolbar Single Line */}
             <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
@@ -1922,7 +1685,16 @@ export default function RekapAbsensiAdmin() {
                               {formatDate(item.tanggal)}
                             </td>
                             <td className="px-4 py-3 text-slate-600 font-mono">
-                              {item.jam_masuk ? item.jam_masuk.slice(0, 5) : '—'}
+                              <div className="flex flex-col items-start gap-1">
+                                <span>{item.jam_masuk ? item.jam_masuk.slice(0, 5) : '—'}</span>
+                                {item.status_keterlambatan && (
+                                  <KeterlambatanBadge
+                                    statusKeterlambatan={item.status_keterlambatan}
+                                    menitTerlambat={item.menit_terlambat}
+                                    jamStandar={item.jam_masuk_standar}
+                                  />
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3 text-slate-600 font-mono">
                               {item.jam_pulang ? (
@@ -2461,203 +2233,322 @@ export default function RekapAbsensiAdmin() {
         {/* ============================================================== */}
         {/* MODAL 4: DETAIL & VERIFIKASI ABSENSI (LENGKAP DENGAN GPS & FOTO) */}
         {/* ============================================================== */}
-        {selectedAttendance && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <span>Detail & Verifikasi Absensi</span>
-                </h3>
-                <button
-                  onClick={() => setSelectedAttendance(null)}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <Icon name="cross" className="h-5 w-5" />
-                </button>
-              </div>
+        {selectedAttendance && (() => {
+          const emp = selectedAttendance.emp || {}
+          const job = selectedAttendance.job || {}
+          const namaKaryawan = emp.nama || selectedAttendance.nama_karyawan || 'Pekerja'
+          const kodeKaryawan = emp.kode_karyawan || selectedAttendance.kode_karyawan || `KARY${String(selectedAttendance.id_karyawan).padStart(3, '0')}`
+          const jabatan = emp.jabatan || selectedAttendance.jabatan || 'Teknisi Proyek'
+          const namaPekerjaan = job.nama_pekerjaan || selectedAttendance.nama_pekerjaan || 'Pekerjaan Lapangan'
+          const lokasiPekerjaan = job.lokasi || selectedAttendance.lokasi_pekerjaan || 'Lokasi Proyek'
+          const titikProyek = job.titik_lokasi || selectedAttendance.titik_proyek || ''
+          const radiusProyek = Number(job.radius_meter || selectedAttendance.radius_meter || 100)
 
-              <div className="space-y-3 text-xs">
-                {/* Foto Selfie Absensi Masuk & Pulang */}
-                {(selectedAttendance.foto_lokasi || selectedAttendance.foto_pulang) && (
-                  <div className="space-y-3">
-                    {selectedAttendance.foto_lokasi && (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                            <Icon name="camera" className="h-3.5 w-3.5 text-blue-600" />
-                            Foto Presensi Masuk (Selfie Kamera)
-                          </p>
+          const fotoMasuk = selectedAttendance.foto_masuk || selectedAttendance.foto_lokasi
+          const fotoPulang = selectedAttendance.foto_pulang
+          const titikMasuk = selectedAttendance.titik_masuk || selectedAttendance.titik_lokasi || (selectedAttendance.masuk_latitude && selectedAttendance.masuk_longitude ? `${selectedAttendance.masuk_latitude}, ${selectedAttendance.masuk_longitude}` : '')
+          const titikPulangCoords = selectedAttendance.titik_pulang || (selectedAttendance.pulang_latitude && selectedAttendance.pulang_longitude ? `${selectedAttendance.pulang_latitude}, ${selectedAttendance.pulang_longitude}` : '')
+          const jarakMasuk = selectedAttendance.jarak_masuk ?? selectedAttendance.jarak_meter
+          const jarakPulang = selectedAttendance.jarak_pulang
+
+          const isMasukValid = jarakMasuk !== null && jarakMasuk !== undefined ? Number(jarakMasuk) <= radiusProyek : null
+          const isPulangValid = jarakPulang !== null && jarakPulang !== undefined ? Number(jarakPulang) <= radiusProyek : null
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-4 backdrop-blur-xs">
+              <div className="w-full max-w-2xl rounded-2xl bg-white p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto border border-slate-100">
+                {/* Header Modal */}
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                      <Icon name="clock" className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 leading-tight">
+                        Detail & Verifikasi Absensi
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        ID Absensi: #{selectedAttendance.id_absensi} • {formatDate(selectedAttendance.tanggal)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={selectedAttendance.status_verifikasi} />
+                    <button
+                      onClick={() => setSelectedAttendance(null)}
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <Icon name="cross" className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sesi Foto Masuk & Pulang (Grid 2 Kolom) */}
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Icon name="camera" className="h-4 w-4 text-blue-600" />
+                    Dokumentasi Foto Presensi Kamera
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Kartu Foto Masuk */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
+                          <span>🟢</span> Masuk ({selectedAttendance.jam_masuk?.slice(0, 5) || '—'})
+                        </span>
+                        {fotoMasuk && (
                           <a
-                            href={getFileUrl(selectedAttendance.foto_lokasi)}
+                            href={getFileUrl(fotoMasuk)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            className="text-[11px] font-semibold text-blue-600 hover:underline"
                           >
-                            Buka Ukuran Asli ↗
+                            Ukuran Asli ↗
                           </a>
-                        </div>
-                        <img
-                          src={getFileUrl(selectedAttendance.foto_lokasi)}
-                          alt="Foto Presensi Masuk"
-                          className="mx-auto h-48 w-full max-w-xs rounded-xl object-cover border border-slate-200 shadow-sm"
-                        />
+                        )}
                       </div>
-                    )}
-
-                    {selectedAttendance.foto_pulang && (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                            <Icon name="camera" className="h-3.5 w-3.5 text-emerald-600" />
-                            Foto Presensi Pulang (Selfie Kamera)
-                          </p>
-                          <a
-                            href={getFileUrl(selectedAttendance.foto_pulang)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            Buka Ukuran Asli ↗
-                          </a>
-                        </div>
-                        <img
-                          src={getFileUrl(selectedAttendance.foto_pulang)}
-                          alt="Foto Presensi Pulang"
-                          className="mx-auto h-48 w-full max-w-xs rounded-xl object-cover border border-slate-200 shadow-sm"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Nama Karyawan:</span>
-                  <div className="text-right">
-                    <span className="font-bold text-slate-900 block">
-                      {selectedAttendance.emp?.nama || selectedAttendance.nama_karyawan}
-                    </span>
-                    <span className="font-mono text-[11px] font-semibold text-blue-600">
-                      {selectedAttendance.emp?.kode_karyawan || selectedAttendance.kode_karyawan || `KARY${String(selectedAttendance.id_karyawan).padStart(3, '0')}`}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Pekerjaan:</span>
-                  <span className="font-semibold text-slate-800">
-                    {selectedAttendance.job?.nama_pekerjaan || selectedAttendance.nama_pekerjaan}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Tanggal:</span>
-                  <span className="font-medium text-slate-800">{formatDate(selectedAttendance.tanggal)}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Jam Masuk / Pulang:</span>
-                  <span className="font-mono text-slate-800 font-semibold">
-                    {selectedAttendance.jam_masuk?.slice(0, 5)} - {selectedAttendance.jam_pulang?.slice(0, 5) || 'Aktif'}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-slate-50 pb-2">
-                  <span className="text-slate-500">Durasi Kerja:</span>
-                  <span className="font-bold text-blue-600 font-mono">{selectedAttendance.durasi_format || formatJamMenit(selectedAttendance.durasi_menit)}</span>
-                </div>
-
-                {/* Catatan Karyawan */}
-                {selectedAttendance.catatan && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                    <span className="text-slate-500 block text-[11px] font-semibold">Catatan Karyawan Saat Absen:</span>
-                    <p className="text-xs text-slate-800 mt-1 italic font-medium">"{selectedAttendance.catatan}"</p>
-                  </div>
-                )}
-
-                {/* Informasi Koordinat GPS & Jarak */}
-                {(selectedAttendance.masuk_latitude || selectedAttendance.titik_lokasi) && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-700 block font-semibold flex items-center gap-1">
-                        <Icon name="location" className="h-3.5 w-3.5 text-blue-600" />
-                        Titik Lokasi GPS Absensi
-                      </span>
-                      {selectedAttendance.masuk_latitude && selectedAttendance.masuk_longitude && (
+                      {fotoMasuk ? (
                         <a
-                          href={`https://www.google.com/maps?q=${selectedAttendance.masuk_latitude},${selectedAttendance.masuk_longitude}`}
+                          href={getFileUrl(fotoMasuk)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                          className="block group overflow-hidden rounded-lg border border-slate-200 bg-slate-900"
                         >
-                          Buka di Google Maps ↗
+                          <img
+                            src={getFileUrl(fotoMasuk)}
+                            alt="Foto Presensi Masuk"
+                            className="h-44 w-full object-cover transition group-hover:scale-105"
+                          />
                         </a>
+                      ) : (
+                        <div className="flex h-44 flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-slate-400 text-xs">
+                          <span>Belum ada foto masuk</span>
+                        </div>
                       )}
                     </div>
-                    <span className="font-mono text-[11px] text-slate-700 block bg-white p-2 rounded-lg border border-slate-200">
-                      {selectedAttendance.masuk_latitude && selectedAttendance.masuk_longitude
-                        ? `Lat: ${selectedAttendance.masuk_latitude}, Lng: ${selectedAttendance.masuk_longitude}`
-                        : selectedAttendance.titik_lokasi}
-                    </span>
-                    {selectedAttendance.jarak_meter !== null && selectedAttendance.jarak_meter !== undefined && (
-                      <span className="text-[11px] text-slate-600 block">
-                        Jarak dari titik proyek: <strong>{selectedAttendance.jarak_meter} meter</strong>
+
+                    {/* Kartu Foto Pulang */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                          <span>🔴</span> Pulang ({selectedAttendance.jam_pulang?.slice(0, 5) || 'Sedang Aktif'})
+                        </span>
+                        {fotoPulang && (
+                          <a
+                            href={getFileUrl(fotoPulang)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-semibold text-blue-600 hover:underline"
+                          >
+                            Ukuran Asli ↗
+                          </a>
+                        )}
+                      </div>
+                      {fotoPulang ? (
+                        <a
+                          href={getFileUrl(fotoPulang)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block group overflow-hidden rounded-lg border border-slate-200 bg-slate-900"
+                        >
+                          <img
+                            src={getFileUrl(fotoPulang)}
+                            alt="Foto Presensi Pulang"
+                            className="h-44 w-full object-cover transition group-hover:scale-105"
+                          />
+                        </a>
+                      ) : (
+                        <div className="flex h-44 flex-col items-center justify-center rounded-lg border border-dashed border-amber-300 bg-amber-50/50 text-amber-700 text-xs p-3 text-center">
+                          <Icon name="clock" className="h-6 w-6 text-amber-500 mb-1 animate-pulse" />
+                          <span className="font-bold">Shift Masih Berjalan</span>
+                          <span className="text-[11px] text-amber-600/90 mt-0.5">Pekerja belum melakukan absen pulang</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ringkasan Data Karyawan & Pekerjaan (2 Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Karyawan:</span>
+                      <span className="font-bold text-slate-800 text-sm">{namaKaryawan}</span>
+                      <span className="ml-1.5 font-mono text-[11px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                        {kodeKaryawan}
                       </span>
-                    )}
-                    {selectedAttendance.masuk_alamat && (
-                      <span className="text-[10px] text-slate-500 block leading-relaxed">
-                        {selectedAttendance.masuk_alamat}
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Jabatan:</span>
+                      <span className="font-semibold text-slate-700">{jabatan}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Waktu Kerja:</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-mono font-bold text-slate-800">
+                          {selectedAttendance.jam_masuk?.slice(0, 5) || '—'} - {selectedAttendance.jam_pulang?.slice(0, 5) || 'Aktif'}
+                        </span>
+                        {selectedAttendance.status_keterlambatan && (
+                          <KeterlambatanBadge
+                            statusKeterlambatan={selectedAttendance.status_keterlambatan}
+                            menitTerlambat={selectedAttendance.menit_terlambat}
+                            jamStandar={selectedAttendance.jam_masuk_standar}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Pekerjaan Proyek:</span>
+                      <span className="font-bold text-slate-800 text-sm">{namaPekerjaan}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Alamat / Lokasi Proyek:</span>
+                      <span className="text-slate-700 leading-tight">{lokasiPekerjaan}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Total Durasi Kerja:</span>
+                      <span className="font-mono font-bold text-blue-600 text-sm">
+                        {selectedAttendance.durasi_format || formatJamMenit(selectedAttendance.durasi_menit)}
                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Analisis Koordinat GPS & Validasi Geofencing */}
+                <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Icon name="location" className="h-4 w-4 text-blue-600" />
+                      Akurasi Titik Lokasi GPS & Geofencing
+                    </h4>
+                    {titikMasuk && (
+                      <a
+                        href={`https://www.google.com/maps?q=${titikMasuk.replace(/\s+/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        Buka di Google Maps ↗
+                      </a>
                     )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    {/* Titik Masuk */}
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 font-semibold block text-[11px]">Titik GPS Masuk:</span>
+                      <span className="font-mono font-semibold text-slate-800 text-[11px] block mt-0.5">
+                        {titikMasuk || 'Tidak ada koordinat'}
+                      </span>
+                      {jarakMasuk !== null && jarakMasuk !== undefined && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <span className="text-[11px] text-slate-600">Jarak: <strong>{jarakMasuk} m</strong></span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${isMasukValid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                            {isMasukValid ? `✓ Sesuai (≤ ${radiusProyek}m)` : `⚠️ Di Luar Radius (> ${radiusProyek}m)`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Titik Pulang */}
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 font-semibold block text-[11px]">Titik GPS Pulang:</span>
+                      <span className="font-mono font-semibold text-slate-800 text-[11px] block mt-0.5">
+                        {titikPulangCoords || (selectedAttendance.jam_pulang ? 'Sama dengan lokasi masuk' : 'Menunggu absen pulang')}
+                      </span>
+                      {jarakPulang !== null && jarakPulang !== undefined && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <span className="text-[11px] text-slate-600">Jarak: <strong>{jarakPulang} m</strong></span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${isPulangValid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                            {isPulangValid ? `✓ Sesuai (≤ ${radiusProyek}m)` : `⚠️ Di Luar Radius (> ${radiusProyek}m)`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {titikProyek && (
+                    <p className="text-[11px] text-slate-500 bg-blue-50/50 p-2 rounded border border-blue-100">
+                      📍 <strong>Titik Acuan Target Proyek:</strong> {titikProyek} (Toleransi Radius: {radiusProyek} meter)
+                    </p>
+                  )}
+                </div>
+
+                {/* Catatan Karyawan Saat Absen */}
+                {selectedAttendance.catatan && (
+                  <div className="rounded-xl border border-slate-200 bg-amber-50/40 p-3 text-xs">
+                    <span className="font-bold text-amber-900 block text-[11px]">Catatan Pekerja Saat Absensi:</span>
+                    <p className="text-slate-800 italic mt-0.5 font-medium">"{selectedAttendance.catatan}"</p>
                   </div>
                 )}
 
-                <div className="flex justify-between items-center pt-1">
-                  <span className="text-slate-500">Status Saat Ini:</span>
-                  <StatusBadge status={selectedAttendance.status_verifikasi} />
+                {/* Input Catatan Verifikasi Admin */}
+                <div className="space-y-1.5 text-xs">
+                  <label className="font-bold text-slate-700 flex items-center justify-between">
+                    <span>Catatan Verifikasi Admin (Opsional):</span>
+                    {selectedAttendance.catatan_admin && (
+                      <span className="text-[10px] text-slate-400 font-normal">Tersimpan sebelumnya</span>
+                    )}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={adminNote}
+                    onChange={(e) => setAdminNote(e.target.value)}
+                    placeholder="Tuliskan catatan verifikasi, alasan persetujuan, atau alasan penolakan..."
+                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
                 </div>
-              </div>
 
-              {/* Tombol Aksi Verifikasi */}
-              <div className="mt-6 flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setSelectedAttendance(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
-                >
-                  Tutup
-                </button>
-                {selectedAttendance.status_verifikasi !== 'menunggu' && (
+                {/* Tombol Aksi Verifikasi */}
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAttendance(null)}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                  {selectedAttendance.status_verifikasi !== 'menunggu' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleVerify(selectedAttendance.id_absensi, 'menunggu', adminNote)
+                        setSelectedAttendance(null)
+                      }}
+                      className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                    >
+                      Set Menunggu
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
-                      handleVerify(selectedAttendance.id_absensi, 'menunggu')
+                      handleVerify(selectedAttendance.id_absensi, 'ditolak', adminNote)
                       setSelectedAttendance(null)
                     }}
-                    className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                    className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-sm transition cursor-pointer"
                   >
-                    Set Menunggu
+                    Tolak Absensi
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleVerify(selectedAttendance.id_absensi, 'ditolak')
-                    setSelectedAttendance(null)
-                  }}
-                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-sm transition cursor-pointer"
-                >
-                  Tolak Absensi
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleVerify(selectedAttendance.id_absensi, 'disetujui')
-                    setSelectedAttendance(null)
-                  }}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition cursor-pointer flex items-center gap-1"
-                >
-                  <span>✓</span> Setujui Absensi
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleVerify(selectedAttendance.id_absensi, 'disetujui', adminNote)
+                      setSelectedAttendance(null)
+                    }}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition cursor-pointer flex items-center gap-1"
+                  >
+                    <span>✓</span> Setujui Absensi
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )

@@ -6,6 +6,8 @@ import {
   toggleUserStatus,
 } from '../../services/userApi.js'
 import AvatarAdmin from '../../components/AvatarAdmin.jsx'
+import { isAdminRole } from '../../utils/roles.js'
+import { useAuth } from '../../auth/useAuth.js'
 
 const PAGE_SIZE = 8
 
@@ -308,6 +310,7 @@ function UserResetPasswordModal({ user, isSaving, onClose, onReset }) {
  * KOMPONEN UTAMA: ManajemenPengguna
  */
 function ManajemenPengguna() {
+  const { canUpdate } = useAuth()
   const navigate = useNavigate()
   const [users, setUsers] = useState([])
   const [isReady, setIsReady] = useState(false)
@@ -358,7 +361,7 @@ function ManajemenPengguna() {
           (u.kode_karyawan && u.kode_karyawan.toLowerCase().includes(q)) ||
           (u.jabatan && u.jabatan.toLowerCase().includes(q))
 
-        const matchesRole = !roleFilter || u.peran === roleFilter
+        const matchesRole = !roleFilter || (roleFilter === 'admin' ? isAdminRole(u.peran) : u.peran === roleFilter)
         const isUserActive = Number(u.aktif) === 1
         const matchesStatus =
           !statusFilter ||
@@ -375,7 +378,7 @@ function ManajemenPengguna() {
   const totalCount = users.length
   const activeCount = users.filter((u) => Number(u.aktif) === 1).length
   const inactiveCount = totalCount - activeCount
-  const adminCount = users.filter((u) => u.peran === 'admin').length
+  const adminCount = users.filter((u) => ['admin', 'super_admin'].includes(u.peran)).length
   const karyawanCount = users.filter((u) => u.peran === 'karyawan').length
 
   // Pagination
@@ -692,6 +695,7 @@ function ManajemenPengguna() {
               >
                 <option value="">Semua Peran</option>
                 <option value="admin">Administrator</option>
+                <option value="super_admin">Super Admin</option>
                 <option value="karyawan">Pekerja / Karyawan</option>
               </select>
               <UserIcon
@@ -905,7 +909,11 @@ function ManajemenPengguna() {
 
                       {/* 7. Role */}
                       <td className="whitespace-nowrap px-3.5 py-3 text-center">
-                        {u.peran === 'admin' ? (
+                        {u.peran === 'super_admin' ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                            Super Admin
+                          </span>
+                        ) : u.peran === 'admin' ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10">
                             👑 Admin
                           </span>
@@ -935,39 +943,43 @@ function ManajemenPengguna() {
                       <td className="whitespace-nowrap px-3.5 py-3 text-right">
                         <div className="inline-flex items-center justify-end gap-1.5">
                           {/* Ubah Password */}
-                          <button
-                            type="button"
-                            onClick={() => setResetModalUser(u)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition shadow-2xs"
-                            title={`Ubah kata sandi untuk ${u.nama}`}
-                          >
-                            <UserIcon name="key" className="h-3.5 w-3.5 text-blue-600" />
-                            <span>Ubah Sandi</span>
-                          </button>
+                          {canUpdate('users') && (
+                            <button
+                              type="button"
+                              onClick={() => setResetModalUser(u)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition shadow-2xs"
+                              title={`Ubah kata sandi untuk ${u.nama}`}
+                            >
+                              <UserIcon name="key" className="h-3.5 w-3.5 text-blue-600" />
+                              <span>Ubah Sandi</span>
+                            </button>
+                          )}
 
                           {/* Toggle Status Aktif/Nonaktif */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(u)}
-                            disabled={isSaving}
-                            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition shadow-2xs ${
-                              isUserActive
-                                ? 'border-slate-200 bg-white text-emerald-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
-                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                            }`}
-                            title={
-                              isUserActive
-                                ? `Nonaktifkan akun ${u.nama}`
-                                : `Aktifkan kembali akun ${u.nama}`
-                            }
-                            aria-label={
-                              isUserActive
-                                ? `Nonaktifkan akun ${u.nama}`
-                                : `Aktifkan kembali akun ${u.nama}`
-                            }
-                          >
-                            <UserIcon name="power" className="h-3.5 w-3.5" />
-                          </button>
+                          {canUpdate('users') && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStatus(u)}
+                              disabled={isSaving}
+                              className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition shadow-2xs ${
+                                isUserActive
+                                  ? 'border-slate-200 bg-white text-emerald-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              }`}
+                              title={
+                                isUserActive
+                                  ? `Nonaktifkan akun ${u.nama}`
+                                  : `Aktifkan kembali akun ${u.nama}`
+                              }
+                              aria-label={
+                                isUserActive
+                                  ? `Nonaktifkan akun ${u.nama}`
+                                  : `Aktifkan kembali akun ${u.nama}`
+                              }
+                            >
+                              <UserIcon name="power" className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -50,6 +50,7 @@ import Modal from '../../components/Modal';
 import KopSuratCetak from '../../components/KopSuratCetak';
 import TandaTanganCetak from '../../components/TandaTanganCetak';
 import DokumenLaporanKeuangan from '../../components/DokumenLaporanKeuangan';
+import { useAuth } from '../../auth/useAuth.js';
 import { 
   formatPeriodeIndo, 
   formatTanggalCetak, 
@@ -58,6 +59,7 @@ import {
 } from '../../utils/printHelpers';
 
 export default function PengeluaranAdmin({ currentUser }) {
+  const { canCreate, canUpdate, canDelete } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -1060,13 +1062,15 @@ export default function PengeluaranAdmin({ currentUser }) {
                 <div className="text-sm font-bold text-slate-900 mt-0.5">Catat Pengeluaran Baru</div>
                 <div className="text-[11px] text-slate-400">Sebagai Administrator</div>
               </div>
-              <button
-                onClick={() => setShowAddExpenseModal(true)}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Tambah Data</span>
-              </button>
+              {canCreate('pengeluaran') && (
+                <button
+                  onClick={() => setShowAddExpenseModal(true)}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Data</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1357,8 +1361,15 @@ export default function PengeluaranAdmin({ currentUser }) {
                                       <span>{row.nama_karyawan}</span>
                                       <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
                                     </button>
-                                    <div className="text-[11px] text-slate-400 font-mono">
-                                      {row.kode_karyawan || `KRY-${row.id_karyawan}`}
+                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                      <span className="text-[11px] text-slate-400 font-mono">
+                                        {row.kode_karyawan || `KRY-${row.id_karyawan}`}
+                                      </span>
+                                      {row.jabatan && (
+                                        <span className="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                                          {row.jabatan}
+                                        </span>
+                                      )}
                                     </div>
                                   </td>
 
@@ -1444,13 +1455,15 @@ export default function PengeluaranAdmin({ currentUser }) {
                                       )}
 
                                       {/* Hapus */}
-                                      <button
-                                        onClick={() => handleDeleteExpense(row.id_pengeluaran)}
-                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition duration-150 cursor-pointer"
-                                        title="Hapus Transaksi"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
+                                      {canDelete('pengeluaran') && (
+                                        <button
+                                          onClick={() => handleDeleteExpense(row.id_pengeluaran)}
+                                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition duration-150 cursor-pointer"
+                                          title="Hapus Transaksi"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -1614,13 +1627,15 @@ export default function PengeluaranAdmin({ currentUser }) {
                               )}
 
                               {/* Hapus */}
-                              <button
-                                onClick={() => handleDeleteExpense(row.id_pengeluaran)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition duration-150 cursor-pointer"
-                                title="Hapus Transaksi"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canDelete('pengeluaran') && (
+                                <button
+                                  onClick={() => handleDeleteExpense(row.id_pengeluaran)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition duration-150 cursor-pointer"
+                                  title="Hapus Transaksi"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1786,45 +1801,21 @@ export default function PengeluaranAdmin({ currentUser }) {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {filterJenisDanaTrans === 'pemasukan_kas' ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormDana(prev => ({ ...prev, jenis_transaksi: 'pemasukan_kas' }));
-                        setShowAddDanaModal(true);
-                      }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Catat Pemasukan Kas Baru</span>
-                    </button>
-                  ) : filterJenisDanaTrans === 'penyaluran_dana' ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormDana(prev => ({ ...prev, jenis_transaksi: 'penyaluran_dana' }));
-                        setShowAddDanaModal(true);
-                      }}
-                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Salurkan Modal ke PJ Proyek</span>
-                    </button>
-                  ) : (
-                    <>
+                {canCreate('pengeluaran') && (
+                  <div className="flex items-center gap-2">
+                    {filterJenisDanaTrans === 'pemasukan_kas' ? (
                       <button
                         type="button"
                         onClick={() => {
                           setFormDana(prev => ({ ...prev, jenis_transaksi: 'pemasukan_kas' }));
                           setShowAddDanaModal(true);
                         }}
-                        className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
                       >
-                        <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Pemasukan Kas</span>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Catat Pemasukan Kas Baru</span>
                       </button>
-
+                    ) : filterJenisDanaTrans === 'penyaluran_dana' ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -1834,11 +1825,37 @@ export default function PengeluaranAdmin({ currentUser }) {
                         className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Salurkan ke PJ</span>
+                        <span>Salurkan Modal ke PJ Proyek</span>
                       </button>
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormDana(prev => ({ ...prev, jenis_transaksi: 'pemasukan_kas' }));
+                            setShowAddDanaModal(true);
+                          }}
+                          className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Pemasukan Kas</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormDana(prev => ({ ...prev, jenis_transaksi: 'penyaluran_dana' }));
+                            setShowAddDanaModal(true);
+                          }}
+                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Salurkan ke PJ</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Search Bar & Keterangan Konteks */}
@@ -2420,7 +2437,14 @@ export default function PengeluaranAdmin({ currentUser }) {
                                       <span>{row.nama_karyawan}</span>
                                       <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
                                     </button>
-                                    <div className="text-[10px] text-slate-400">{row.kode_karyawan}</div>
+                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                      <span className="text-[10px] text-slate-400">{row.kode_karyawan}</span>
+                                      {row.jabatan && (
+                                        <span className="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                                          {row.jabatan}
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
 
                                   <td className="px-4 py-3">
@@ -2569,7 +2593,14 @@ export default function PengeluaranAdmin({ currentUser }) {
                                       <span>{row.nama_karyawan}</span>
                                       <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
                                     </button>
-                                    <div className="text-[10px] text-slate-400">{row.kode_karyawan}</div>
+                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                      <span className="text-[10px] text-slate-400">{row.kode_karyawan}</span>
+                                      {row.jabatan && (
+                                        <span className="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                                          {row.jabatan}
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
 
                                   <td className="px-4 py-3">
@@ -3131,7 +3162,14 @@ export default function PengeluaranAdmin({ currentUser }) {
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
               <div className="flex justify-between">
                 <span className="text-slate-500">Karyawan Pengaju:</span>
-                <span className="font-bold text-slate-900">{verifyReimburseModal.nama_karyawan}</span>
+                <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <span>{verifyReimburseModal.nama_karyawan}</span>
+                  {verifyReimburseModal.jabatan && (
+                    <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-blue-600/20">
+                      {verifyReimburseModal.jabatan}
+                    </span>
+                  )}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Pekerjaan Terkait:</span>

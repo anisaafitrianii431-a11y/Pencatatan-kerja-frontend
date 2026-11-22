@@ -2,10 +2,19 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/
 
 async function request(path, options = {}) {
   const { headers, ...requestOptions } = options
+  const token = localStorage.getItem('token') || (() => {
+    try {
+      return JSON.parse(localStorage.getItem('ruangkerja_user'))?.token
+    } catch {
+      return null
+    }
+  })()
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',
     headers: {
       Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(requestOptions.body ? { 'Content-Type': 'application/json' } : {}),
       ...headers,
     },
@@ -44,6 +53,9 @@ export const MASTER_PEKERJA = [
   { id_karyawan: 18, kode_karyawan: 'ANDI011', nama: 'Andi', jabatan: 'Teknisi jaringan', email: 'andi@jamkerja.com' },
   { id_karyawan: 21, kode_karyawan: 'PUTRI012', nama: 'Putri Cantika', jabatan: 'sistem Analisis', email: 'putricantika012@jamkerja.com' },
   { id_karyawan: 22, kode_karyawan: 'ADINDA013', nama: 'Adinda Keyla', jabatan: 'Teknisi Proyek', email: 'adindakeyla013@jamkerja.com' },
+  { id_karyawan: 23, kode_karyawan: 'RANI014', nama: 'Rani', jabatan: 'jaringan', email: 'rani014@jamkerja.com' },
+  { id_karyawan: 24, kode_karyawan: 'ANDI015', nama: 'andi', jabatan: 'helper biasa', email: 'andi015@jamkerja.com' },
+  { id_karyawan: 25, kode_karyawan: 'PUTRA016', nama: 'Putra', jabatan: 'Teknisi Listrik', email: 'putra016@jamkerja.com' },
 ]
 
 function readUser(result) {
@@ -53,24 +65,15 @@ function readUser(result) {
   }
 
   const rawRole = String(user.peran || user.role || '').trim().toLowerCase()
-  if (!['admin', 'karyawan', 'pekerja'].includes(rawRole)) {
+  if (!['super_admin', 'admin', 'karyawan', 'pekerja'].includes(rawRole)) {
     throw new Error('Peran akun tidak dikenali. Hubungi administrator.')
   }
-  const role = rawRole === 'admin' ? 'admin' : 'karyawan'
+  const role = rawRole === 'pekerja' ? 'karyawan' : rawRole
   if ('aktif' in user && ![true, 1, '1'].includes(user.aktif)) {
     throw new Error('Akun Anda tidak aktif. Hubungi administrator.')
   }
 
   let effectiveName = user.nama || user.name || user.email || 'Pengguna'
-  const userCode = (user.kode_karyawan || user.kode_user || user.username || '').toUpperCase()
-
-  // Jika nama masih berbentuk kode (misal PUTRI012), cocokkan dengan data master
-  if (role !== 'admin' && userCode) {
-    const matched = MASTER_PEKERJA.find((p) => p.kode_karyawan.toUpperCase() === userCode)
-    if (matched && (!user.nama || user.nama === userCode || user.name === userCode)) {
-      effectiveName = matched.nama
-    }
-  }
 
   return {
     id: user.id_user ?? user.id,
@@ -92,31 +95,17 @@ function readUser(result) {
     no_rekening: user.no_rekening || '',
     role,
     peran: role,
+    permissions: user.permissions || {},
   }
-}
-
-// Helper untuk membaca dan menyimpan user yang didaftarkan secara lokal
-function getRegisteredUsers() {
-  try {
-    return JSON.parse(localStorage.getItem('ruangkerja_registered_users')) || []
-  } catch {
-    return []
-  }
-}
-
-function saveRegisteredUser(user) {
-  const users = getRegisteredUsers()
-  users.push(user)
-  localStorage.setItem('ruangkerja_registered_users', JSON.stringify(users))
 }
 
 export async function getCurrentUser() {
   try {
-    const result = await request('/auth.php?action=me')
+    const result = await request('/auth/me')
     const user = readUser(result)
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
     localStorage.setItem('jam_kerja_auth', JSON.stringify({
-      id_user: user.id || (user.role === 'admin' ? 1 : 2),
+      id_user: user.id || (['admin', 'super_admin'].includes(user.role) ? 1 : 2),
       id_karyawan: user.employeeId || null,
       peran: user.role,
       email: user.email,
@@ -189,6 +178,10 @@ export async function login(credentials) {
       body: JSON.stringify(credentials),
     })
     const user = readUser(result)
+    if (result?.token) {
+      user.token = result.token
+      localStorage.setItem('token', result.token)
+    }
     localStorage.setItem('ruangkerja_user', JSON.stringify(user))
     localStorage.setItem('jam_kerja_auth', JSON.stringify({
       id_user: user.id || (user.role === 'admin' ? 1 : 2),
@@ -315,109 +308,43 @@ export async function login(credentials) {
 
 export async function registerKaryawan(data) {
   const { name, email, jabatan, password } = data
-  try {
-    const result = await request('/auth.php?action=register', {
-      method: 'POST',
-      body: JSON.stringify({
-        nama: name,
-        email,
-        jabatan,
-        kata_sandi: password,
-        peran: 'karyawan',
-      }),
-    })
-    const user = readUser(result)
-    localStorage.setItem('ruangkerja_user', JSON.stringify(user))
-    localStorage.setItem('jam_kerja_auth', JSON.stringify({
-      id_user: user.id || 2,
-      id_karyawan: user.employeeId || null,
-      peran: user.role,
-      email: user.email,
-      nama: user.name,
-    }))
-    saveRegisteredUser({ email, password, name, jabatan, role: 'karyawan', employeeId: user.employeeId || 1 })
-    return user
-  } catch (error) {
-    if (
-      (error.status === 400 || error.status === 409) &&
-      error.message &&
-      error.message !== 'Terjadi kesalahan. Silakan coba lagi.'
-    ) {
-      throw error
-    }
-
-    // Mode Offline / Fallback:
-    const existing = getRegisteredUsers().find(
-      (u) => (u.email || '').toLowerCase() === email.toLowerCase().trim()
-    )
-    if (existing) {
-      throw new Error('Email ini sudah terdaftar. Silakan gunakan email lain atau langsung masuk.')
-    }
-
-    // Sambungkan ke tabel karyawan MySQL jika API backend tersedia
-    let assignedEmployeeId = 1
-    try {
-      const res = await fetch(`${API_BASE_URL}/pekerja.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          nama: name.trim(),
-          jabatan: jabatan ? jabatan.trim() : 'Teknisi Lapangan',
-          tarif_per_jam: 35000,
-        }),
-      })
-      const resData = await res.json()
-      if (resData?.data?.id_karyawan) {
-        assignedEmployeeId = Number(resData.data.id_karyawan)
-      }
-    } catch {
-      // Fallback ke ID 1 jika backend offline
-    }
-
-    const newUser = {
-      id: assignedEmployeeId,
-      employeeId: assignedEmployeeId,
-      email: email.trim(),
-      password,
-      name: name.trim(),
-      jabatan: jabatan ? jabatan.trim() : 'Pekerja',
-      role: 'karyawan',
-    }
-
-    saveRegisteredUser(newUser)
-    localStorage.setItem('ruangkerja_user', JSON.stringify({
-      id: newUser.id,
-      employeeId: newUser.employeeId,
-      email: newUser.email,
-      name: newUser.name,
-      jabatan: newUser.jabatan,
-      role: newUser.role,
-    }))
-
-    return newUser
-  }
+  const result = await request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ nama: name, email, jabatan, kata_sandi: password, peran: 'karyawan' }),
+  })
+  const user = readUser(result)
+  localStorage.setItem('ruangkerja_user', JSON.stringify(user))
+  localStorage.setItem('jam_kerja_auth', JSON.stringify({
+    id_user: user.id,
+    id_karyawan: user.employeeId,
+    peran: user.role,
+    email: user.email,
+    nama: user.name,
+  }))
+  return user
 }
 
 export async function logout() {
   try {
-    await request('/auth.php?action=logout', { method: 'POST' })
+    await request('/auth/logout', { method: 'POST' })
   } catch {
     // Abaikan error saat offline
   } finally {
     localStorage.removeItem('ruangkerja_user')
     localStorage.removeItem('jam_kerja_auth')
+    localStorage.removeItem('token')
   }
 }
 
 export async function updateProfile(payload) {
-  const result = await request('/auth.php?action=update_profile', {
+  const result = await request('/auth/profile', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
   const updatedUser = readUser(result)
   localStorage.setItem('ruangkerja_user', JSON.stringify(updatedUser))
   localStorage.setItem('jam_kerja_auth', JSON.stringify({
-    id_user: updatedUser.id || (updatedUser.role === 'admin' ? 1 : 2),
+    id_user: updatedUser.id || (['admin', 'super_admin'].includes(updatedUser.role) ? 1 : 2),
     id_karyawan: updatedUser.employeeId || null,
     peran: updatedUser.role,
     email: updatedUser.email,
@@ -427,7 +354,7 @@ export async function updateProfile(payload) {
 }
 
 export async function changePassword({ password_lama, password_baru }) {
-  const result = await request('/auth.php?action=change_password', {
+  const result = await request('/auth/change-password', {
     method: 'POST',
     body: JSON.stringify({ password_lama, password_baru }),
   })

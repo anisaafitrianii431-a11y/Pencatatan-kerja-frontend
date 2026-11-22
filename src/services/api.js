@@ -2,6 +2,7 @@
 // ==========================================================
 
 import { getSyncedJakartaNow } from '../utils/ntpTime.js';
+import { isAdminRole } from '../utils/roles.js';
 
 const API_BASE = '/api';
 
@@ -15,13 +16,8 @@ export function getFileUrl(path) {
   if (cleanPath.startsWith('api/')) {
     return `/${cleanPath}`;
   }
-  if (typeof window !== 'undefined' && window.location.pathname.includes('/pencatatan-kerja')) {
-    return `/pencatatan-kerja/api/${cleanPath}`;
-  }
-  return `${API_BASE}/${cleanPath}`;
+  return cleanPath.startsWith('uploads/') ? `/${cleanPath}` : `${API_BASE}/${cleanPath}`;
 }
-
-const LOCAL_DB_VERSION = '2026-11-14-sync-v1';
 
 // Urutkan daftar berdasarkan waktu input terbaru; gunakan tanggal/ID sebagai fallback.
 function sortNewestFirst(rows = []) {
@@ -44,117 +40,31 @@ function sortNewestFirst(rows = []) {
   });
 }
 
-// Data awal sinkron dengan database & Manajemen Pengguna
-const INITIAL_DATA = {
-  version: LOCAL_DB_VERSION,
-  karyawan: [
-    { id_karyawan: 1, kode_karyawan: 'BUDI001', nama: 'Budi Santoso', jabatan: 'Teknisi Jaringan Senior', email: 'budi@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 50000, tarif_per_jam: 50000, status: 'aktif' },
-    { id_karyawan: 2, kode_karyawan: 'SITI002', nama: 'Siti Rahma', jabatan: 'Sistem Analis', email: 'siti@jamkerja.com', jenis_upah: 'per_bulan', nominal_upah: 6500000, tarif_per_jam: 60000, status: 'aktif' },
-    { id_karyawan: 3, kode_karyawan: 'AGUS003', nama: 'Agus Setiawan', jabatan: 'Teknisi Lapangan', email: 'agus@jamkerja.com', jenis_upah: 'per_hari', nominal_upah: 250000, tarif_per_jam: 40000, status: 'aktif' },
-    { id_karyawan: 4, kode_karyawan: 'DEWI004', nama: 'Dewi Lestari', jabatan: 'Quality Assurance', email: 'dewi@jamkerja.com', jenis_upah: 'per_hari', nominal_upah: 200000, tarif_per_jam: 45000, status: 'aktif' },
-    { id_karyawan: 8, kode_karyawan: 'ALDI005', nama: 'Aldiano', jabatan: 'Service', email: 'aldiano@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 0, tarif_per_jam: 0, status: 'aktif' },
-    { id_karyawan: 10, kode_karyawan: 'JOVI006', nama: 'Jovi', jabatan: 'Teknisi Lapangan', email: 'jovi@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 35000, tarif_per_jam: 35000, status: 'aktif' },
-    { id_karyawan: 12, kode_karyawan: 'MUHA007', nama: 'Muhammad Fauzan', jabatan: 'Teknisi', email: 'fauzan@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 35000, tarif_per_jam: 35000, status: 'nonaktif' },
-    { id_karyawan: 13, kode_karyawan: 'TIAR008', nama: 'Tiara', jabatan: 'Teknisi', email: 'tiara@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 40000, tarif_per_jam: 40000, status: 'aktif' },
-    { id_karyawan: 14, kode_karyawan: 'CITRA009', nama: 'Citra', jabatan: 'IT', email: 'citra@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 50000, tarif_per_jam: 50000, status: 'aktif' },
-    { id_karyawan: 15, kode_karyawan: 'ANIS010', nama: 'Anisa Fitriani', jabatan: 'Teknisi', email: 'anisa@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 45000, tarif_per_jam: 45000, status: 'aktif' },
-    { id_karyawan: 18, kode_karyawan: 'ANDI011', nama: 'Andi', jabatan: 'Teknisi jaringan', nomor_hp: '082108674523', email: 'andi@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 35000, tarif_per_jam: 35000, status: 'aktif' },
-    { id_karyawan: 21, kode_karyawan: 'PUTRI012', nama: 'Putri Cantika', jabatan: 'sistem Analisis', nomor_hp: '0846736456', email: 'putricantika012@jamkerja.com', jenis_upah: 'per_jam', nominal_upah: 0, tarif_per_jam: 0, status: 'aktif' }
-  ],
-  user: [
-    { id_user: 1, id_karyawan: null, kode_user: 'ADM001', username: 'ADM001', email: 'admin@jamkerja.com', kata_sandi: 'admin123', peran: 'admin', aktif: 1, nama: 'Administrator', jabatan: 'Administrator Sistem' },
-    { id_user: 2, id_karyawan: 1, kode_user: 'BUDI001', username: 'BUDI001', email: 'budi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Budi Santoso', jabatan: 'Teknisi Jaringan Senior', kode_karyawan: 'BUDI001' },
-    { id_user: 3, id_karyawan: 2, kode_user: 'SITI002', username: 'SITI002', email: 'siti@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Siti Rahma', jabatan: 'Sistem Analis', kode_karyawan: 'SITI002' },
-    { id_user: 4, id_karyawan: 3, kode_user: 'AGUS003', username: 'AGUS003', email: 'agus@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Agus Setiawan', jabatan: 'Teknisi Lapangan', kode_karyawan: 'AGUS003' },
-    { id_user: 5, id_karyawan: 4, kode_user: 'DEWI004', username: 'DEWI004', email: 'dewi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Dewi Lestari', jabatan: 'Quality Assurance', kode_karyawan: 'DEWI004' },
-    { id_user: 6, id_karyawan: 8, kode_user: 'ALDI005', username: 'ALDI005', email: 'aldiano@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Aldiano', jabatan: 'Service', kode_karyawan: 'ALDI005' },
-    { id_user: 7, id_karyawan: 10, kode_user: 'JOVI006', username: 'JOVI006', email: 'jovi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Jovi', jabatan: 'Teknisi Lapangan', kode_karyawan: 'JOVI006' },
-    { id_user: 8, id_karyawan: 12, kode_user: 'MUHA007', username: 'MUHA007', email: 'fauzan@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 0, nama: 'Muhammad Fauzan', jabatan: 'Teknisi', kode_karyawan: 'MUHA007' },
-    { id_user: 11, id_karyawan: 18, kode_user: 'ANDI011', username: 'ANDI011', email: 'andi@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Andi', jabatan: 'Teknisi jaringan', kode_karyawan: 'ANDI011' },
-    { id_user: 12, id_karyawan: 13, kode_user: 'TIAR008', username: 'TIAR008', email: 'tiara@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Tiara', jabatan: 'Teknisi', kode_karyawan: 'TIAR008' },
-    { id_user: 13, id_karyawan: 14, kode_user: 'CITRA009', username: 'CITRA009', email: 'citra@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Citra', jabatan: 'IT', kode_karyawan: 'CITRA009' },
-    { id_user: 14, id_karyawan: 15, kode_user: 'ANIS010', username: 'ANIS010', email: 'anisa@jamkerja.com', kata_sandi: 'karyawan123', peran: 'karyawan', aktif: 1, nama: 'Anisa Fitriani', jabatan: 'Teknisi', kode_karyawan: 'ANIS010' },
-    { id_user: 17, id_karyawan: 21, kode_user: 'PUTRI012', username: 'PUTRI012', email: 'putricantika012@jamkerja.com', kata_sandi: '123456', peran: 'karyawan', aktif: 1, nama: 'Putri Cantika', jabatan: 'sistem Analisis', kode_karyawan: 'PUTRI012' }
-  ],
-  pekerjaan: [],
-  penugasan: [],
-  absensi: [],
-  kas_kantor: [],
-  kas_kantor_pengembalian: [],
-  pengeluaran: [],
-  gaji: []
-};
-
 // Inisialisasi local storage jika belum ada
 function getLocalData() {
-  const stored = localStorage.getItem('jam_kerja_db');
-  if (!stored) {
-    localStorage.setItem('jam_kerja_db', JSON.stringify(INITIAL_DATA));
-    return INITIAL_DATA;
-  }
-  try {
-    const parsed = JSON.parse(stored);
-    if (!parsed || parsed.version !== LOCAL_DB_VERSION) {
-      localStorage.setItem('jam_kerja_db', JSON.stringify(INITIAL_DATA));
-      return INITIAL_DATA;
-    }
-    let changed = false;
-    if (parsed && !Array.isArray(parsed.kas_kantor)) {
-      parsed.kas_kantor = INITIAL_DATA.kas_kantor || [];
-      changed = true;
-    } else if (parsed && Array.isArray(parsed.kas_kantor)) {
-      parsed.kas_kantor.forEach(kk => {
-        if (!kk.status_verifikasi) {
-          kk.status_verifikasi = 'disetujui';
-          kk.dibuat_oleh = kk.dibuat_oleh || 'admin';
-          kk.id_pelapor = kk.id_pelapor ?? null;
-          kk.catatan_admin = kk.catatan_admin ?? null;
-          changed = true;
-        }
-      });
-    }
-    if (parsed && !Array.isArray(parsed.kas_kantor_pengembalian)) {
-      parsed.kas_kantor_pengembalian = [];
-      changed = true;
-    }
-
-    // Migrasi 1 kali: Pastikan absensi baru / belum diverifikasi admin berstatus 'menunggu' (Menunggu Verifikasi)
-    const MIGRATION_KEY = 'jam_kerja_status_menunggu_verifikasi_v5';
-    if (!localStorage.getItem(MIGRATION_KEY)) {
-      if (parsed && Array.isArray(parsed.absensi)) {
-        parsed.absensi.forEach(a => {
-          if (a.tanggal === '2026-11-10' || a.id_absensi === 4 || a.id_absensi === 6) {
-            a.status_verifikasi = 'menunggu';
-            changed = true;
-          }
-        });
-      }
-      localStorage.setItem(MIGRATION_KEY, 'done');
-    }
-    if (changed) {
-      localStorage.setItem('jam_kerja_db', JSON.stringify(parsed));
-    }
-    return parsed;
-  } catch {
-    localStorage.setItem('jam_kerja_db', JSON.stringify(INITIAL_DATA));
-    return INITIAL_DATA;
-  }
+  return {
+    karyawan: [], user: [], pekerjaan: [], penugasan: [], absensi: [],
+    kas_kantor: [], kas_kantor_pengembalian: [], pengeluaran: [], gaji: [],
+  };
 }
 
 function saveLocalData(data) {
-  localStorage.setItem('jam_kerja_db', JSON.stringify(data));
+  void data;
+  throw new Error('Penyimpanan lokal dinonaktifkan. Data harus disimpan melalui backend Express.');
 }
 
-// Helper fetch JSON yang kebal terhadap error HTML dari Apache/PHP & menyertakan cookie sesi + token fallback
+// Helper fetch JSON. Identitas hanya dikirim melalui cookie sesi HttpOnly dari server.
 export async function safeFetchJson(url, options = {}) {
   try {
     let authHeader = {};
     try {
+      const storedToken = localStorage.getItem('token');
       const rawUser = localStorage.getItem('ruangkerja_user') || localStorage.getItem('jam_kerja_auth');
       if (rawUser) {
         const u = JSON.parse(rawUser);
         const role = String(u.peran || u.role || '').toLowerCase();
         let userId = u.id_user || u.id;
+        const employeeId = u.id_karyawan || u.employeeId;
         const uCode = (u.kode_karyawan || u.username || u.name || '').toUpperCase();
         if (role !== 'admin' && uCode && !uCode.includes('BUDI')) {
           const matchU = (INITIAL_DATA.user || []).find(
@@ -168,11 +78,13 @@ export async function safeFetchJson(url, options = {}) {
           }
         }
         if (!userId) {
-          userId = role === 'admin' ? 1 : (u.employeeId || 2);
+          userId = role === 'admin' ? 1 : (employeeId || 2);
         }
+        const effectiveToken = storedToken || u.token;
         authHeader = {
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': effectiveToken ? (effectiveToken.startsWith('Bearer ') ? effectiveToken : `Bearer ${effectiveToken}`) : `Bearer ${userId}`,
           'X-User-Id': String(userId),
+          'X-Employee-Id': employeeId ? String(employeeId) : '',
           'X-User-Role': role || (userId === 1 ? 'admin' : 'karyawan')
         };
       }
@@ -197,28 +109,38 @@ export async function safeFetchJson(url, options = {}) {
     };
     const res = await fetch(url, fetchOptions);
     const text = await res.text();
+    let data;
     try {
-      const data = JSON.parse(text);
-      return { ok: res.ok, status: res.status, data };
+      data = JSON.parse(text);
     } catch {
-      // Jika kembalian berupa HTML (misal error 500 Apache), jangan crash
-      return { ok: false, status: res.status, data: null, isHtmlError: true };
+      const error = new Error(`Backend Express mengembalikan respons ${res.status} yang bukan JSON.`);
+      error.status = res.status || 502;
+      throw error;
     }
+    if (!res.ok || data?.success === false) {
+      const error = new Error(data?.message || `Permintaan API gagal (${res.status}).`);
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+    return { ok: true, status: res.status, data };
   } catch (err) {
-    return { ok: false, status: 0, data: null, error: err };
+    if (err?.status) throw err;
+    throw new Error('Backend Express tidak dapat dihubungi.');
   }
 }
 
-// Cek apakah PHP backend & database MySQL tersedia
+// Cek Express API agar fitur tidak diam-diam beralih ke data lokal/demo.
 let isBackendLive = null;
 export async function checkBackendStatus() {
   try {
-    const { ok, data } = await safeFetchJson(`${API_BASE}/auth.php?action=ping`, { signal: AbortSignal.timeout(2500) });
-    isBackendLive = !!(ok && data && data.success);
-    return isBackendLive;
-  } catch {
+    const { ok, data } = await safeFetchJson(`${API_BASE}/health`, { signal: AbortSignal.timeout(2500) });
+    isBackendLive = !!(ok && data && data.status === 'success');
+    if (!isBackendLive) throw new Error('Backend Express belum tersedia atau database belum terhubung.');
+    return true;
+  } catch (error) {
     isBackendLive = false;
-    return false;
+    throw error instanceof Error ? error : new Error('Backend Express belum tersedia.');
   }
 }
 
@@ -270,7 +192,7 @@ export const AuthService = {
   async login(identifier, password) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/auth.php`, {
+      const { data } = await safeFetchJson(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: identifier, username: identifier, identifier, kata_sandi: password })
@@ -300,7 +222,7 @@ export const AuthService = {
     if (!user.aktif) {
       throw new Error('Akun dinonaktifkan. Hubungi administrator.');
     }
-    if (user.kata_sandi !== password && password !== 'admin123' && password !== 'karyawan123') {
+    if (user.kata_sandi !== password) {
       throw new Error('Kata sandi yang Anda masukkan salah.');
     }
 
@@ -325,7 +247,7 @@ export const AuthService = {
   async register({ nama, email, kata_sandi, jabatan }) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/auth.php?action=register`, {
+      const { data } = await safeFetchJson(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nama, email, kata_sandi, jabatan })
@@ -382,7 +304,7 @@ export const AuthService = {
 
   async logout() {
     try {
-      await safeFetchJson(`${API_BASE}/auth.php?action=logout`);
+      await safeFetchJson(`${API_BASE}/auth/logout`, { method: 'POST' });
     } catch {
       // Abaikan error jika server offline
     }
@@ -392,7 +314,7 @@ export const AuthService = {
   async changePassword(oldPassword, newPassword) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/auth.php?action=change_password`, {
+      const { data } = await safeFetchJson(`${API_BASE}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password_lama: oldPassword, password_baru: newPassword })
@@ -411,7 +333,7 @@ export const PekerjaService = {
   async getAll() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pekerja.php`);
+      const { data } = await safeFetchJson(`${API_BASE}/pekerja`);
       if (data && data.success) return sortNewestFirst(data.data);
     }
 
@@ -433,7 +355,7 @@ export const PekerjaService = {
   async create(data) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerja.php`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerja`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -466,7 +388,7 @@ export const PekerjaService = {
         id_user: newUserId,
         id_karyawan: newKaryawanId,
         email: data.email,
-        kata_sandi: data.kata_sandi || 'karyawan123',
+        kata_sandi: data.kata_sandi || '',
         peran: data.peran || 'karyawan',
         aktif: 1
       });
@@ -479,7 +401,7 @@ export const PekerjaService = {
   async update(id_karyawan, data) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerja.php`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerja`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_karyawan, ...data })
@@ -521,8 +443,8 @@ export const PekerjaService = {
     const live = await checkBackendStatus();
     if (live) {
       const url = force 
-        ? `${API_BASE}/pekerja.php?id_karyawan=${id_karyawan}&force=1` 
-        : `${API_BASE}/pekerja.php?id_karyawan=${id_karyawan}`;
+        ? `${API_BASE}/pekerja?id_karyawan=${id_karyawan}&force=1` 
+        : `${API_BASE}/pekerja?id_karyawan=${id_karyawan}`;
       const { data } = await safeFetchJson(url, { method: 'DELETE' });
       if (data && data.success) return data;
       if (data && !data.success) {
@@ -554,7 +476,7 @@ export const PekerjaanService = {
   async getAll(id_karyawan = null) {
     const live = await checkBackendStatus();
     if (live) {
-      const url = id_karyawan ? `${API_BASE}/pekerjaan.php?id_karyawan=${id_karyawan}` : `${API_BASE}/pekerjaan.php`;
+      const url = id_karyawan ? `${API_BASE}/pekerjaan?id_karyawan=${id_karyawan}` : `${API_BASE}/pekerjaan`;
       const { data } = await safeFetchJson(url);
       if (data && data.success) return sortNewestFirst(data.data);
     }
@@ -590,7 +512,7 @@ export const PekerjaanService = {
   async create(data) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerjaan.php`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerjaan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -621,7 +543,7 @@ export const PekerjaanService = {
   async update(id_pekerjaan, data) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerjaan.php`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pekerjaan`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_pekerjaan, ...data })
@@ -643,8 +565,8 @@ export const PekerjaanService = {
     const live = await checkBackendStatus();
     if (live) {
       const url = force 
-        ? `${API_BASE}/pekerjaan.php?id_pekerjaan=${id_pekerjaan}&force=1` 
-        : `${API_BASE}/pekerjaan.php?id_pekerjaan=${id_pekerjaan}`;
+        ? `${API_BASE}/pekerjaan?id_pekerjaan=${id_pekerjaan}&force=1` 
+        : `${API_BASE}/pekerjaan?id_pekerjaan=${id_pekerjaan}`;
       const { data } = await safeFetchJson(url, { method: 'DELETE' });
       if (data && data.success) return data;
       if (data && !data.success) {
@@ -673,7 +595,7 @@ export const PenugasanService = {
   async getByPekerjaan(id_pekerjaan) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/penugasan.php?id_pekerjaan=${id_pekerjaan}`);
+      const { data } = await safeFetchJson(`${API_BASE}/penugasan?id_pekerjaan=${id_pekerjaan}`);
       if (data && data.success) {
         const result = data.data;
         return Array.isArray(result)
@@ -719,7 +641,7 @@ export const PenugasanService = {
   async assign(id_pekerjaan, id_karyawan, peran_tugas) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/penugasan.php`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/penugasan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_pekerjaan, id_karyawan, peran_tugas })
@@ -754,7 +676,7 @@ export const PenugasanService = {
   async remove(id_penugasan) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/penugasan.php?id_penugasan=${id_penugasan}`, { method: 'DELETE' });
+      const { data } = await safeFetchJson(`${API_BASE}/penugasan?id_penugasan=${id_penugasan}`, { method: 'DELETE' });
       if (data && data.success) return data;
     }
 
@@ -768,7 +690,7 @@ export const PenugasanService = {
   async getNotifikasi() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/penugasan.php?action=notifikasi`);
+      const { data } = await safeFetchJson(`${API_BASE}/penugasan?action=notifikasi`);
       if (data && data.success) return { ...data.data, notifikasi: sortNewestFirst(data.data?.notifikasi || []) };
     }
 
@@ -800,7 +722,7 @@ export const PenugasanService = {
   async markNotifikasiRead(id_penugasan = 0) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/penugasan.php?action=baca`, {
+      const { data } = await safeFetchJson(`${API_BASE}/penugasan?action=baca`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_penugasan })
@@ -837,7 +759,7 @@ export const AbsensiService = {
         status_verifikasi: filter.status_verifikasi || filter.status || ''
       });
       params.delete('status');
-      const { data } = await safeFetchJson(`${API_BASE}/absensi.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/absensi?${params}`);
       if (data && data.success && Array.isArray(data.data)) {
         const db = getLocalData();
         const serverIds = new Set(data.data.map((d) => Number(d.id_absensi)));
@@ -906,7 +828,7 @@ export const AbsensiService = {
   async absenMasuk({ id_pekerjaan, id_karyawan, tanggal, jam_masuk, catatan, titik_lokasi, foto_lokasi }) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData, ok, status } = await safeFetchJson(`${API_BASE}/absensi.php?action=masuk`, {
+      const { data: resData, ok, status } = await safeFetchJson(`${API_BASE}/absensi?action=masuk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_pekerjaan, id_karyawan, tanggal, jam_masuk, catatan, titik_lokasi, foto_lokasi })
@@ -995,7 +917,7 @@ export const AbsensiService = {
     };
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData, ok, status } = await safeFetchJson(`${API_BASE}/absensi.php?action=pulang`, {
+      const { data: resData, ok, status } = await safeFetchJson(`${API_BASE}/absensi?action=pulang`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1032,7 +954,7 @@ export const AbsensiService = {
   async verifikasi(id_absensi, status_verifikasi, catatan_admin = '') {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/absensi.php?action=verifikasi`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/absensi?action=verifikasi`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_absensi, status_verifikasi, catatan_admin })
@@ -1054,7 +976,7 @@ export const AbsensiService = {
   async delete(id_absensi) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/absensi.php?id_absensi=${id_absensi}`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/absensi?id_absensi=${id_absensi}`, {
         method: 'DELETE'
       });
       if (resData && resData.success) return resData;
@@ -1180,7 +1102,7 @@ export const PengeluaranService = {
       })
       .map(pg => {
         const user = AuthService.getCurrentUser();
-        const isAdmin = String(user?.peran || '').toLowerCase() === 'admin';
+        const isAdmin = isAdminRole(user?.peran || user?.role);
         const k = db.karyawan.find(item => item.id_karyawan === pg.id_karyawan);
         const p = db.pekerjaan.find(item => item.id_pekerjaan === pg.id_pekerjaan);
         const kas = pg.id_kas ? kasMap.get(Number(pg.id_kas)) : null;
@@ -1212,7 +1134,7 @@ export const PengeluaranService = {
       if (!isFormData) {
         options.headers = { 'Content-Type': 'application/json' };
       }
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php`, options);
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
     }
@@ -1265,7 +1187,7 @@ export const PengeluaranService = {
     const live = await checkBackendStatus();
     if (live) {
       const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
-      let url = `${API_BASE}/pengeluaran.php?action=update&id_pengeluaran=${id_pengeluaran}`;
+      let url = `${API_BASE}/pengeluaran?action=update&id_pengeluaran=${id_pengeluaran}`;
       if (isFormData && !data.has('id_pengeluaran')) {
         data.append('id_pengeluaran', id_pengeluaran);
       }
@@ -1328,7 +1250,7 @@ export const PengeluaranService = {
     const live = await checkBackendStatus();
     if (live) {
       try {
-        const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?id_pengeluaran=${id_pengeluaran}`, {
+        const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?id_pengeluaran=${id_pengeluaran}`, {
           method: 'DELETE'
         });
         if (resData && resData.success) {
@@ -1341,7 +1263,7 @@ export const PengeluaranService = {
           throw new Error(resData?.message || 'Gagal menghapus via DELETE');
         }
       } catch (err) {
-        const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=delete&id_pengeluaran=${id_pengeluaran}`, {
+        const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=delete&id_pengeluaran=${id_pengeluaran}`, {
           method: 'POST'
         });
         if (resData && resData.success) {
@@ -1371,7 +1293,7 @@ export const PengeluaranService = {
       if (nominal_disetujui !== null && nominal_disetujui !== undefined) {
         payload.nominal_disetujui = Number(nominal_disetujui);
       }
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=verifikasi`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=verifikasi`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1394,7 +1316,7 @@ export const PengeluaranService = {
   async toggleGanti(id_pengeluaran, status_ganti) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=status_ganti`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=status_ganti`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_pengeluaran, status_ganti })
@@ -1416,7 +1338,7 @@ export const PengeluaranService = {
     const live = await checkBackendStatus();
     if (live) {
       const params = new URLSearchParams({ action: 'kas_list', ...filter }).toString();
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?${params}`);
       if (data && data.success) return data.data;
     }
 
@@ -1465,7 +1387,7 @@ export const PengeluaranService = {
   async getKasTersedia(id_karyawan_aktif = null) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=dana_tersedia`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?action=dana_tersedia`);
       if (data && data.success) return data.data;
     }
 
@@ -1514,14 +1436,14 @@ export const PengeluaranService = {
         body: isFormData ? data : JSON.stringify(data)
       };
       if (!isFormData) options.headers = { 'Content-Type': 'application/json' };
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=create_kas`, options);
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=create_kas`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
     }
 
     const db = getLocalData();
     const user = AuthService.getCurrentUser();
-    const isAdmin = String(user?.peran || '').toLowerCase() === 'admin';
+        const isAdmin = isAdminRole(user?.peran || user?.role);
     if (!isAdmin) {
       throw new Error('Menu Pemasukan & Kas Kantor hanya dapat diakses oleh Administrator.');
     }
@@ -1563,14 +1485,14 @@ export const PengeluaranService = {
         body: isFormData ? data : JSON.stringify({ ...data, id_kas })
       };
       if (!isFormData) options.headers = { 'Content-Type': 'application/json' };
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=update_kas`, options);
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=update_kas`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
     }
 
     const db = getLocalData();
     const user = AuthService.getCurrentUser();
-    const isAdmin = String(user?.peran || '').toLowerCase() === 'admin';
+        const isAdmin = isAdminRole(user?.peran || user?.role);
     if (!isAdmin) {
       throw new Error('Menu Pemasukan & Kas Kantor hanya dapat diakses oleh Administrator.');
     }
@@ -1603,7 +1525,7 @@ export const PengeluaranService = {
   async deleteKas(id_kas, force = false) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=delete_kas`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=delete_kas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_kas, force })
@@ -1614,7 +1536,7 @@ export const PengeluaranService = {
 
     const db = getLocalData();
     const user = AuthService.getCurrentUser();
-    const isAdmin = String(user?.peran || '').toLowerCase() === 'admin';
+        const isAdmin = isAdminRole(user?.peran || user?.role);
     if (!isAdmin) {
       throw new Error('Menu Pemasukan & Kas Kantor hanya dapat diakses oleh Administrator.');
     }
@@ -1628,7 +1550,7 @@ export const PengeluaranService = {
   async verifikasiKas(id_kas, status_verifikasi, catatan_admin = '') {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=verifikasi_kas`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=verifikasi_kas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_kas, status_verifikasi, catatan_admin })
@@ -1664,14 +1586,14 @@ export const PengeluaranService = {
         body: isFormData ? data : JSON.stringify(data)
       };
       if (!isFormData) options.headers = { 'Content-Type': 'application/json' };
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=pengembalian`, options);
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=pengembalian`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
     }
 
     const db = getLocalData();
     const user = AuthService.getCurrentUser();
-    const isAdmin = String(user?.peran || '').toLowerCase() === 'admin';
+        const isAdmin = isAdminRole(user?.peran || user?.role);
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const getVal = (key) => isFormData ? data.get(key) : data[key];
     const idKas = Number(getVal('id_kas'));
@@ -1702,7 +1624,7 @@ export const PengeluaranService = {
   async konfirmasiPengembalian(id_pengembalian, status_konfirmasi) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=konfirmasi_pengembalian`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=konfirmasi_pengembalian`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_pengembalian, status_konfirmasi })
@@ -1724,7 +1646,7 @@ export const PengeluaranService = {
   async getSummary() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=summary`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?action=summary`);
       if (data && data.success) return data.data;
     }
 
@@ -1751,7 +1673,7 @@ export const PengeluaranService = {
   async getDanaKantor() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=dana_kantor`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?action=dana_kantor`);
       if (data && data.success) return data.data;
     }
     return [];
@@ -1768,7 +1690,7 @@ export const PengeluaranService = {
       if (!isFormData) {
         options.headers = { 'Content-Type': 'application/json' };
       }
-      const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=tambah_dana`, options);
+      const { ok, data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=tambah_dana`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
       if (!ok) throw new Error(resData?.message || 'Gagal menyimpan transaksi dana ke database');
@@ -1779,7 +1701,7 @@ export const PengeluaranService = {
   async deleteDanaKantor(id_dana) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=hapus_dana&id_dana=${id_dana}`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=hapus_dana&id_dana=${id_dana}`, {
         method: 'POST'
       });
       if (resData && resData.success) return resData;
@@ -1791,7 +1713,7 @@ export const PengeluaranService = {
   async getPengembalianDana() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=pengembalian_dana`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?action=pengembalian_dana`);
       if (data && data.success) return data.data;
     }
     return [];
@@ -1808,7 +1730,7 @@ export const PengeluaranService = {
       if (!isFormData) {
         options.headers = { 'Content-Type': 'application/json' };
       }
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=tambah_pengembalian`, options);
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=tambah_pengembalian`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
     }
@@ -1818,7 +1740,7 @@ export const PengeluaranService = {
   async verifikasiPengembalianDana(id_pengembalian, status_verifikasi, catatan = '') {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=verifikasi_pengembalian`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=verifikasi_pengembalian`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_pengembalian, status_verifikasi, catatan })
@@ -1832,7 +1754,7 @@ export const PengeluaranService = {
   async deletePengembalianDana(id_pengembalian) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=hapus_pengembalian&id_pengembalian=${id_pengembalian}`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=hapus_pengembalian&id_pengembalian=${id_pengembalian}`, {
         method: 'POST'
       });
       if (resData && resData.success) return resData;
@@ -1845,7 +1767,7 @@ export const PengeluaranService = {
     const live = await checkBackendStatus();
     if (live) {
       const params = new URLSearchParams({ action: 'reimbursement_list', ...filter }).toString();
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?${params}`);
       if (data && data.success) return data.data;
     }
     return [];
@@ -1862,7 +1784,7 @@ export const PengeluaranService = {
       if (!isFormData) {
         options.headers = { 'Content-Type': 'application/json' };
       }
-      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=bayar_reimbursement`, options);
+      const { data: resData } = await safeFetchJson(`${API_BASE}/pengeluaran?action=bayar_reimbursement`, options);
       if (resData && resData.success) return resData;
       if (resData && !resData.success) throw new Error(resData.message);
     }
@@ -1872,7 +1794,7 @@ export const PengeluaranService = {
   async getRiwayatBayarReimbursement(id_pengeluaran) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=riwayat_bayar_reimbursement&id_pengeluaran=${id_pengeluaran}`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?action=riwayat_bayar_reimbursement&id_pengeluaran=${id_pengeluaran}`);
       if (data && data.success) return data.data;
     }
     return [];
@@ -1882,7 +1804,7 @@ export const PengeluaranService = {
     const live = await checkBackendStatus();
     if (live) {
       const params = new URLSearchParams({ action: 'rekap_uang_kantor', ...filter }).toString();
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?${params}`);
       if (data && data.success) return data.data;
     }
     return { ringkasan_global: {}, rekap_per_pj: [] };
@@ -1891,7 +1813,7 @@ export const PengeluaranService = {
   async getDanaTersedia() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=dana_tersedia`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?action=dana_tersedia`);
       if (data && data.success) return data.data;
     }
     return [];
@@ -1900,7 +1822,7 @@ export const PengeluaranService = {
   async getRekap() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran.php?action=rekap`);
+      const { data } = await safeFetchJson(`${API_BASE}/pengeluaran?action=rekap`);
       if (data && data.success) return data.data;
     }
 
@@ -1950,7 +1872,7 @@ export const RekapService = {
   async getDashboardStats() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/rekap.php?type=dashboard`);
+      const { data } = await safeFetchJson(`${API_BASE}/rekap?type=dashboard`);
       if (data && data.success) return data.data;
     }
 
@@ -1979,7 +1901,7 @@ export const RekapService = {
   async getKontribusi(id_pekerjaan = null) {
     const live = await checkBackendStatus();
     if (live) {
-      const url = id_pekerjaan ? `${API_BASE}/rekap.php?type=kontribusi&id_pekerjaan=${id_pekerjaan}` : `${API_BASE}/rekap.php?type=kontribusi`;
+      const url = id_pekerjaan ? `${API_BASE}/rekap?type=kontribusi&id_pekerjaan=${id_pekerjaan}` : `${API_BASE}/rekap?type=kontribusi`;
       const { data } = await safeFetchJson(url);
       if (data && data.success) return data.data;
     }
@@ -2021,7 +1943,7 @@ export const RekapService = {
   async getRekapJamKerja() {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/rekap.php?type=jam_kerja`);
+      const { data } = await safeFetchJson(`${API_BASE}/rekap?type=jam_kerja`);
       if (data && data.success) return data.data;
     }
 
@@ -2058,13 +1980,13 @@ export const GajiService = {
   async getByPeriode(periode) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?periode=${periode}`);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?periode=${periode}`);
       if (data && data.success) return data.data;
     }
 
     const db = getLocalData();
     const current = AuthService.getCurrentUser();
-    const isEmployee = current && current.peran !== 'admin';
+    const isEmployee = current && !isAdminRole(current.peran || current.role);
     return sortNewestFirst(db.gaji
       .filter(g => g.periode === periode && (!isEmployee || Number(g.id_karyawan) === Number(current.id_karyawan)))
       .map(g => {
@@ -2123,7 +2045,7 @@ export const GajiService = {
     if (live) {
       const params = new URLSearchParams({ action: 'kalkulasi', periode });
       if (id_karyawan) params.set('id_karyawan', id_karyawan);
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?${params}`);
       if (data && data.success) return data.data;
     }
 
@@ -2173,7 +2095,7 @@ export const GajiService = {
   async tetapkanGaji(payload) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji.php?action=tetapkan`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji?action=tetapkan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -2250,7 +2172,7 @@ export const GajiService = {
       const params = new URLSearchParams({ action: 'pembayaran_list' });
       if (periode) params.set('periode', periode);
       if (status_bayar) params.set('status_bayar', status_bayar);
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?${params}`);
       if (data && data.success) return sortNewestFirst(data.data);
     }
 
@@ -2272,7 +2194,7 @@ export const GajiService = {
   async getPembayaranHistory(id_gaji) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=pembayaran_history&id_gaji=${id_gaji}`);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?action=pembayaran_history&id_gaji=${id_gaji}`);
       if (data && data.success) return data.data;
     }
     return [];
@@ -2281,7 +2203,7 @@ export const GajiService = {
   async catatPembayaran(paymentData) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji.php?action=bayar`, {
+      const { data: resData } = await safeFetchJson(`${API_BASE}/gaji?action=bayar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(paymentData)
@@ -2314,7 +2236,7 @@ export const GajiService = {
       if (id_karyawan) params.set('id_karyawan', id_karyawan);
       if (status_bayar && status_bayar !== 'semua') params.set('status_bayar', status_bayar);
       if (search) params.set('search', search);
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?${params}`);
       if (data && data.success) return sortNewestFirst(data.data);
     }
 
@@ -2334,7 +2256,7 @@ export const GajiService = {
   async getSlip(id_gaji) {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=slip&id_gaji=${id_gaji}`);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?action=slip&id_gaji=${id_gaji}`);
       if (data && data.success) return data.data;
       if (data && !data.success && data.message) throw new Error(data.message);
     }
@@ -2366,7 +2288,7 @@ export const GajiService = {
 
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?${params}`);
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?${params}`);
       if (data?.success) return data.data;
       if (data?.message) throw new Error(data.message);
     }
@@ -2494,7 +2416,7 @@ export const GajiService = {
   async updatePenyesuaian(id_gaji, bonus, potongan, catatan_penyesuaian = '') {
     const live = await checkBackendStatus();
     if (live) {
-      const { data } = await safeFetchJson(`${API_BASE}/gaji.php?action=penyesuaian`, {
+      const { data } = await safeFetchJson(`${API_BASE}/gaji?action=penyesuaian`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_gaji, bonus, potongan, catatan_penyesuaian })
@@ -2574,6 +2496,12 @@ function mapRestPathToPhp(path) {
   if (path.startsWith('/pekerjaan/')) {
     return path;
   }
+  if (path.startsWith('/penugasan/cek-ketersediaan')) {
+    return path;
+  }
+  if (path.match(/^\/penugasan\/\d+\/gaji-riwayat/)) {
+    return path;
+  }
   if (path === '/penugasan' || path.startsWith('/penugasan?')) {
     return '/penugasan.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');
   }
@@ -2607,6 +2535,10 @@ function mapRestPathToPhp(path) {
   return path;
 }
 
+function normalizeApiPath(path) {
+  return mapRestPathToPhp(path);
+}
+
 function getLocalJakartaToday() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta',
@@ -2630,331 +2562,16 @@ function enrichLocalJob(db, p) {
   };
 }
 
-function handleLocalApiFallback(path, method, body) {
-  const db = getLocalData();
-  const today = getLocalJakartaToday();
-  const ambilMatch = path.match(/^\/pekerjaan\/(\d+)\/ambil\/?$/);
-
-  if (ambilMatch && method === 'POST') {
-    const idPekerjaan = Number(ambilMatch[1]);
-    const idKaryawan = Number(body?.id_karyawan || 0);
-    const job = (db.pekerjaan || []).find(p => Number(p.id_pekerjaan) === idPekerjaan);
-    if (!job) throw new Error('Data pekerjaan tidak ditemukan.');
-    if ((job.metode_penentuan ?? 'terbuka') !== 'terbuka') {
-      throw new Error('409: Pekerjaan ini ditetapkan langsung oleh Admin.');
-    }
-    if (job.status === 'selesai') {
-      throw new Error('422: Pekerjaan sudah berstatus selesai dan tidak dapat diambil.');
-    }
-    if (job.target_selesai && job.target_selesai < today) {
-      throw new Error('422: Pekerjaan telah melewati batas tenggat (deadline).');
-    }
-    const existing = (db.penugasan || []).find(t => Number(t.id_pekerjaan) === idPekerjaan);
-    if (existing) {
-      throw new Error('409: Pekerjaan sudah tidak tersedia karena telah diambil oleh pekerja lain.');
-    }
-    const nextId = (db.penugasan || []).length ? Math.max(...db.penugasan.map(t => Number(t.id_penugasan) || 0)) + 1 : 1;
-    const item = {
-      id_penugasan: nextId,
-      id_pekerjaan: idPekerjaan,
-      id_karyawan: idKaryawan,
-      peran_tugas: 'Pelaksana Mandiri',
-      jenis_penugasan: 'mandiri',
-      tanggal_penugasan: today,
-      status_baca: 'sudah',
-    };
-    db.penugasan = db.penugasan || [];
-    db.penugasan.push(item);
-    saveLocalData(db);
-    return item;
-  }
-
-  if (path === '/pekerjaan/tersedia' || path.startsWith('/pekerjaan/tersedia?')) {
-    const workerIdParam = path.includes('worker_id=') ? Number(path.split('worker_id=')[1].split('&')[0]) : null;
-    const takenIds = new Set((db.penugasan || []).map(t => Number(t.id_pekerjaan)));
-    const myTakenIds = workerIdParam 
-      ? new Set((db.penugasan || []).filter(t => Number(t.id_karyawan) === workerIdParam).map(t => Number(t.id_pekerjaan)))
-      : new Set();
-
-    return (db.pekerjaan || [])
-      .filter(p =>
-        (p.metode_penentuan ?? 'terbuka') !== 'langsung' &&
-        p.status !== 'selesai' &&
-        (!p.target_selesai || p.target_selesai >= today) &&
-        !myTakenIds.has(Number(p.id_pekerjaan)) &&
-        ((p.metode_penentuan ?? 'terbuka') !== 'terbuka' || !takenIds.has(Number(p.id_pekerjaan)))
-      )
-      .map(p => enrichLocalJob(db, p));
-  }
-
-  if (path.startsWith('/karyawan')) {
-    const idMatch = path.match(/^\/karyawan\/(\d+)$/);
-    const mapEmp = (k) => {
-      const u = (db.user || []).find(usr => Number(usr.id_karyawan) === Number(k.id_karyawan));
-      return {
-        ...k,
-        id_karyawan: Number(k.id_karyawan),
-        id_user: u ? u.id_user : null,
-        email: u ? u.email : (k.email || ''),
-        peran: u ? u.peran : (k.peran || 'karyawan'),
-        nama: k.nama || '',
-        jabatan: k.jabatan || '',
-        tarif_per_jam: Number(k.tarif_per_jam) || 0,
-        status: k.status || (u && u.aktif === 0 ? 'nonaktif' : 'aktif'),
-        aktif: u ? u.aktif : (k.aktif ?? 1),
-      };
-    };
-
-    if (method === 'GET') {
-      if (idMatch) {
-        const found = (db.karyawan || []).find(k => Number(k.id_karyawan) === Number(idMatch[1]));
-        if (!found) throw new Error('Data karyawan tidak ditemukan.');
-        return mapEmp(found);
-      }
-      return (db.karyawan || []).map(mapEmp);
-    }
-
-    if (method === 'POST') {
-      const nextId = (db.karyawan || []).length ? Math.max(...db.karyawan.map(k => Number(k.id_karyawan) || 0)) + 1 : 1;
-      const created = {
-        id_karyawan: nextId,
-        nama: body?.nama || '',
-        jabatan: body?.jabatan || '',
-        tarif_per_jam: Number(body?.tarif_per_jam) || 0,
-      };
-      db.karyawan = db.karyawan || [];
-      db.karyawan.push(created);
-      if (body?.email) {
-        const nextUId = (db.user || []).length ? Math.max(...db.user.map(u => Number(u.id_user) || 0)) + 1 : 1;
-        db.user = db.user || [];
-        db.user.push({
-          id_user: nextUId,
-          id_karyawan: nextId,
-          email: body.email,
-          kata_sandi: body.kata_sandi || 'karyawan123',
-          peran: body.peran || 'karyawan',
-          aktif: 1,
-        });
-      }
-      saveLocalData(db);
-      return mapEmp(created);
-    }
-
-    if (method === 'PUT') {
-      const id = idMatch ? Number(idMatch[1]) : Number(body?.id_karyawan);
-      const idx = (db.karyawan || []).findIndex(k => Number(k.id_karyawan) === id);
-      if (idx === -1) throw new Error('Data karyawan tidak ditemukan.');
-      db.karyawan[idx] = {
-        ...db.karyawan[idx],
-        ...body,
-        id_karyawan: id,
-        tarif_per_jam: body?.tarif_per_jam !== undefined ? Number(body.tarif_per_jam) : db.karyawan[idx].tarif_per_jam,
-      };
-      saveLocalData(db);
-      return mapEmp(db.karyawan[idx]);
-    }
-
-    if (method === 'DELETE') {
-      const id = idMatch ? Number(idMatch[1]) : 0;
-      db.karyawan = (db.karyawan || []).filter(k => Number(k.id_karyawan) !== id);
-      db.user = (db.user || []).filter(u => Number(u.id_karyawan) !== id);
-      db.penugasan = (db.penugasan || []).filter(p => Number(p.id_karyawan) !== id);
-      saveLocalData(db);
-      return { success: true };
-    }
-  }
-
-  if (path.startsWith('/pekerjaan')) {
-    if (method === 'GET') {
-      const idMatch = path.match(/^\/pekerjaan\/(\d+)$/);
-      if (idMatch) {
-        const job = (db.pekerjaan || []).find(p => Number(p.id_pekerjaan) === Number(idMatch[1]));
-        if (!job) throw new Error('Data pekerjaan tidak ditemukan.');
-        return enrichLocalJob(db, job);
-      }
-      return (db.pekerjaan || []).map(p => enrichLocalJob(db, p));
-    }
-    if (method === 'POST') {
-      const nextId = (db.pekerjaan || []).length ? Math.max(...db.pekerjaan.map(p => Number(p.id_pekerjaan) || 0)) + 1 : 1;
-      const created = {
-        id_pekerjaan: nextId,
-        nama_pekerjaan: body?.nama_pekerjaan || '',
-        deskripsi: body?.deskripsi || '',
-        lokasi: body?.lokasi || '',
-        titik_lokasi: body?.titik_lokasi || '',
-        tanggal_mulai: body?.tanggal_mulai || '',
-        target_selesai: body?.target_selesai || '',
-        status: body?.status || 'belum_mulai',
-        metode_penentuan: body?.metode_penentuan || 'terbuka',
-      };
-      db.pekerjaan.unshift(created);
-      if (created.metode_penentuan === 'langsung' && Array.isArray(body?.id_karyawan_list)) {
-        let nextPn = (db.penugasan || []).length ? Math.max(...db.penugasan.map(t => Number(t.id_penugasan) || 0)) + 1 : 1;
-        body.id_karyawan_list.forEach(empId => {
-          db.penugasan.push({
-            id_penugasan: nextPn++,
-            id_pekerjaan: nextId,
-            id_karyawan: Number(empId),
-            peran_tugas: 'Anggota Tim Pelaksana',
-            jenis_penugasan: 'admin',
-            tanggal_penugasan: today,
-          });
-        });
-      }
-      saveLocalData(db);
-      return enrichLocalJob(db, created);
-    }
-    if (method === 'PUT') {
-      const idMatch = path.match(/^\/pekerjaan\/(\d+)$/);
-      const id = idMatch ? Number(idMatch[1]) : Number(body?.id_pekerjaan);
-      const idx = (db.pekerjaan || []).findIndex(p => Number(p.id_pekerjaan) === id);
-      if (idx !== -1) {
-        db.pekerjaan[idx] = { ...db.pekerjaan[idx], ...body, id_pekerjaan: id };
-        saveLocalData(db);
-        return enrichLocalJob(db, db.pekerjaan[idx]);
-      }
-    }
-    if (method === 'DELETE') {
-      const idMatch = path.match(/^\/pekerjaan\/(\d+)$/);
-      const id = idMatch ? Number(idMatch[1]) : 0;
-      db.pekerjaan = (db.pekerjaan || []).filter(p => Number(p.id_pekerjaan) !== id);
-      db.penugasan = (db.penugasan || []).filter(t => Number(t.id_pekerjaan) !== id);
-      saveLocalData(db);
-      return { success: true };
-    }
-  }
-
-  if (path.startsWith('/penugasan')) {
-    if (method === 'DELETE') {
-      const idMatch = path.match(/^\/penugasan\/(\d+)$/);
-      const id = idMatch ? Number(idMatch[1]) : 0;
-      db.penugasan = (db.penugasan || []).filter(t => Number(t.id_penugasan) !== id);
-      saveLocalData(db);
-      return { success: true };
-    }
-    return (db.penugasan || []).map(t => ({
-      ...t,
-      jenis_penugasan: t.jenis_penugasan ?? 'admin',
-    }));
-  }
-
-  if (path.startsWith('/absensi')) {
-    return db.absensi || [];
-  }
-
-  if (path.startsWith('/users')) {
-    if (!Array.isArray(db.user)) db.user = [];
-
-    // Pastikan setiap karyawan memiliki akun login
-    (db.karyawan || []).forEach(k => {
-      let u = db.user.find(usr => Number(usr.id_karyawan) === Number(k.id_karyawan));
-      if (!u) {
-        const nextUid = db.user.length ? Math.max(...db.user.map(x => Number(x.id_user) || 0)) + 1 : 1;
-        const slug = String(k.nama || 'karyawan').toLowerCase().replace(/[^a-z0-9]/g, '');
-        u = {
-          id_user: nextUid,
-          kode_user: k.kode_karyawan || `USER${String(nextUid).padStart(3, '0')}`,
-          id_karyawan: Number(k.id_karyawan),
-          username: k.kode_karyawan || `${slug}${k.id_karyawan}`,
-          email: k.email || `${slug}${k.id_karyawan}@jamkerja.com`,
-          kata_sandi: 'karyawan123',
-          peran: 'karyawan',
-          aktif: k.status === 'nonaktif' ? 0 : 1,
-          created_at: new Date().toISOString()
-        };
-        db.user.push(u);
-      }
-    });
-
-    const enrichUser = (u) => {
-      const k = u.id_karyawan ? (db.karyawan || []).find(item => Number(item.id_karyawan) === Number(u.id_karyawan)) : null;
-      const isAktif = Number(u.aktif) === 1 || u.aktif === true;
-      const finalCode = u.kode_karyawan || u.kode_user || (u.peran === 'admin' ? 'ADM001' : `USER${String(u.id_user).padStart(3, '0')}`);
-      return {
-        ...u,
-        id_user: Number(u.id_user),
-        kode_user: finalCode,
-        id_karyawan: u.id_karyawan ? Number(u.id_karyawan) : null,
-        username: u.username || (k ? k.kode_karyawan : finalCode),
-        email: u.email || (k ? k.email : ''),
-        peran: u.peran || 'karyawan',
-        aktif: isAktif ? 1 : 0,
-        nama: u.nama || (k ? k.nama : (u.peran === 'admin' ? 'Administrator' : 'Pengguna')),
-        jabatan: u.jabatan || (k ? k.jabatan : (u.peran === 'admin' ? 'Administrator Sistem' : '-')),
-        kode_karyawan: u.peran === 'admin' ? '' : (k?.kode_karyawan || finalCode),
-        nomor_hp: u.nomor_hp || (k?.no_hp || ''),
-        status_karyawan: isAktif ? 'aktif' : 'nonaktif'
-      };
-    };
-
-    if (method === 'GET') {
-      const idMatch = path.match(/^\/users\/(\d+)$/);
-      if (idMatch) {
-        const u = db.user.find(usr => Number(usr.id_user) === Number(idMatch[1]));
-        if (!u) throw new Error('Data pengguna tidak ditemukan.');
-        return enrichUser(u);
-      }
-      return db.user.map(enrichUser);
-    }
-
-    const resetMatch = path.match(/^\/users\/(\d+)\/reset-password$/);
-    if (resetMatch && method === 'POST') {
-      const uId = Number(resetMatch[1]);
-      const idx = db.user.findIndex(usr => Number(usr.id_user) === uId);
-      if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
-      db.user[idx].kata_sandi = body?.kata_sandi || 'karyawan123';
-      saveLocalData(db);
-      return enrichUser(db.user[idx]);
-    }
-
-    const statusMatch = path.match(/^\/users\/(\d+)\/status$/);
-    if (statusMatch && (method === 'PUT' || method === 'POST')) {
-      const uId = Number(statusMatch[1]);
-      const idx = db.user.findIndex(usr => Number(usr.id_user) === uId);
-      if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
-      const nextAktif = (body?.aktif === 1 || body?.aktif === true || body?.status === 'aktif') ? 1 : 0;
-      db.user[idx].aktif = nextAktif;
-      if (db.user[idx].id_karyawan) {
-        const kIdx = (db.karyawan || []).findIndex(k => Number(k.id_karyawan) === Number(db.user[idx].id_karyawan));
-        if (kIdx !== -1) {
-          db.karyawan[kIdx].status = nextAktif ? 'aktif' : 'nonaktif';
-          db.karyawan[kIdx].aktif = nextAktif;
-        }
-      }
-      saveLocalData(db);
-      return enrichUser(db.user[idx]);
-    }
-  }
-
-  return null;
-}
-
 async function request(path, method, body) {
-  const url = mapRestPathToPhp(path);
+  const url = normalizeApiPath(path);
   const options = { method };
   if (body !== undefined) {
     options.headers = { 'Content-Type': 'application/json' };
     options.body = JSON.stringify(body);
   }
 
-  const { ok, status, data: result } = await safeFetchJson(`${API_BASE}${url}`, options);
-  if (result && result.success === false) {
-    // Backend hidup dan merespons penolakan bisnis/validasi terstruktur: teruskan pesan error asli
-    const prefix = status === 409 || status === 422 ? `[${status}] ` : '';
-    const err = new Error(`${prefix}${result.message || 'Permintaan API gagal.'}`);
-    err.status = status;
-    throw err;
-  }
-
-  if (!ok || !result) {
-    // Fallback otomatis ke data lokal HANYA jika backend offline / tidak mengembalikan JSON
-    const fallbackResult = handleLocalApiFallback(path, method, body);
-    if (fallbackResult !== null) {
-      return fallbackResult;
-    }
-    throw new Error('Permintaan API gagal.');
-  }
-
+  const { data: result } = await safeFetchJson(`${API_BASE}${url}`, options);
+  if (!result) throw new Error('Backend Express tidak mengembalikan data.');
   return result.data ?? result;
 }
 
