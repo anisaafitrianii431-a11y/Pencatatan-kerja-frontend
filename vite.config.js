@@ -9,7 +9,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     watch: {
-      ignored: ['api/**', 'backend/**', '**/uploads/**', '**/node_modules/**'],
+      ignored: ['backend/**', '**/uploads/**', '**/node_modules/**'],
     },
     proxy: {
       '/api': {
