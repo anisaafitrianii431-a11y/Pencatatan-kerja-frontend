@@ -41,6 +41,10 @@ export async function getKaryawan() {
   return (Array.isArray(employees) ? employees : []).map(normalizeEmployee)
 }
 
+export async function getKaryawanMe() {
+  return normalizeEmployee(await apiGet('/karyawan/me'))
+}
+
 export async function getKaryawanById(id) {
   return normalizeEmployee(await apiGet(`/karyawan/${id}`))
 }

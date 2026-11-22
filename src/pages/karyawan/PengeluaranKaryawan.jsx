@@ -25,6 +25,7 @@ import {
 import { PengeluaranService, PekerjaanService } from '../../services/api';
 import { compressImage, formatBytes } from '../../utils/imageCompressor';
 import Modal from '../../components/Modal';
+import { useAuth } from '../../auth/useAuth.js';
 
 const MONTH_OPTIONS = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -32,6 +33,7 @@ const MONTH_OPTIONS = [
 ].map((label, index) => ({ value: String(index + 1).padStart(2, '0'), label }));
 
 export default function PengeluaranKaryawan({ currentUser }) {
+  const { canCreate, canUpdate, canDelete } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -995,24 +997,28 @@ export default function PengeluaranKaryawan({ currentUser }) {
                             </span>
                           ) : (
                             <div className="inline-flex items-center space-x-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(p)}
-                                aria-label={`Edit pengeluaran ${p.keterangan || p.id_pengeluaran}`}
-                                title="Edit Catatan Pengeluaran"
-                                className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-xs"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(p)}
-                                aria-label={`Hapus pengeluaran ${p.keterangan || p.id_pengeluaran}`}
-                                title="Hapus Catatan Pengeluaran"
-                                className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition cursor-pointer shadow-xs"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canUpdate('pengeluaran') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(p)}
+                                  aria-label={`Edit pengeluaran ${p.keterangan || p.id_pengeluaran}`}
+                                  title="Edit Catatan Pengeluaran"
+                                  className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-xs"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canDelete('pengeluaran') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(p)}
+                                  aria-label={`Hapus pengeluaran ${p.keterangan || p.id_pengeluaran}`}
+                                  title="Hapus Catatan Pengeluaran"
+                                  className="p-1.5 min-h-[28px] min-w-[28px] rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition cursor-pointer shadow-xs"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>

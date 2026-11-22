@@ -13,6 +13,7 @@ import {
 import { getFileUrl } from '../../services/api.js'
 import KameraAbsensi from '../../components/KameraAbsensi.jsx'
 import ModalPeriksaAbsensi from '../../components/ModalPeriksaAbsensi.jsx'
+import { useAuth } from '../../auth/useAuth.js'
 import {
   formatWeekdayAndDate,
   getGoogleMapsUrl,
@@ -150,6 +151,7 @@ export default function RekapAbsensiPekerja({
   workerName = '',
   defaultTab = 'absen',
 }) {
+  const { canCreate, canUpdate } = useAuth()
   const [activeTab, setActiveTab] = useState(defaultTab === 'rekap' ? 'rekap' : 'absen')
 
   useEffect(() => {
@@ -721,14 +723,20 @@ export default function RekapAbsensiPekerja({
 
                         <div className="mt-5 pt-3 border-t border-slate-100 space-y-2.5">
                           {activeSession ? (
-                            <button
-                              type="button"
-                              onClick={() => openCameraModal(job, 'pulang', activeSession)}
-                              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-rose-700"
-                            >
-                              <Icon name="camera" className="h-4 w-4" />
-                              <span>Ambil Absen Pulang (Kamera &amp; GPS)</span>
-                            </button>
+                            !canUpdate('absensi') ? (
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-center text-xs font-semibold text-amber-800">
+                                Izin absen pulang dinonaktifkan oleh administrator.
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openCameraModal(job, 'pulang', activeSession)}
+                                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-rose-700"
+                              >
+                                <Icon name="camera" className="h-4 w-4" />
+                                <span>Ambil Absen Pulang (Kamera &amp; GPS)</span>
+                              </button>
+                            )
                           ) : jobAtt.isLocked ? (
                             <div className="space-y-1.5">
                               <button
@@ -750,6 +758,10 @@ export default function RekapAbsensiPekerja({
                               >
                                 {jobAtt.lockDescription}
                               </p>
+                            </div>
+                          ) : !canCreate('absensi') ? (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-center text-xs font-semibold text-amber-800">
+                              Izin absen masuk dinonaktifkan oleh administrator.
                             </div>
                           ) : (
                             <button

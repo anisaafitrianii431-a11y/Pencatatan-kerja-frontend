@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { GajiService, KaryawanService, formatRupiah, getFileUrl } from '../../services/api';
 import Modal from '../../components/Modal';
+import { useAuth } from '../../auth/useAuth.js';
 import KopSuratCetak from '../../components/KopSuratCetak';
 import TandaTanganCetak from '../../components/TandaTanganCetak';
 import { 
@@ -46,6 +47,7 @@ import {
 } from '../../utils/printHelpers';
 
 export default function GajiAdmin({ currentUser }) {
+  const { canUpdate } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -1394,19 +1396,21 @@ export default function GajiAdmin({ currentUser }) {
                           <td className="px-4 py-3 text-center">
                             <div className="inline-flex items-center gap-2">
                               {/* Tombol Bayar Gaji */}
-                              <button
-                                onClick={() => handleOpenBayarModal(row)}
-                                disabled={isLunas}
-                                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition duration-150 flex items-center gap-1.5 shadow-xs cursor-pointer ${
-                                  isLunas
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                }`}
-                                title={isLunas ? 'Gaji sudah lunas' : 'Catat Pembayaran Gaji'}
-                              >
-                                <CreditCard className="w-3.5 h-3.5" />
-                                <span>Bayar Gaji</span>
-                              </button>
+                              {canUpdate('gaji') && (
+                                <button
+                                  onClick={() => handleOpenBayarModal(row)}
+                                  disabled={isLunas}
+                                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition duration-150 flex items-center gap-1.5 shadow-xs cursor-pointer ${
+                                    isLunas
+                                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  }`}
+                                  title={isLunas ? 'Gaji sudah lunas' : 'Catat Pembayaran Gaji'}
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  <span>Bayar Gaji</span>
+                                </button>
+                              )}
 
                               {/* Tombol Lihat Riwayat Transaksi */}
                               {Number(row.jumlah_transaksi_bayar || 0) > 0 && (

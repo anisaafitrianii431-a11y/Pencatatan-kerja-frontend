@@ -37,6 +37,12 @@ const iconContent = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </>
   ),
+  shield: (
+    <>
+      <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
   receipt: (
     <>
       <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
@@ -175,9 +181,13 @@ function SidebarAdmin({
   onClose = () => {},
   onLogout = () => {},
   adminName = 'Admin',
+  isSuperAdmin = false,
 }) {
   const location = useLocation()
   const currentPath = location.pathname
+  const visibleMenuItems = isSuperAdmin
+    ? [...menuItems, { label: 'Pengaturan Hak Akses', icon: 'shield', match: (p) => p.startsWith('/admin/hak-akses') }]
+    : menuItems
   return (
     <>
       {isMobileOpen && (
@@ -235,7 +245,7 @@ function SidebarAdmin({
           <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Menu Utama
           </p>
-          {menuItems.map(({ label, icon, match }) => {
+          {visibleMenuItems.map(({ label, icon, match }) => {
             const isPathMatch = typeof match === 'function' && match(currentPath)
             const isActive = activeItem === label || isPathMatch
 

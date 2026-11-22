@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import {
   STATUS_PEKERJAAN,
   STATUS_PEKERJAAN_OPTIONS,
@@ -22,6 +24,7 @@ import {
 } from '../../services/pekerjaanApi.js'
 import { getKaryawan } from '../../services/karyawanApi.js'
 import ModalKonfirmasiHapus from '../../components/ModalKonfirmasiHapus.jsx'
+import { useAuth } from '../../auth/useAuth.js'
 
 const PAGE_SIZE = 8
 
@@ -238,8 +241,6 @@ function InteractiveMapPicker({
   // Inisialisasi Peta
   useEffect(() => {
     if (!mapContainerRef.current) return
-    const L = window.L
-    if (!L) return
 
     if (!mapInstanceRef.current) {
       const initialLat = hasCoordinates ? currentLat : -6.2088
@@ -290,8 +291,7 @@ function InteractiveMapPicker({
 
   // Update posisi Marker dan Geofence Radius
   useEffect(() => {
-    const L = window.L
-    if (!L || !mapInstanceRef.current) return
+    if (!mapInstanceRef.current) return
 
     if (hasCoordinates) {
       mapInstanceRef.current.setView([currentLat, currentLng], 16)
@@ -458,6 +458,7 @@ function InteractiveMapPicker({
 
 // Modal Detail Data Pekerjaan & Pengelolaan Tim Multi-Worker
 function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
+  const { can, canUpdate, canDelete } = useAuth()
   const navigate = useNavigate()
   const [job, setJob] = useState(initialJob)
   const [isLoading, setIsLoading] = useState(false)
@@ -830,14 +831,16 @@ function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
                   Karyawan yang saat ini aktif ditugaskan atau telah mengambil pekerjaan ini.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setAddWorkerOpen((prev) => !prev)}
-                className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
-              >
-                <WorkIcon name="plus" className="h-3.5 w-3.5" />
-                <span>Tambah Pekerja ke Tim</span>
-              </button>
+              {(can('penugasan', 'create') || canUpdate('pekerjaan')) && (
+                <button
+                  type="button"
+                  onClick={() => setAddWorkerOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
+                >
+                  <WorkIcon name="plus" className="h-3.5 w-3.5" />
+                  <span>Tambah Pekerja ke Tim</span>
+                </button>
+              )}
             </div>
 
             {/* Inline Box Tambah Pekerja */}
@@ -943,15 +946,17 @@ function JobDetailModal({ job: initialJob, employees, onClose, onRefresh }) {
                             </span>
                           </td>
                           <td className="px-3.5 py-2.5 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setCancelModal({ worker, alasan: '', isSubmitting: false })}
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded transition cursor-pointer"
-                              title="Batalkan penugasan pekerja ini"
-                            >
-                              <WorkIcon name="trash" className="h-3.5 w-3.5" />
-                              <span>Batalkan</span>
-                            </button>
+                            {canDelete('penugasan') && (
+                              <button
+                                type="button"
+                                onClick={() => setCancelModal({ worker, alasan: '', isSubmitting: false })}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded transition cursor-pointer"
+                                title="Batalkan penugasan pekerja ini"
+                              >
+                                <WorkIcon name="trash" className="h-3.5 w-3.5" />
+                                <span>Batalkan</span>
+                              </button>
+                            )}
                           </td>
                         </tr>
                       )
@@ -2770,6 +2775,7 @@ function ReportApprovalModal({ job, employees, onClose, onRefresh }) {
 }
 
 function DataPekerjaan() {
+  const { can, canCreate, canUpdate, canDelete } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initialStatus = searchParams.get('status') || ''
@@ -3041,15 +3047,17 @@ function DataPekerjaan() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setModal({ mode: 'create' })}
-            disabled={isLoading || Boolean(error)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 cursor-pointer"
-          >
-            <WorkIcon name="plus" className="h-4 w-4" />
-            <span>Tambah Pekerjaan</span>
-          </button>
+          {canCreate('pekerjaan') && (
+            <button
+              type="button"
+              onClick={() => setModal({ mode: 'create' })}
+              disabled={isLoading || Boolean(error)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 cursor-pointer"
+            >
+              <WorkIcon name="plus" className="h-4 w-4" />
+              <span>Tambah Pekerjaan</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -3623,27 +3631,31 @@ function DataPekerjaan() {
                           </button>
 
                           {/* Edit */}
-                          <button
-                            type="button"
-                            onClick={() => editJob(job)}
-                            disabled={loadingDetailId === job.id_pekerjaan}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition shadow-2xs shrink-0 disabled:opacity-50 cursor-pointer"
-                            title={`Edit proyek ${job.nama_pekerjaan}`}
-                            aria-label={`Edit proyek ${job.nama_pekerjaan}`}
-                          >
-                            <WorkIcon name="edit" className="h-4 w-4" />
-                          </button>
+                          {canUpdate('pekerjaan') && (
+                            <button
+                              type="button"
+                              onClick={() => editJob(job)}
+                              disabled={loadingDetailId === job.id_pekerjaan}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600 transition shadow-2xs shrink-0 disabled:opacity-50 cursor-pointer"
+                              title={`Edit proyek ${job.nama_pekerjaan}`}
+                              aria-label={`Edit proyek ${job.nama_pekerjaan}`}
+                            >
+                              <WorkIcon name="edit" className="h-4 w-4" />
+                            </button>
+                          )}
 
                           {/* Hapus */}
-                          <button
-                            type="button"
-                            onClick={() => setPendingDelete(job)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition shadow-2xs shrink-0 cursor-pointer"
-                            title={`Hapus proyek ${job.nama_pekerjaan}`}
-                            aria-label={`Hapus proyek ${job.nama_pekerjaan}`}
-                          >
-                            <WorkIcon name="trash" className="h-4 w-4" />
-                          </button>
+                          {canDelete('pekerjaan') && (
+                            <button
+                              type="button"
+                              onClick={() => setPendingDelete(job)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition shadow-2xs shrink-0 cursor-pointer"
+                              title={`Hapus proyek ${job.nama_pekerjaan}`}
+                              aria-label={`Hapus proyek ${job.nama_pekerjaan}`}
+                            >
+                              <WorkIcon name="trash" className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

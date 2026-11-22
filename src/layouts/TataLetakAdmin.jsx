@@ -8,6 +8,7 @@ function TataLetakAdmin({
   onSelectMenuItem = () => {},
   onLogout = () => {},
   adminName = 'Admin',
+  isSuperAdmin = false,
   children,
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -22,6 +23,7 @@ function TataLetakAdmin({
       <SidebarAdmin
         activeItem={activeItem}
         adminName={adminName}
+        isSuperAdmin={isSuperAdmin}
         isMobileOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         onSelectMenuItem={handleSelectMenuItem}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import HeaderHalamanKaryawan from '../../components/HeaderHalamanKaryawan.jsx'
 import { STATUS_PEKERJAAN, STATUS_PEKERJAAN_OPTIONS } from '../../data/pekerjaan.js'
 import { getPekerjaanSaya } from '../../services/workerPekerjaanApi.js'
+import { useAuth } from '../../auth/useAuth.js'
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
@@ -265,6 +266,7 @@ function WorkDetails({ job, assignment, onClose }) {
 }
 
 function WorkCard({ job, assignment, onOpen, onRecordExpense }) {
+  const { canCreate } = useAuth()
   if (!job) {
     return (
       <article className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 sm:p-6">
@@ -341,15 +343,17 @@ function WorkCard({ job, assignment, onOpen, onRecordExpense }) {
           <span>Lihat Detail</span>
         </button>
 
-        <button
-          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 px-3 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
-          onClick={() => onRecordExpense?.(job)}
-          type="button"
-          title="Catat nota belanja untuk proyek ini"
-        >
-          <Icon className="h-4 w-4" name="receipt" />
-          <span>💰 Catat Belanja</span>
-        </button>
+        {canCreate('pengeluaran') && (
+          <button
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 px-3 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+            onClick={() => onRecordExpense?.(job)}
+            type="button"
+            title="Catat nota belanja untuk proyek ini"
+          >
+            <Icon className="h-4 w-4" name="receipt" />
+            <span>💰 Catat Belanja</span>
+          </button>
+        )}
       </div>
     </article>
   )

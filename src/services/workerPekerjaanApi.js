@@ -1,4 +1,4 @@
-import { getKaryawan } from './karyawanApi.js'
+import { getKaryawanMe } from './karyawanApi.js'
 import {
   ambilPekerjaan,
   getPekerjaan,
@@ -31,11 +31,12 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
   const effectiveName = employeeName || activeUser?.nama || activeUser?.name || ''
   const effectiveCode = activeUser?.kode_karyawan || activeUser?.username || ''
 
-  const [employees, jobs, assignments] = await Promise.all([
-    getKaryawan(),
+  const [currentEmployee, jobs, assignments] = await Promise.all([
+    getKaryawanMe(),
     getPekerjaan(),
     getPenugasan(),
   ])
+  const employees = currentEmployee ? [currentEmployee] : []
 
   // 1. Cocokkan berdasarkan kode_karyawan atau username terlebih dahulu (identitas paling unik dan akurat)
   let worker = null
@@ -204,11 +205,12 @@ export async function getRiwayatPekerjaanSaya(employeeId, employeeName = '') {
   const effectiveName = employeeName || activeUser?.nama || activeUser?.name || ''
   const effectiveCode = activeUser?.kode_karyawan || activeUser?.username || ''
 
-  const [employees, jobs, assignments] = await Promise.all([
-    getKaryawan(),
+  const [currentEmployee, jobs, assignments] = await Promise.all([
+    getKaryawanMe(),
     getPekerjaan(),
     getPenugasan(),
   ])
+  const employees = currentEmployee ? [currentEmployee] : []
 
   let worker = null
   if (normalizedEmployeeId > 0) {

@@ -10,6 +10,7 @@ import {
 } from '../../services/penugasanApi.js'
 import AvatarAdmin from '../../components/AvatarAdmin.jsx'
 import ModalKonfirmasiHapus from '../../components/ModalKonfirmasiHapus.jsx'
+import { useAuth } from '../../auth/useAuth.js'
 
 const PAGE_SIZE = 8
 
@@ -265,6 +266,7 @@ function WorkerAssignmentHistoryModal({
   onCancelAssignment,
   onFilterWorker,
 }) {
+  const { canDelete } = useAuth()
   if (!worker) return null
 
   // Ambil semua penugasan pekerja ini
@@ -457,17 +459,19 @@ function WorkerAssignmentHistoryModal({
                               >
                                 <Icon name="eye" className="h-3.5 w-3.5" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onClose()
-                                  onCancelAssignment(as)
-                                }}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition shadow-2xs cursor-pointer"
-                                title="Batalkan penugasan ini"
-                              >
-                                <Icon name="trash" className="h-3.5 w-3.5" />
-                              </button>
+                              {canDelete('penugasan') && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onClose()
+                                    onCancelAssignment(as)
+                                  }}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition shadow-2xs cursor-pointer"
+                                  title="Batalkan penugasan ini"
+                                >
+                                  <Icon name="trash" className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -495,6 +499,7 @@ function WorkerAssignmentHistoryModal({
 }
 
 function Penugasan() {
+  const { canDelete } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initialJobFilter = searchParams.get('pekerjaan') || ''
@@ -1397,7 +1402,7 @@ function Penugasan() {
                             <Icon name="history" className="h-4 w-4" />
                           </button>
 
-                          {group.primaryAssignment && (
+                          {group.primaryAssignment && canDelete('penugasan') && (
                             <button
                               type="button"
                               onClick={() => {

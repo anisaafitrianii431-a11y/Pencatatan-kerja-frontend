@@ -1,11 +1,13 @@
 import { apiGet, apiPost, apiPut } from './api.js'
+import { isAdminRole } from '../utils/roles.js'
 
 export function normalizeUser(user) {
   if (!user) return null
 
   const idNum = Number(user.id_user)
   const isAktif = Number(user.aktif) === 1 || user.aktif === true || user.aktif === '1'
-  const finalCode = user.kode_karyawan || user.kode_user || (user.peran === 'admin' ? 'ADM001' : `USER${String(idNum).padStart(3, '0')}`)
+  const isAdmin = isAdminRole(user.peran)
+  const finalCode = user.kode_karyawan || user.kode_user || (isAdmin ? 'ADM001' : `USER${String(idNum).padStart(3, '0')}`)
 
   return {
     ...user,
@@ -16,9 +18,9 @@ export function normalizeUser(user) {
     email: user.email || '',
     peran: user.peran || 'karyawan',
     aktif: isAktif ? 1 : 0,
-    nama: user.nama || (user.peran === 'admin' ? 'Administrator' : 'Pengguna'),
-    jabatan: user.jabatan || (user.peran === 'admin' ? 'Administrator Sistem' : '-'),
-    kode_karyawan: user.kode_karyawan || (user.peran === 'admin' ? '' : finalCode),
+    nama: user.nama || (user.peran === 'super_admin' ? 'Super Administrator' : isAdmin ? 'Administrator' : 'Pengguna'),
+    jabatan: user.jabatan || (user.peran === 'super_admin' ? 'Super Administrator Sistem' : isAdmin ? 'Administrator Sistem' : '-'),
+    kode_karyawan: user.kode_karyawan || (isAdmin ? '' : finalCode),
     nomor_hp: user.nomor_hp || '',
     status_karyawan: user.status_karyawan || (isAktif ? 'aktif' : 'nonaktif'),
   }

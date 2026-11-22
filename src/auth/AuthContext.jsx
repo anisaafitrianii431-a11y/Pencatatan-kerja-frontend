@@ -79,6 +79,24 @@ export function AuthProvider({ children }) {
     return changePasswordRequest(payload)
   }, [])
 
+  const can = useCallback(
+    (resource, action) => {
+      if (!user) return false
+      const role = String(user.peran || user.role || '').toLowerCase()
+      if (role === 'super_admin') return true
+      const resourcePerms = user.permissions?.[resource]
+      if (!resourcePerms) return false
+      const actionKey = action.startsWith('can_') ? action : `can_${action}`
+      return Number(resourcePerms[actionKey]) === 1
+    },
+    [user],
+  )
+
+  const canCreate = useCallback((resource) => can(resource, 'create'), [can])
+  const canRead = useCallback((resource) => can(resource, 'read'), [can])
+  const canUpdate = useCallback((resource) => can(resource, 'update'), [can])
+  const canDelete = useCallback((resource) => can(resource, 'delete'), [can])
+
   const value = useMemo(
     () => ({
       user,
@@ -90,8 +108,28 @@ export function AuthProvider({ children }) {
       signOut,
       updateUserProfile,
       changeUserPassword,
+      can,
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete,
     }),
-    [user, loading, authError, refreshUser, signIn, signUp, signOut, updateUserProfile, changeUserPassword],
+    [
+      user,
+      loading,
+      authError,
+      refreshUser,
+      signIn,
+      signUp,
+      signOut,
+      updateUserProfile,
+      changeUserPassword,
+      can,
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
