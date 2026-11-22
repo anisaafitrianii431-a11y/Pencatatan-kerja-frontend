@@ -28,6 +28,11 @@ export async function getPenugasan() {
   return assignments.map(normalizeAssignment)
 }
 
+export async function getPenugasanByKaryawan(idKaryawan) {
+  const assignments = await apiGet(`/penugasan?id_karyawan=${idKaryawan}`)
+  return Array.isArray(assignments) ? assignments.map(normalizeAssignment) : []
+}
+
 export async function getPenugasanById(id) {
   const res = await apiGet(`/penugasan/${id}`)
   const raw = Array.isArray(res) ? (res.find((a) => Number(a.id_penugasan) === Number(id)) || res[0]) : res

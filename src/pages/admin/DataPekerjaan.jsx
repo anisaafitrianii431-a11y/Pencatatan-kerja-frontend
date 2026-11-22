@@ -1216,7 +1216,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
           jenis_upah: job.jenis_upah || 'per_jam',
           nominal_upah: String(job.nominal_upah || ''),
           status: job.status || STATUS_PEKERJAAN.BELUM_MULAI,
-          metode_penentuan: job.metode_penentuan || 'terbuka',
+          metode_penentuan: 'langsung',
           kuota_pekerja:
             job.kuota_pekerja !== null && job.kuota_pekerja !== undefined
               ? String(job.kuota_pekerja)
@@ -1225,7 +1225,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
             job.kuota_pekerja === null ||
             job.kuota_pekerja === undefined ||
             job.kuota_pekerja === '',
-          status_pengambilan: job.status_pengambilan || 'terbuka',
+          status_pengambilan: 'ditutup',
           id_karyawan_list: initialEmployeeIds,
         }
       : {
@@ -1241,10 +1241,10 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
           jenis_upah: 'per_jam',
           nominal_upah: '',
           status: STATUS_PEKERJAAN.BELUM_MULAI,
-          metode_penentuan: 'terbuka',
+          metode_penentuan: 'langsung',
           kuota_pekerja: '',
           is_unlimited_kuota: true,
-          status_pengambilan: 'terbuka',
+          status_pengambilan: 'ditutup',
           id_karyawan_list: [],
         },
   )
@@ -1291,17 +1291,10 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
       jenis_upah: values.jenis_upah,
       nominal_upah: Number(values.nominal_upah || 0),
       status: values.status || STATUS_PEKERJAAN.BELUM_MULAI,
-      metode_penentuan: values.metode_penentuan,
-      kuota_pekerja:
-        values.is_unlimited_kuota || !values.kuota_pekerja
-          ? null
-          : Number(values.kuota_pekerja),
-      status_pengambilan:
-        values.metode_penentuan === 'langsung' ? 'ditutup' : values.status_pengambilan || 'terbuka',
-      id_karyawan_list:
-        values.metode_penentuan === 'langsung'
-          ? values.id_karyawan_list
-          : [],
+      metode_penentuan: 'langsung',
+      kuota_pekerja: null,
+      status_pengambilan: 'ditutup',
+      id_karyawan_list: values.id_karyawan_list || [],
     }
 
     if (!normalized.nama_pekerjaan) {
@@ -1579,7 +1572,7 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
               <label className="block text-xs font-semibold text-slate-700">
                 Pilih Satuan Lama Kerja <span className="text-rose-500">*</span>
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {/* 1. Per Jam */}
                 <button
                   type="button"
@@ -1666,6 +1659,35 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                     Gaji tetap bulanan / proporsi kehadiran.
                   </span>
                 </button>
+
+                {/* 4. Borongan */}
+                <button
+                  type="button"
+                  onClick={() => updateField('jenis_upah', 'borongan')}
+                  className={`flex flex-col text-left p-3 rounded-xl border-2 transition cursor-pointer ${
+                    values.jenis_upah === 'borongan'
+                      ? 'border-emerald-600 bg-white ring-2 ring-emerald-500/10 shadow-xs'
+                      : 'border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-white text-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold text-slate-900">Upah Borongan</span>
+                    <span
+                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                        values.jenis_upah === 'borongan'
+                          ? 'border-emerald-600 bg-emerald-600 text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    >
+                      {values.jenis_upah === 'borongan' && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      )}
+                    </span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-slate-500 leading-snug">
+                    Upah tetap per paket proyek selesai.
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -1676,6 +1698,8 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                   ? 'Besar Upah Per Hari (Rp)'
                   : values.jenis_upah === 'per_bulan'
                   ? 'Besar Gaji Per Bulan (Rp)'
+                  : values.jenis_upah === 'borongan'
+                  ? 'Besar Upah Borongan Proyek (Rp)'
                   : 'Besar Upah Per Jam (Rp)'}{' '}
                 <span className="text-rose-500">*</span>
               </label>
@@ -1695,6 +1719,8 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                       ? 'contoh: 150000'
                       : values.jenis_upah === 'per_bulan'
                       ? 'contoh: 3000000'
+                      : values.jenis_upah === 'borongan'
+                      ? 'contoh: 2500000'
                       : 'contoh: 25000'
                   }
                   className="w-full bg-transparent px-2 py-2.5 text-sm font-semibold text-slate-900 outline-none"
@@ -1704,6 +1730,8 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                     ? '/ hari'
                     : values.jenis_upah === 'per_bulan'
                     ? '/ bulan'
+                    : values.jenis_upah === 'borongan'
+                    ? '/ borongan'
                     : '/ jam'}
                 </span>
               </div>
@@ -1720,6 +1748,8 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                       ? '/ hari'
                       : values.jenis_upah === 'per_bulan'
                       ? '/ bulan'
+                      : values.jenis_upah === 'borongan'
+                      ? '/ borongan'
                       : '/ jam'}
                   </span>
                 </span>
@@ -1738,6 +1768,13 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                     <strong className="text-emerald-800">
                       {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(values.nominal_upah) || 0)}
                     </strong> / bulan.
+                  </>
+                ) : values.jenis_upah === 'borongan' ? (
+                  <>
+                    💡 <strong>Simulasi</strong>: Pekerja menerima upah borongan tetap sebesar{' '}
+                    <strong className="text-emerald-800">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(values.nominal_upah) || 0)}
+                    </strong> setelah pekerjaan diselesaikan.
                   </>
                 ) : (
                   <>
@@ -1847,63 +1884,23 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
             </div>
           </div>
 
-          {/* Siapa yang Menentukan Pekerja? (2 Metode) */}
+          {/* Metode Penentuan Pekerja: 1 Metode (Admin yang Menentukan) */}
           <div className="space-y-2 pt-1">
             <span className="block text-xs font-semibold text-slate-700">
-              Cara Penentuan Pekerja <span className="text-rose-500">*</span>
+              Metode Penugasan Pekerja
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* A. Ditugaskan oleh Admin */}
-              <label
-                className={`flex cursor-pointer flex-col rounded-xl border p-3.5 transition ${
-                  values.metode_penentuan === 'langsung'
-                    ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="metode_penentuan"
-                    value="langsung"
-                    checked={values.metode_penentuan === 'langsung'}
-                    onChange={() => updateField('metode_penentuan', 'langsung')}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-xs font-bold text-slate-900">
-                    Ditugaskan oleh Admin
-                  </span>
+            <div className="rounded-xl border border-blue-500/80 bg-blue-50/60 p-3.5 shadow-xs">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-xs">
+                  ✓
                 </div>
-                <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed pl-6">
-                  Admin memilih langsung karyawan yang mengerjakan tugas ini. Pekerjaan otomatis masuk ke daftar tugas karyawan terkait.
-                </p>
-              </label>
-
-              {/* B. Diambil Mandiri oleh Pekerja */}
-              <label
-                className={`flex cursor-pointer flex-col rounded-xl border p-3.5 transition ${
-                  values.metode_penentuan === 'terbuka'
-                    ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="metode_penentuan"
-                    value="terbuka"
-                    checked={values.metode_penentuan === 'terbuka'}
-                    onChange={() => updateField('metode_penentuan', 'terbuka')}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-xs font-bold text-slate-900">
-                    Diambil Mandiri oleh Pekerja
-                  </span>
-                </div>
-                <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed pl-6">
-                  Pekerjaan dibuka untuk seluruh karyawan di menu "Pekerjaan Tersedia". Karyawan dapat mendaftar/mengambil pekerjaan ini sendiri hingga kuota terpenuhi.
-                </p>
-              </label>
+                <span className="text-xs font-bold text-slate-900">
+                  Ditugaskan Langsung oleh Admin (Sistem Tunggal)
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-600 leading-relaxed pl-8">
+                Admin menentukan langsung karyawan atau tim yang bertanggung jawab mengerjakan proyek ini. Pekerjaan otomatis masuk ke daftar tugas karyawan terkait.
+              </p>
             </div>
           </div>
 
@@ -1953,83 +1950,6 @@ function WorkModal({ mode, job, employees, onClose, onSave, isSaving }) {
                     )
                   })
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* Pengaturan Kuota Pekerja (Jika Diambil Mandiri) */}
-          {values.metode_penentuan === 'terbuka' && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="block text-xs font-bold text-slate-800">
-                    Batas Kuota Pekerja yang Dibutuhkan
-                  </span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Tentukan berapa banyak pekerja yang boleh mengambil pekerjaan ini secara mandiri.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                <div>
-                  <label htmlFor="job-kuota" className="block text-[11px] font-medium text-slate-600 mb-1">
-                    Jumlah Maksimal Pekerja (Kuota)
-                  </label>
-                  <input
-                    id="job-kuota"
-                    type="number"
-                    min="1"
-                    disabled={values.is_unlimited_kuota}
-                    placeholder={values.is_unlimited_kuota ? 'Tanpa batas kuota' : 'Contoh: 5'}
-                    value={values.is_unlimited_kuota ? '' : values.kuota_pekerja}
-                    onChange={(e) => updateField('kuota_pekerja', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                </div>
-
-                <div className="pt-4 sm:pt-5">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={values.is_unlimited_kuota}
-                      onChange={(e) => updateField('is_unlimited_kuota', e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span>Bebas Kuota (Tanpa Batas Jumlah)</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Status Penerimaan Mandiri */}
-              <div className="pt-1">
-                <span className="block text-[11px] font-medium text-slate-600 mb-1">
-                  Status Penerimaan Pekerja Mandiri
-                </span>
-                <div className="flex items-center gap-4 text-xs">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="status_pengambilan"
-                      value="terbuka"
-                      checked={values.status_pengambilan === 'terbuka'}
-                      onChange={() => updateField('status_pengambilan', 'terbuka')}
-                      className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="font-semibold text-emerald-700">Buka Pendaftaran (Dapat Diambil)</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="status_pengambilan"
-                      value="ditutup"
-                      checked={values.status_pengambilan === 'ditutup'}
-                      onChange={() => updateField('status_pengambilan', 'ditutup')}
-                      className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="font-semibold text-amber-700">Tutup Pendaftaran</span>
-                  </label>
-                </div>
               </div>
             </div>
           )}

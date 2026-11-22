@@ -944,7 +944,7 @@ export default function PengeluaranAdmin({ currentUser }) {
             }`}
           >
             <Receipt className={`w-4 h-4 ${activeTab === 'data_pengeluaran' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>1. Data Pengeluaran</span>
+            <span>1. Pengeluaran Operasional</span>
             {Number(summaryData?.pending_count || 0) > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-100 text-amber-800 rounded-full font-bold">
                 {summaryData.pending_count} Review
@@ -961,7 +961,7 @@ export default function PengeluaranAdmin({ currentUser }) {
             }`}
           >
             <CreditCard className={`w-4 h-4 ${activeTab === 'pengelolaan_dana' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>2. Pengelolaan Dana</span>
+            <span>2. Kas &amp; Saldo Kantor</span>
           </button>
 
           <button
@@ -973,7 +973,7 @@ export default function PengeluaranAdmin({ currentUser }) {
             }`}
           >
             <FileText className={`w-4 h-4 ${activeTab === 'rekap_laporan' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>3. Rekap & Laporan</span>
+            <span>3. Laporan &amp; Cetak Rekap</span>
           </button>
         </div>
       </div>
@@ -1666,7 +1666,7 @@ export default function PengeluaranAdmin({ currentUser }) {
                 }`}
               >
                 <Building className="w-4 h-4" />
-                <span>Subtab A: Dana Uang Kantor</span>
+                <span>Kas Masuk &amp; Uang Jalan Kantor</span>
               </button>
 
               <button
@@ -1678,7 +1678,7 @@ export default function PengeluaranAdmin({ currentUser }) {
                 }`}
               >
                 <ArrowRight className="w-4 h-4" />
-                <span>Subtab B: Pengembalian Dana & Reimbursement</span>
+                <span>Pengembalian Sisa &amp; Reimbursement</span>
               </button>
             </div>
           </div>

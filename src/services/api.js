@@ -66,17 +66,6 @@ export async function safeFetchJson(url, options = {}) {
         let userId = u.id_user || u.id;
         const employeeId = u.id_karyawan || u.employeeId;
         const uCode = (u.kode_karyawan || u.username || u.name || '').toUpperCase();
-        if (role !== 'admin' && uCode && !uCode.includes('BUDI')) {
-          const matchU = (INITIAL_DATA.user || []).find(
-            (usr) =>
-              (usr.kode_user && usr.kode_user.toUpperCase() === uCode) ||
-              (usr.username && usr.username.toUpperCase() === uCode) ||
-              (usr.nama && usr.nama.toUpperCase().includes(uCode)),
-          );
-          if (matchU) {
-            userId = matchU.id_user;
-          }
-        }
         if (!userId) {
           userId = role === 'admin' ? 1 : (employeeId || 2);
         }
@@ -2475,6 +2464,9 @@ function mapRestPathToPhp(path) {
   const ambilMatch = path.match(/^\/pekerjaan\/(\d+)\/ambil\/?$/)
   if (ambilMatch) {
     return `/pekerjaan.php?action=ambil&id_pekerjaan=${ambilMatch[1]}`
+  }
+  if (path === '/karyawan/me' || path.startsWith('/karyawan/me?')) {
+    return path;
   }
   if (path === '/karyawan' || path.startsWith('/karyawan?')) {
     return '/pekerja.php' + (path.includes('?') ? path.substring(path.indexOf('?')) : '');

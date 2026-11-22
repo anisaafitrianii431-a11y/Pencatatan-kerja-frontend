@@ -241,10 +241,10 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
       tone: 'bg-emerald-50 text-emerald-600',
     },
     {
-      label: 'Pekerjaan Tersedia',
-      value: statistics.tersedia,
+      label: 'Belum Mulai',
+      value: statistics.belumMulai,
       icon: 'sparkles',
-      tone: 'bg-indigo-50 text-indigo-700',
+      tone: 'bg-amber-50 text-amber-700',
     },
   ]
 
@@ -268,7 +268,7 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
                 Jabatan: {worker?.jabatan || 'Pekerja'}
               </span>
               <span className="rounded-lg bg-emerald-900/60 px-2.5 py-1 backdrop-blur-sm">
-                Tarif: {CURRENCY_FORMATTER.format(worker?.tarif_per_jam || 0)} / jam
+                Tarif: {CURRENCY_FORMATTER.format(worker?.nominal_upah || worker?.tarif_per_jam || 0)} {worker?.jenis_upah === 'borongan' ? '/ borongan' : worker?.jenis_upah === 'per_hari' ? '/ hari' : worker?.jenis_upah === 'per_bulan' ? '/ bulan' : '/ jam'}
               </span>
               <span className="rounded-lg bg-emerald-900/60 px-2.5 py-1 backdrop-blur-sm">
                 ID Karyawan: {worker?.kode_karyawan || workerId || worker?.id_karyawan || '—'}
@@ -281,7 +281,7 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
           className="grid shrink-0 gap-2 sm:grid-cols-2"
         >
           <button
-            className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm"
+            className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm cursor-pointer"
             onClick={() => onNavigate('List Pekerjaan')}
             type="button"
           >
@@ -289,11 +289,11 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
             <Icon className="h-4 w-4" name="arrow" />
           </button>
           <button
-            className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm"
-            onClick={() => onNavigate('List Pekerjaan')}
+            className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm cursor-pointer"
+            onClick={() => onNavigate('Absensi')}
             type="button"
           >
-            <span>List Pekerjaan</span>
+            <span>Absensi Kerja</span>
             <Icon className="h-4 w-4" name="arrow" />
           </button>
         </nav>
@@ -378,70 +378,6 @@ function DashboardPekerja({ workerId, workerName = '', onNavigate = () => {} }) 
             </p>
             <p className="mt-1 text-sm text-slate-500">
               Penugasan resmi dari Admin akan tampil otomatis pada bagian ini.
-            </p>
-          </div>
-        )}
-      </section>
-
-      <section
-        aria-label="Pekerjaan tersedia di perusahaan"
-        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.02]"
-      >
-        <SectionHeader
-          buttonLabel="Lihat Semua Pekerjaan"
-          description="Pekerjaan di perusahaan yang belum ditugaskan dan belum selesai."
-          onClick={() => onNavigate('List Pekerjaan')}
-          title="List Pekerjaan"
-        />
-        {isLoading ? (
-          <div
-            aria-label="Memuat pekerjaan tersedia"
-            className="space-y-3 p-5"
-            role="status"
-          >
-            {Array.from({ length: 2 }, (_, index) => (
-              <div
-                className="h-14 animate-pulse rounded-xl bg-slate-100"
-                key={index}
-              />
-            ))}
-          </div>
-        ) : recentAvailableJobs.length > 0 ? (
-          <div className="divide-y divide-slate-100">
-            {recentAvailableJobs.map((job) => (
-              <article
-                className="flex items-center justify-between gap-3 px-5 py-4 sm:px-6"
-                key={job.id_pekerjaan}
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-800">
-                    {job.nama_pekerjaan}
-                  </p>
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    <Icon className="h-3.5 w-3.5 shrink-0" name="location" />
-                    <span className="truncate">
-                      {job.lokasi || 'Lokasi belum ditentukan'}
-                    </span>
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
-                  <span className="text-xs text-slate-500">
-                    {formatDate(job.tanggal_mulai)}{' '}
-                    <span className="text-slate-300">—</span>{' '}
-                    {formatDate(job.target_selesai)}
-                  </span>
-                  <Badge status={job.status} />
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="px-6 py-10 text-center">
-            <p className="text-sm font-semibold text-slate-800">
-              Tidak ada pekerjaan baru yang tersedia saat ini.
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Semua pekerjaan sudah ditugaskan atau telah selesai.
             </p>
           </div>
         )}

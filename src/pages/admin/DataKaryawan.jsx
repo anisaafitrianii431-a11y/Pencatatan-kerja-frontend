@@ -11,6 +11,7 @@ import AvatarAdmin from '../../components/AvatarAdmin.jsx'
 import ModalKonfirmasiHapus from '../../components/ModalKonfirmasiHapus.jsx'
 import { useAuth } from '../../auth/useAuth.js'
 import { getMasterRoles } from '../../services/masterRoleApi.js'
+import { getPenugasanByKaryawan } from '../../services/penugasanApi.js'
 
 const PAGE_SIZE = 8
 
@@ -40,6 +41,14 @@ function formatCurrency(value) {
 
 function formatWageType(type) {
   switch (type) {
+    case 'borongan':
+      return {
+        label: 'Upah Borongan',
+        inputLabel: 'Besar Upah Borongan (Rp)',
+        unit: '/ borongan',
+        desc: 'Dibayarkan per paket atau proyek borongan yang diselesaikan.',
+        color: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+      }
     case 'per_hari':
       return {
         label: 'Gaji Per Hari',
@@ -243,10 +252,12 @@ function EmployeeIcon({ name, className = 'h-4 w-4' }) {
   )
 }
 
+
+
 /**
  * MODAL DETAIL KARYAWAN (Bahasa Sederhana, 3 Panel Jelas, Tanpa Email)
  */
-function EmployeeDetailModal({ employee, onClose, onEdit, onResetPassword }) {
+function EmployeeDetailModal({ employee, onClose, onEdit, onResetPassword, onOpenWorkHistory }) {
   const { canUpdate } = useAuth()
   const navigate = useNavigate()
   if (!employee) return null
@@ -515,6 +526,18 @@ function EmployeeDetailModal({ employee, onClose, onEdit, onResetPassword }) {
                 type="button"
                 onClick={() => {
                   onClose()
+                  onOpenWorkHistory?.(employee)
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 hover:border-indigo-400 hover:bg-indigo-100/70 text-indigo-800 font-semibold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <EmployeeIcon name="briefcase" className="h-4 w-4 text-indigo-600" />
+                <span>Histori Pekerjaan Karyawan</span>
+                <span className="text-[10px] text-indigo-600">→</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose()
                   navigate(`/admin/penugasan?karyawan=${employee.id_karyawan}`)
                 }}
                 className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 font-semibold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
@@ -573,6 +596,8 @@ function EmployeeDetailModal({ employee, onClose, onEdit, onResetPassword }) {
     </div>
   )
 }
+
+
 
 
 
@@ -954,12 +979,124 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             </div>
           </fieldset>
 
-          {/* BAGIAN B: AKUN LOGIN KARYAWAN ATAU STATUS */}
+          {/* BAGIAN B: PENGATURAN SKEMA UPAH & LEMBUR */}
+          <fieldset className="space-y-4 rounded-xl border border-emerald-200/90 bg-emerald-50/30 p-4">
+            <legend className="px-2 text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+              <EmployeeIcon name="banknote" className="h-3.5 w-3.5 text-emerald-600" />
+              <span>B. Skema Upah &amp; Kompensasi Lembur</span>
+            </legend>
+
+            {/* Pilihan Satuan Upah */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-2">
+                Pilihan Skema Upah / Gaji
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: 'per_jam', label: 'Per Jam', sub: 'Hitungan durasi jam' },
+                  { id: 'per_hari', label: 'Per Hari', sub: 'Hitungan per hari kerja' },
+                  { id: 'per_bulan', label: 'Bulanan', sub: 'Gaji tetap bulanan' },
+                  { id: 'borongan', label: 'Borongan', sub: 'Per paket pekerjaan' },
+                ].map((tier) => {
+                  const isSelected = values.jenis_upah === tier.id
+                  return (
+                    <button
+                      key={tier.id}
+                      type="button"
+                      onClick={() => handleWageTypeChange(tier.id)}
+                      className={`flex flex-col text-left p-3 rounded-xl border transition cursor-pointer ${
+                        isSelected
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/20 font-bold'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">{tier.label}</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">{tier.sub}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Input Nominal Upah */}
+            <div>
+              <label htmlFor="form-nominal-upah" className="block text-xs font-semibold text-slate-700 mb-1">
+                {currentWageConfig.inputLabel}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                  Rp
+                </span>
+                <input
+                  id="form-nominal-upah"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  placeholder="contoh: 25000"
+                  value={values.nominal_upah}
+                  onChange={(e) => setValues((prev) => ({ ...prev, nominal_upah: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 pl-9 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 font-semibold"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">{currentWageConfig.desc}</p>
+            </div>
+
+            {/* Pengaturan Kompensasi Lembur */}
+            <div className="rounded-xl border border-blue-200/80 bg-white p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-bold text-slate-800">
+                    Kompensasi Gaji Lembur
+                  </span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Aktifkan jika karyawan berhak menerima bayaran tambahan untuk jam lembur.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={values.lembur_aktif}
+                    onChange={(e) => setValues((prev) => ({ ...prev, lembur_aktif: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {values.lembur_aktif && (
+                <div className="pt-2 border-t border-slate-100">
+                  <label htmlFor="form-tarif-lembur" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Tarif Lembur Per Jam (Rp)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                      Rp
+                    </span>
+                    <input
+                      id="form-tarif-lembur"
+                      type="number"
+                      min="0"
+                      step="1000"
+                      placeholder="contoh: 20000"
+                      value={values.tarif_lembur}
+                      onChange={(e) => setValues((prev) => ({ ...prev, tarif_lembur: e.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-white p-2.5 pl-9 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-semibold"
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Nominal ini dihitung untuk setiap kelebihan jam kerja di atas jam standar kerja proyek.
+                  </p>
+                </div>
+              )}
+            </div>
+          </fieldset>
+
+          {/* BAGIAN C: AKUN LOGIN KARYAWAN ATAU STATUS */}
           {!isEdit ? (
             <fieldset className="space-y-4 rounded-xl border border-blue-200/90 bg-blue-50/30 p-4">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
                 <EmployeeIcon name="lock" className="h-3.5 w-3.5 text-blue-600" />
-                <span>B. Akun Login Karyawan</span>
+                <span>C. Akun Login Karyawan</span>
               </legend>
 
               <div className="rounded-lg bg-white p-3 border border-blue-100 flex items-start gap-2.5 text-xs text-slate-600">
@@ -1039,7 +1176,7 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             <fieldset className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <EmployeeIcon name="power" className="h-3.5 w-3.5 text-blue-600" />
-                <span>B. Status Karyawan &amp; Keamanan Akun</span>
+                <span>C. Status Karyawan &amp; Keamanan Akun</span>
               </legend>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80">
@@ -1086,12 +1223,12 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             </fieldset>
           )}
 
-          {/* BAGIAN C: CATATAN KHUSUS ADMIN */}
+          {/* BAGIAN D: CATATAN KHUSUS ADMIN */}
           <fieldset className="space-y-2 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4">
             <div className="flex items-center justify-between">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <EmployeeIcon name="fileText" className="h-3.5 w-3.5 text-amber-600" />
-                <span>C. Catatan Khusus Admin</span>
+                <span>D. Catatan Khusus Admin</span>
               </legend>
               <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200/70">
                 Hanya Terlihat Oleh Admin
@@ -1159,6 +1296,163 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             </button>
           </div>
         </form>
+      </section>
+    </div>
+  )
+}
+
+
+
+/**
+ * MODAL HISTORI PEKERJAAN KARYAWAN
+ */
+function EmployeeWorkHistoryModal({ employee, onClose }) {
+  const [history, setHistory] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+    async function fetchHistory() {
+      try {
+        setIsLoading(true)
+        const data = await getPenugasanByKaryawan(employee.id_karyawan)
+        if (isMounted) setHistory(data)
+      } catch (err) {
+        if (isMounted) setError(err.message || 'Gagal memuat histori pekerjaan.')
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+    fetchHistory()
+    return () => {
+      isMounted = false
+    }
+  }, [employee.id_karyawan])
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-sm transition-all"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        className="my-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all"
+      >
+        {/* Header Modal */}
+        <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-600/10">
+              <EmployeeIcon name="briefcase" className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                Histori Pekerjaan — {employee.nama}
+              </h2>
+              <p className="text-xs text-slate-500">
+                Riwayat tugas dan proyek yang pernah/sedang dikerjakan ({employee.kode_karyawan || `ID ${employee.id_karyawan}`}).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition"
+          >
+            <EmployeeIcon name="close" className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Isi Modal */}
+        <div className="max-h-[65vh] overflow-y-auto p-6 space-y-3">
+          {isLoading ? (
+            <div className="space-y-3 py-4">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="h-16 animate-pulse rounded-xl bg-slate-100" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800">
+              {error}
+            </div>
+          ) : history.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-3">
+                <EmployeeIcon name="briefcase" className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-semibold text-slate-700">Belum Ada Histori Penugasan</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Karyawan ini belum memiliki riwayat tugas atau proyek yang ditugaskan oleh Admin.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {history.map((item) => (
+                <div
+                  key={item.id_penugasan}
+                  className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs hover:border-indigo-300 transition"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                          {item.kode_pekerjaan || `PRJ-${item.id_pekerjaan}`}
+                        </span>
+                        <h4 className="font-bold text-slate-900 text-sm">
+                          {item.nama_pekerjaan || 'Pekerjaan Tanpa Judul'}
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-1.5">
+                        <span>Peran: <strong className="text-slate-700">{item.peran_tugas || 'Anggota Tim'}</strong></span>
+                        <span>•</span>
+                        <span>Lokasi: {item.lokasi || 'Kantor / Lokasi Proyek'}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          item.status_pekerjaan === 'selesai'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : item.status_pekerjaan === 'berjalan'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        {item.status_pekerjaan === 'selesai'
+                          ? 'Selesai'
+                          : item.status_pekerjaan === 'berjalan'
+                          ? 'Sedang Berjalan'
+                          : 'Belum Mulai'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between text-[11px] text-slate-500">
+                    <div>
+                      Jadwal: {item.tanggal_mulai || '-'} s/d {item.target_selesai || '-'}
+                    </div>
+                    <div>
+                      Tanggal Penugasan: {item.tanggal_penugasan || '-'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer Modal */}
+        <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50/50 px-6 py-3.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+          >
+            Tutup
+          </button>
+        </div>
       </section>
     </div>
   )
@@ -1749,6 +2043,7 @@ function DataKaryawan() {
                 <option value="per_jam">Gaji Per Jam</option>
                 <option value="per_hari">Gaji Per Hari</option>
                 <option value="per_bulan">Gaji Bulanan</option>
+                <option value="borongan">Upah Borongan</option>
               </select>
               <EmployeeIcon
                 name="chevron"
@@ -2023,6 +2318,17 @@ function DataKaryawan() {
                             <EmployeeIcon name="eye" className="h-4 w-4" />
                           </button>
 
+                          {/* Histori Pekerjaan */}
+                          <button
+                            type="button"
+                            onClick={() => setModal({ mode: 'work_history', employee })}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition shadow-2xs"
+                            title={`Histori pekerjaan ${employee.nama}`}
+                            aria-label={`Histori pekerjaan ${employee.nama}`}
+                          >
+                            <EmployeeIcon name="briefcase" className="h-4 w-4" />
+                          </button>
+
                           {/* Edit */}
                           {canUpdate('karyawan') && (
                             <button
@@ -2153,6 +2459,15 @@ function DataKaryawan() {
           employee={modal.employee}
           onClose={() => setModal(null)}
           onEdit={(emp) => setModal({ mode: 'edit', employee: emp })}
+          onOpenWorkHistory={(emp) => setModal({ mode: 'work_history', employee: emp })}
+        />
+      )}
+
+      {/* 7. MODAL HISTORI PEKERJAAN */}
+      {modal && modal.mode === 'work_history' && modal.employee && (
+        <EmployeeWorkHistoryModal
+          employee={modal.employee}
+          onClose={() => setModal(null)}
         />
       )}
 
@@ -2169,5 +2484,7 @@ function DataKaryawan() {
     </div>
   )
 }
+
+
 
 export default DataKaryawan
