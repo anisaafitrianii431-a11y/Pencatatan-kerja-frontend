@@ -5,11 +5,14 @@
  */
 
 export const COMPANY_INFO = {
-  name: 'PAM-TECHNO (CV. PUTRA ANUGRAH MANDIRI)',
+  name: 'CV. PUTRA ANUGRAH MANDIRI',
   brand: 'CV. PUTRA ANUGRAH MANDIRI',
   tagline: 'General Contractor, Electrical & IT Infrastructure Services',
-  address: 'Jl. M. Yunus No.6, Lubuk Lintah, Kec. Kuranji, Kota Padang, Sumatera Barat 25153',
-  contact: 'Email: admin@putraanugrah.co.id',
+  address: 'Jl. M. Yunus No. 06 Kalawi, Kel. Lubuk Lintah, Padang',
+  contact: '+6285274828427 | +625274153595 | putra.anugrahmandiri2016@gmail.com | www.pam-techno.co.id',
+  phone: '+6285274828427 | +625274153595',
+  email: 'putra.anugrahmandiri2016@gmail.com',
+  website: 'www.pam-techno.co.id',
   city: 'Padang',
 };
 

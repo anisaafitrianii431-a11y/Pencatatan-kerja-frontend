@@ -2246,7 +2246,34 @@ export const GajiService = {
     const live = await checkBackendStatus();
     if (live) {
       const { data } = await safeFetchJson(`${API_BASE}/gaji?action=slip&id_gaji=${id_gaji}`);
-      if (data && data.success) return data.data;
+      if (data && data.success) {
+        const slip = data.data || {};
+        const gajiObj = slip.gaji || slip;
+        const jobSummary = slip.pekerjaan_summary || [
+          {
+            nama_pekerjaan: gajiObj.nama_pekerjaan || 'Proyek Lapangan',
+            nama_role: gajiObj.jabatan || gajiObj.nama_role || 'Pelaksana',
+            peran_tugas: gajiObj.jabatan || gajiObj.nama_role || 'Pelaksana',
+            hierarchy_level: 1,
+            jenis_upah: gajiObj.jenis_upah || 'per_jam',
+            nominal_upah: Number(gajiObj.tarif || 0),
+            lama_bekerja: gajiObj.jenis_upah === 'per_hari' ? `${gajiObj.total_hari} Hari` : `${gajiObj.total_jam} Jam`,
+            total_hari: gajiObj.total_hari,
+            total_jam: gajiObj.total_jam,
+            jam_lembur: gajiObj.jam_lembur,
+            lembur_diizinkan: 1,
+            subtotal_upah: Number(gajiObj.upah_normal !== undefined ? gajiObj.upah_normal : gajiObj.total_upah)
+          }
+        ];
+        return {
+          ...slip,
+          gaji: gajiObj,
+          pekerjaan_summary: jobSummary,
+          pembayaran: slip.pembayaran || slip.pembayaran_list || [],
+          absensi: slip.absensi || slip.absensi_list || [],
+          reimburse: slip.reimburse || slip.reimburse_list || []
+        };
+      }
       if (data && !data.success && data.message) throw new Error(data.message);
     }
 

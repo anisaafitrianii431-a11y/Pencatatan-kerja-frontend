@@ -57,13 +57,22 @@ export default function DokumenLaporanKeuangan({
   // Total Likuiditas Kas Perusahaan (Kas Kantor + Kas Dipegang Seluruh PJ)
   const totalLikuiditasKas = sisaKasUtamaKantor + totalSaldoPj;
 
-  // Nama Penanggung Jawab dan Proyek Utama
-  const primaryPjRow = filteredRekapPj[0];
-  const primaryPjName = selectedPjObj?.nama || primaryPjRow?.penanggung_jawab?.nama || 'Anisa Fitriani';
-  const primaryProjectName =
-    primaryPjRow?.daftar_pengeluaran?.[0]?.nama_pekerjaan ||
-    primaryPjRow?.penanggung_jawab?.nama_pekerjaan ||
-    'Pemasangan Kanopi Kantor';
+  // Status filter: apakah laporan mencakup seluruh perusahaan (konsolidasi) atau per penanggung jawab spesifik
+  const isMenyeluruh = !rekapFilterPj;
+
+  const primaryPjRow = filteredRekapPj.find(
+    (r) => String(r.id_karyawan || r.penanggung_jawab?.id_karyawan) === String(rekapFilterPj)
+  ) || filteredRekapPj[0];
+
+  const primaryPjName = isMenyeluruh 
+    ? 'Seluruh Penanggung Jawab' 
+    : (selectedPjObj?.nama || primaryPjRow?.penanggung_jawab?.nama || 'Penanggung Jawab Proyek');
+
+  const primaryProjectName = isMenyeluruh
+    ? 'Semua Proyek Lapangan (Konsolidasi Perusahaan)'
+    : (primaryPjRow?.daftar_pengeluaran?.[0]?.nama_pekerjaan ||
+       primaryPjRow?.penanggung_jawab?.nama_pekerjaan ||
+       'Proyek Operasional Lapangan');
 
   // Format angka ribuan standar akuntansi (tanpa embel-embel Rp agar tabel bersih dan profesional)
   const formatAngka = (val) => {
@@ -82,30 +91,26 @@ export default function DokumenLaporanKeuangan({
     <div className="corporate-report-sheet bg-white text-slate-900 font-sans p-4 sm:p-8 max-w-[210mm] mx-auto print:max-w-none print:p-0 print:m-0 text-[10px] leading-normal select-text">
       
       {/* ============================================================== */}
-      {/* 1. KOP SURAT RESMI (GAYA RESMI HASHMICRO DENGAN LOGO CV. PAM)   */}
+      {/* 1. KOP SURAT RESMI CV. PUTRA ANUGRAH MANDIRI                   */}
       {/* ============================================================== */}
-      <div className="official-header-section text-center pb-3 mb-3 border-b-2 border-slate-900 print-avoid-break">
-        {/* Logo & Identitas Usaha */}
-        <div className="flex flex-col items-center justify-center">
-          <div className="w-12 h-12 rounded-xl bg-slate-900 text-white font-black text-xl flex items-center justify-center border-2 border-slate-700 shadow-xs mb-1">
-            PAM
-          </div>
-          <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase font-serif">
-            CV. PUTRA ANUGRAH MANDIRI
-          </h1>
-          <p className="text-[10px] font-bold text-slate-700 tracking-wider uppercase mt-0.5">
-            General Contractor, Electrical &amp; IT Infrastructure Services
-          </p>
-          <p className="text-[9px] text-slate-600 mt-0.5 leading-snug">
-            Jl. M. Yunus No.6, Lubuk Lintah, Kec. Kuranji, Kota Padang, Sumatera Barat 25153
-          </p>
-          <p className="text-[8.5px] text-slate-500 mt-0.5">
-            Telp / WA: 0812-6688-9900 &bull; Email: admin@putraanugrah.co.id &bull; No. Dokumen: <strong className="text-slate-800 font-mono">{noDokumen}</strong>
-          </p>
+      <div className="official-header-section text-center pb-2 mb-3 print-avoid-break">
+        {/* Banner Kop Surat Resmi */}
+        <div className="w-full mb-1">
+          <img 
+            src="/kop-surat.png" 
+            alt="Kop Surat Resmi CV. Putra Anugrah Mandiri" 
+            className="w-full h-auto object-contain max-h-[125px] mx-auto block"
+          />
+        </div>
+
+        {/* Info No. Dokumen */}
+        <div className="flex justify-between items-center text-[8.5px] text-slate-500 px-1 mt-0.5">
+          <span>Klasifikasi: <strong>{isMenyeluruh ? 'Dokumen Keuangan Konsolidasi Perusahaan' : 'Laporan Pertanggungjawaban (LPJ)'}</strong></span>
+          <span>No. Dokumen: <strong className="text-slate-800 font-mono">{noDokumen}</strong></span>
         </div>
 
         {/* Judul Laporan & Periode */}
-        <div className="mt-3 pt-2 border-t border-slate-300">
+        <div className="mt-2 pt-2 border-t border-slate-300">
           <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 font-serif">
             LAPORAN ARUS KAS &amp; PENGELUARAN OPERASIONAL
           </h2>
@@ -113,7 +118,11 @@ export default function DokumenLaporanKeuangan({
             Periode: {periodeText} &bull; Dicetak: {tglCetak}
           </p>
           <div className="inline-block mt-1 py-0.5 px-3 bg-slate-100 border border-slate-300 rounded text-[9px] text-slate-800">
-            Penanggung Jawab: <strong className="text-slate-900">{primaryPjName}</strong> &bull; Proyek: <strong className="text-slate-900">{primaryProjectName}</strong>
+            {isMenyeluruh ? (
+              <span>Cakupan Laporan: <strong className="text-slate-900">Konsolidasi Menyeluruh Seluruh Perusahaan</strong> &bull; Proyek: <strong className="text-slate-900">Semua Proyek Lapangan</strong></span>
+            ) : (
+              <span>Penanggung Jawab: <strong className="text-slate-900">{primaryPjName}</strong> &bull; Proyek: <strong className="text-slate-900">{primaryProjectName}</strong></span>
+            )}
           </div>
         </div>
       </div>
@@ -197,7 +206,7 @@ export default function DokumenLaporanKeuangan({
             </tr>
             <tr className="border-b border-slate-600">
               <td className="p-1.5 border border-slate-600 pl-4">
-                Kas modal operasional masih dipegang penanggung jawab ({primaryPjName} - Wajib LPJ)
+                Kas modal operasional masih dipegang {isMenyeluruh ? 'seluruh penanggung jawab' : `penanggung jawab (${primaryPjName})`} (Wajib LPJ)
               </td>
               <td className="p-1.5 border border-slate-600 text-right">
                 ({formatAngka(totalSaldoPj)})
@@ -253,7 +262,7 @@ export default function DokumenLaporanKeuangan({
             </tr>
             <tr className="bg-[#fff3cd] font-bold">
               <td className="p-1.5 border border-slate-700 font-bold">
-                Saldo kas operasional masih dipegang penanggung jawab ({primaryPjName})
+                Saldo kas operasional masih dipegang {isMenyeluruh ? 'seluruh penanggung jawab' : `penanggung jawab (${primaryPjName})`}
               </td>
               <td className="p-1.5 border border-slate-700 text-right"></td>
               <td className="p-1.5 border border-slate-700 text-right font-bold">
@@ -316,7 +325,8 @@ export default function DokumenLaporanKeuangan({
                 const proyekName =
                   row.daftar_pengeluaran?.[0]?.nama_pekerjaan ||
                   row.penanggung_jawab?.nama_pekerjaan ||
-                  'Pemasangan Kanopi Kantor';
+                  row.nama_pekerjaan ||
+                  'Operasional Lapangan';
                 const saldo = Number(row.saldo_dipegang || 0);
 
                 return (
@@ -391,7 +401,7 @@ export default function DokumenLaporanKeuangan({
                       </td>
                       <td className="border border-slate-300 p-1 text-center text-slate-700">{d.tanggal || '-'}</td>
                       <td className="border border-slate-300 p-1 font-bold text-slate-900">
-                        {d.nama_penanggung_jawab || d.penerima_dana || 'Anisa Fitriani'}
+                        {d.nama_penanggung_jawab || d.penerima_dana || '-'}
                       </td>
                       <td className="border border-slate-300 p-1 text-slate-800">
                         {d.nama_pekerjaan ? `${d.nama_pekerjaan} - ` : ''}{d.tujuan_penggunaan || d.keterangan || 'Modal Belanja Operasional'}
@@ -439,7 +449,7 @@ export default function DokumenLaporanKeuangan({
                       </td>
                       <td className="border border-slate-300 p-1 text-center text-slate-700">{tx.tanggal || '-'}</td>
                       <td className="border border-slate-300 p-1 font-bold text-slate-900">
-                        {tx.nama_pj || tx.nama_karyawan || 'Anisa Fitriani'}
+                        {tx.nama_pj || tx.nama_karyawan || '-'}
                       </td>
                       <td className="border border-slate-300 p-1 text-slate-800">
                         <span className="font-semibold block">{tx.kategori || 'Operasional'}</span>
@@ -477,19 +487,19 @@ export default function DokumenLaporanKeuangan({
         <div className="grid grid-cols-3 gap-4 text-center text-xs">
           <div>
             <div className="text-[8px] font-bold text-slate-600 uppercase tracking-wider">
-              Yang Mempertanggungjawabkan (PJ):
+              {isMenyeluruh ? 'Dibuat / Dilaporkan Oleh:' : 'Yang Mempertanggungjawabkan (PJ):'}
             </div>
             <div className="font-bold text-slate-900 mt-0.5 text-[9.5px]">
-              {primaryPjName}
+              {isMenyeluruh ? (currentUser?.nama || 'Administrator Keuangan') : primaryPjName}
             </div>
             <div className="text-[7.5px] text-slate-500">
-              Teknisi / Penanggung Jawab Proyek
+              {isMenyeluruh ? 'Bagian Keuangan & Administrasi' : 'Teknisi / Penanggung Jawab Proyek'}
             </div>
             <div className="h-12 flex items-center justify-center">
               <span className="text-[7px] text-slate-300 italic">[ Tanda Tangan ]</span>
             </div>
             <div className="border-t border-slate-900 font-bold text-slate-900 pt-0.5 mx-auto max-w-[130px] text-[9px]">
-              ( {primaryPjName} )
+              ( {isMenyeluruh ? (currentUser?.nama || 'Administrator') : primaryPjName} )
             </div>
           </div>
 
@@ -498,10 +508,10 @@ export default function DokumenLaporanKeuangan({
               Diperiksa Oleh:
             </div>
             <div className="font-bold text-slate-900 mt-0.5 text-[9.5px]">
-              Bendahara Kantor
+              Bendahara Perusahaan
             </div>
             <div className="text-[7.5px] text-slate-500">
-              Finance &amp; Kasir Perusahaan
+              Finance &amp; Kasir Kantor
             </div>
             <div className="h-12 flex items-center justify-center">
               <span className="text-[7px] text-slate-300 italic">[ Tanda Tangan ]</span>

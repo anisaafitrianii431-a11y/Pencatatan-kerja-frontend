@@ -14,10 +14,6 @@ import {
   updatePekerjaan,
   getPekerjaanPekerja,
   updatePekerjaanStatusPekerja,
-  getPekerjaanLaporan,
-  createPekerjaanLaporan,
-  setujuiPekerjaanLaporan,
-  tolakPekerjaanLaporan,
   togglePengambilanPekerjaan,
   batalkanPenugasanPekerja,
   tambahPekerjaKePekerjaan,
@@ -2314,443 +2310,6 @@ function WorkerMonitoringModal({ job, onClose, onRefresh }) {
   )
 }
 
-// Modal Laporan & Persetujuan Penyelesaian Pekerjaan
-function ReportApprovalModal({ job, employees, onClose, onRefresh }) {
-  const [reports, setReports] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [actionId, setActionId] = useState(null)
-  const [actionDialog, setActionDialog] = useState(null) // { report, type: 'approve' | 'reject' }
-  const [noteInput, setNoteInput] = useState('')
-  const [showAddReportForm, setShowAddReportForm] = useState(false)
-  const [notice, setNotice] = useState(null)
-
-  // Form Tambah Laporan
-  const [newReport, setNewReport] = useState({
-    id_karyawan: employees[0]?.id_karyawan || '',
-    tipe_laporan: 'akhir',
-    judul: 'Laporan Penyelesaian Pekerjaan',
-    keterangan: '',
-    foto_dokumentasi: '',
-  })
-
-  const loadReports = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const res = await getPekerjaanLaporan(job.id_pekerjaan)
-      setReports(Array.isArray(res) ? res : [])
-    } catch (err) {
-      setNotice({ type: 'error', message: `Gagal memuat laporan: ${err.message}` })
-    } finally {
-      setIsLoading(false)
-    }
-  }, [job.id_pekerjaan])
-
-  useEffect(() => {
-    loadReports()
-  }, [loadReports])
-
-  async function handleActionSubmit() {
-    if (!actionDialog) return
-    const { report, type } = actionDialog
-    setActionId(report.id_laporan)
-
-    try {
-      if (type === 'approve') {
-        await setujuiPekerjaanLaporan(report.id_laporan, noteInput.trim())
-        setNotice({
-          type: 'success',
-          message: 'Laporan berhasil disetujui! Status pekerjaan kini Selesai.',
-        })
-      } else {
-        await tolakPekerjaanLaporan(report.id_laporan, noteInput.trim())
-        setNotice({
-          type: 'success',
-          message: 'Laporan ditolak dengan catatan evaluasi.',
-        })
-      }
-      setActionDialog(null)
-      setNoteInput('')
-      await loadReports()
-      onRefresh?.()
-    } catch (err) {
-      setNotice({ type: 'error', message: `Aksi gagal: ${err.message}` })
-    } finally {
-      setActionId(null)
-    }
-  }
-
-  async function handleCreateReport(e) {
-    e.preventDefault()
-    if (!newReport.judul.trim() || !newReport.id_karyawan) {
-      setNotice({ type: 'error', message: 'Judul laporan dan pelapor wajib diisi.' })
-      return
-    }
-
-    try {
-      await createPekerjaanLaporan(job.id_pekerjaan, {
-        id_karyawan: Number(newReport.id_karyawan),
-        tipe_laporan: newReport.tipe_laporan,
-        judul: newReport.judul.trim(),
-        keterangan: newReport.keterangan.trim(),
-        foto_dokumentasi: newReport.foto_dokumentasi || null,
-      })
-      setShowAddReportForm(false)
-      setNewReport({
-        id_karyawan: employees[0]?.id_karyawan || '',
-        tipe_laporan: 'akhir',
-        judul: 'Laporan Penyelesaian Pekerjaan',
-        keterangan: '',
-        foto_dokumentasi: '',
-      })
-      await loadReports()
-      onRefresh?.()
-      setNotice({ type: 'success', message: 'Laporan penyelesaian berhasil dikirim untuk diverifikasi.' })
-    } catch (err) {
-      setNotice({ type: 'error', message: `Gagal mengirim laporan: ${err.message}` })
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-[85] flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl my-6"
-      >
-        <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <WorkIcon name="clipboard" className="h-5 w-5 text-blue-600" />
-              <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                Laporan & Persetujuan Penyelesaian
-              </h2>
-            </div>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Pekerjaan: <strong className="text-slate-800">{job.nama_pekerjaan}</strong> (#{job.id_pekerjaan})
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition cursor-pointer"
-          >
-            <WorkIcon name="close" className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {notice && (
-            <div
-              className={`p-3 rounded-xl text-xs font-medium flex items-center justify-between ${
-                notice.type === 'error'
-                  ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-              }`}
-            >
-              <span>{notice.message}</span>
-              <button
-                type="button"
-                onClick={() => setNotice(null)}
-                className="text-slate-400 hover:text-slate-600 text-xs"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700">
-              Daftar Laporan Pekerjaan ({reports.length})
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowAddReportForm((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
-            >
-              <WorkIcon name="plus" className="h-3.5 w-3.5" />
-              <span>{showAddReportForm ? 'Tutup Form' : 'Input Laporan Penyelesaian'}</span>
-            </button>
-          </div>
-
-          {/* Form Input Laporan Baru */}
-          {showAddReportForm && (
-            <form onSubmit={handleCreateReport} className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3 text-xs">
-              <h4 className="font-bold text-blue-900 text-sm">
-                Kirim Laporan Penyelesaian Proyek
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="rep-karyawan" className="block font-semibold text-slate-700 mb-1">
-                    Karyawan Pelapor <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    id="rep-karyawan"
-                    value={newReport.id_karyawan}
-                    onChange={(e) => setNewReport({ ...newReport, id_karyawan: e.target.value })}
-                    className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
-                    required
-                  >
-                    {employees.map((emp) => (
-                      <option key={emp.id_karyawan} value={emp.id_karyawan}>
-                        {emp.nama} ({emp.jabatan || 'Teknisi'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="rep-tipe" className="block font-semibold text-slate-700 mb-1">
-                    Tipe Laporan
-                  </label>
-                  <select
-                    id="rep-tipe"
-                    value={newReport.tipe_laporan}
-                    onChange={(e) => setNewReport({ ...newReport, tipe_laporan: e.target.value })}
-                    className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
-                  >
-                    <option value="akhir">Laporan Akhir (Penyelesaian Pekerjaan)</option>
-                    <option value="progres">Laporan Progres Berkala</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="rep-judul" className="block font-semibold text-slate-700 mb-1">
-                  Judul Laporan <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  id="rep-judul"
-                  type="text"
-                  required
-                  value={newReport.judul}
-                  onChange={(e) => setNewReport({ ...newReport, judul: e.target.value })}
-                  placeholder="Contoh: Pekerjaan Instalasi Kabel Selesai 100%"
-                  className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="rep-ket" className="block font-semibold text-slate-700 mb-1">
-                  Keterangan & Catatan Hasil Kerja
-                </label>
-                <textarea
-                  id="rep-ket"
-                  rows={2}
-                  value={newReport.keterangan}
-                  onChange={(e) => setNewReport({ ...newReport, keterangan: e.target.value })}
-                  placeholder="Jelaskan hasil pekerjaan yang sudah rampung..."
-                  className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowAddReportForm(false)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-1.5 font-semibold text-white hover:bg-blue-700"
-                >
-                  Kirim Laporan
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* List Laporan */}
-          {isLoading ? (
-            <div className="py-12 text-center text-slate-500 text-sm">
-              Memuat data laporan pekerjaan...
-            </div>
-          ) : reports.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-400 text-xs">
-              Belum ada laporan yang dikirim untuk pekerjaan ini.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {reports.map((r) => {
-                const isApproved = r.status_persetujuan === 'disetujui'
-                const isRejected = r.status_persetujuan === 'ditolak'
-                const isPending = r.status_persetujuan === 'menunggu'
-
-                return (
-                  <div
-                    key={r.id_laporan}
-                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                              r.tipe_laporan === 'akhir'
-                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            {r.tipe_laporan === 'akhir' ? 'Laporan Akhir' : 'Laporan Progres'}
-                          </span>
-                          <h4 className="font-bold text-slate-900 text-sm">
-                            {r.judul}
-                          </h4>
-                        </div>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Pelapor: <strong className="text-slate-700">{r.nama_karyawan}</strong> ({r.jabatan || 'Teknisi'}) • Tanggal: {formatDate(r.tanggal_laporan)}
-                        </p>
-                      </div>
-
-                      <div>
-                        {isApproved && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                            ✓ Disetujui
-                          </span>
-                        )}
-                        {isRejected && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/20">
-                            ✕ Ditolak
-                          </span>
-                        )}
-                        {isPending && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-600/20">
-                            Menunggu Verifikasi
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {r.keterangan && (
-                      <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed whitespace-pre-line">
-                        {r.keterangan}
-                      </p>
-                    )}
-
-                    {r.catatan_admin && (
-                      <p className="text-xs text-slate-600 bg-amber-50/60 p-2 rounded-lg border border-amber-200/60">
-                        <strong>Catatan Admin:</strong> {r.catatan_admin}
-                      </p>
-                    )}
-
-                    {/* Tombol Aksi Verifikasi untuk Laporan Menunggu */}
-                    {isPending && (
-                      <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setActionDialog({
-                              report: r,
-                              type: 'reject',
-                              title: 'Tolak Laporan Penyelesaian',
-                            })
-                          }
-                          disabled={actionId === r.id_laporan}
-                          className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 transition cursor-pointer"
-                        >
-                          Tolak Laporan
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setActionDialog({
-                              report: r,
-                              type: 'approve',
-                              title: 'Setujui Laporan & Selesaikan Pekerjaan',
-                            })
-                          }
-                          disabled={actionId === r.id_laporan}
-                          className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition cursor-pointer"
-                        >
-                          Setujui Penyelesaian
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end border-t border-slate-100 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
-          >
-            Tutup
-          </button>
-        </div>
-      </section>
-
-      {/* Dialog Catatan Persetujuan / Penolakan */}
-      {actionDialog && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900">
-              {actionDialog.title}
-            </h3>
-            <p className="text-xs text-slate-600">
-              Laporan: <strong>{actionDialog.report.judul}</strong> ({actionDialog.report.nama_karyawan})
-            </p>
-
-            <div>
-              <label htmlFor="catatan-laporan-action" className="block text-xs font-semibold text-slate-700 mb-1">
-                Catatan Admin {actionDialog.type === 'reject' ? '(Wajib)' : '(Opsional)'}
-              </label>
-              <textarea
-                id="catatan-laporan-action"
-                rows={3}
-                placeholder={
-                  actionDialog.type === 'approve'
-                    ? 'Contoh: Hasil pekerjaan telah diperiksa dan disetujui...'
-                    : 'Contoh: Mohon perbaiki kabel dan unggah foto dokumentasi ulang...'
-                }
-                value={noteInput}
-                onChange={(e) => setNoteInput(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setActionDialog(null)
-                  setNoteInput('')
-                }}
-                className="rounded-xl border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleActionSubmit}
-                disabled={actionDialog.type === 'reject' && !noteInput.trim()}
-                className={`rounded-xl px-4 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${
-                  actionDialog.type === 'approve'
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-rose-600 hover:bg-rose-700'
-                }`}
-              >
-                {actionDialog.type === 'approve' ? 'Konfirmasi Setujui' : 'Konfirmasi Tolak'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function DataPekerjaan() {
   const { can, canCreate, canUpdate, canDelete } = useAuth()
   const navigate = useNavigate()
@@ -2770,9 +2329,8 @@ function DataPekerjaan() {
   const [modal, setModal] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
 
-  // Modals tambahan untuk Pemantauan Pekerja & Laporan
+  // Modal Pemantauan Pekerja
   const [monitoringJob, setMonitoringJob] = useState(null)
-  const [reportJob, setReportJob] = useState(null)
 
   // Filters & Sorting
   const [search, setSearch] = useState('')
@@ -3019,7 +2577,7 @@ function DataPekerjaan() {
             )}
           </div>
           <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-            Kelola proyek, penugasan karyawan, koordinat peta presensi, batas waktu, dan verifikasi persetujuan penyelesaian.
+            Kelola proyek, penugasan karyawan, koordinat peta presensi, batas waktu, dan status penyelesaian proyek.
           </p>
         </div>
 
@@ -3140,7 +2698,7 @@ function DataPekerjaan() {
             statusKey: STATUS_PEKERJAAN.SELESAI,
             tone: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/10',
             activeClass: 'border-2 border-emerald-600 bg-emerald-50/40 ring-2 ring-emerald-600/20',
-            sub: 'Laporan disetujui • Klik filter',
+            sub: 'Proyek tuntas • Klik filter',
           },
         ].map((stat) => {
           const isActive = stat.statusKey === '' ? statusFilter === '' : statusFilter === stat.statusKey
@@ -3395,6 +2953,15 @@ function DataPekerjaan() {
                     job.target_selesai === today &&
                     job.status !== STATUS_PEKERJAAN.SELESAI
 
+                  let daysLeft = null
+                  if (job.target_selesai && !isExpired && !isDueToday && job.status !== STATUS_PEKERJAAN.SELESAI) {
+                    const diffTime = new Date(job.target_selesai + 'T00:00:00') - new Date(today + 'T00:00:00')
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                    if (diffDays > 0 && diffDays <= 3) {
+                      daysLeft = diffDays
+                    }
+                  }
+
                   return (
                     <tr
                       key={job.id_pekerjaan}
@@ -3564,7 +3131,13 @@ function DataPekerjaan() {
                               Tenggat Hari Ini
                             </span>
                           )}
-                          {!isExpired && !isDueToday && job.target_selesai && (
+                          {daysLeft !== null && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 ring-1 ring-inset ring-orange-600/20 whitespace-nowrap">
+                              <span>⏳</span>
+                              <span>Sisa {daysLeft} Hari</span>
+                            </span>
+                          )}
+                          {!isExpired && !isDueToday && daysLeft === null && job.target_selesai && (
                             <span className="text-[10px] text-slate-400">Batas waktu</span>
                           )}
                         </div>
@@ -3589,21 +3162,28 @@ function DataPekerjaan() {
                             <WorkIcon name="users" className="h-4 w-4" />
                           </button>
 
-                          {/* Laporan & Persetujuan Penyelesaian */}
-                          <button
-                            type="button"
-                            onClick={() => setReportJob(job)}
-                            className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 transition shadow-2xs shrink-0 cursor-pointer"
-                            title={`Laporan & Persetujuan Penyelesaian Pekerjaan #${job.id_pekerjaan}`}
-                            aria-label={`Laporan & Persetujuan Penyelesaian Pekerjaan #${job.id_pekerjaan}`}
-                          >
-                            <WorkIcon name="clipboard" className="h-4 w-4" />
-                            {Number(job.total_laporan_menunggu || 0) > 0 && (
-                              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-white">
-                                {job.total_laporan_menunggu}
-                              </span>
-                            )}
-                          </button>
+                          {/* Selesaikan Proyek Cepat (1-Klik) */}
+                          {canUpdate('pekerjaan') && job.status !== STATUS_PEKERJAAN.SELESAI && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (window.confirm(`Tandai proyek "${job.nama_pekerjaan}" sebagai SELESAI?`)) {
+                                  try {
+                                    await updatePekerjaan(job.id_pekerjaan, { status: STATUS_PEKERJAAN.SELESAI })
+                                    showToast('Proyek berhasil diselesaikan!')
+                                    await loadData()
+                                  } catch (err) {
+                                    showToast(`Gagal menyelesaikan proyek: ${err.message}`, 'error')
+                                  }
+                                }
+                              }}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 transition shadow-2xs shrink-0 cursor-pointer"
+                              title="Tandai Proyek Selesai"
+                              aria-label="Tandai Proyek Selesai"
+                            >
+                              <span className="text-xs font-bold">✓</span>
+                            </button>
+                          )}
 
                           {/* Detail */}
                           <button
@@ -3735,16 +3315,6 @@ function DataPekerjaan() {
         <WorkerMonitoringModal
           job={monitoringJob}
           onClose={() => setMonitoringJob(null)}
-          onRefresh={loadData}
-        />
-      )}
-
-      {/* Modal Laporan & Persetujuan Penyelesaian */}
-      {reportJob && (
-        <ReportApprovalModal
-          job={reportJob}
-          employees={employees}
-          onClose={() => setReportJob(null)}
           onRefresh={loadData}
         />
       )}

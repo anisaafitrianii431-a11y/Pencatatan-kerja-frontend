@@ -482,8 +482,9 @@ export default function GajiAdmin({ currentUser }) {
     setErrorMsg('');
     try {
       const res = await GajiService.getSlip(id_gaji);
+      const targetGaji = res?.gaji || res;
       setSlipData(res);
-      setSlipModal(res?.gaji || {});
+      setSlipModal(targetGaji || {});
     } catch (err) {
       setErrorMsg(err.message || 'Gagal memuat rincian slip gaji');
     } finally {
@@ -1107,17 +1108,22 @@ export default function GajiAdmin({ currentUser }) {
                           </td>
 
                           <td className="px-4 py-3 text-right">
-                            {row.bonus > 0 && (
+                            {Number(row.total_ganti || 0) > 0 && (
+                              <div className="text-[11px] text-amber-700 font-bold" title="Penggantian Uang Talangan Pribadi (Reimbursement)">
+                                + Reimburse: {formatRupiah(row.total_ganti)}
+                              </div>
+                            )}
+                            {Number(row.bonus || 0) > 0 && (
                               <div className="text-[11px] text-emerald-600 font-semibold">
-                                +{formatRupiah(row.bonus)}
+                                + Bonus: {formatRupiah(row.bonus)}
                               </div>
                             )}
-                            {row.potongan > 0 && (
+                            {Number(row.potongan || 0) > 0 && (
                               <div className="text-[11px] text-rose-600 font-semibold">
-                                -{formatRupiah(row.potongan)}
+                                - Potongan: {formatRupiah(row.potongan)}
                               </div>
                             )}
-                            {(!row.bonus && !row.potongan) && (
+                            {(!row.bonus && !row.potongan && (!row.total_ganti || Number(row.total_ganti) === 0)) && (
                               <span className="text-slate-400">-</span>
                             )}
                           </td>
@@ -2479,7 +2485,7 @@ export default function GajiAdmin({ currentUser }) {
                       <tr>
                         <td className="px-3 py-2 text-center text-slate-400 font-medium">1</td>
                         <td className="px-3 py-2 font-bold text-slate-900">
-                          {slipModal.jenis_upah === 'per_jam' ? 'Tugas Operasional Lapangan' : slipModal.jenis_upah === 'per_hari' ? 'Proyek Harian' : 'Gaji Pokok Bulanan'}
+                          {slipModal.nama_pekerjaan || (slipModal.jenis_upah === 'per_jam' ? 'Tugas Operasional Lapangan' : slipModal.jenis_upah === 'per_hari' ? 'Proyek Harian' : 'Gaji Pokok Bulanan')}
                           <span className="block text-[10px] font-normal text-indigo-700 mt-0.5">
                             Role: {slipModal.nama_role || slipModal.jabatan} (Level {slipModal.hierarchy_level || 1})
                           </span>

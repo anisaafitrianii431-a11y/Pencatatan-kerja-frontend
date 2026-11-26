@@ -424,67 +424,38 @@ function EmployeeDetailModal({ employee, onClose, onEdit, onResetPassword, onOpe
             </div>
           </div>
 
-          {/* 2. PENGATURAN GAJI & LEMBUR */}
+          {/* 2. SKEMA PENGGAJIAN PROYEK */}
           <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 mb-3">
               <EmployeeIcon name="banknote" className="h-4 w-4 text-emerald-600" />
-              <span>2. Pengaturan Gaji & Lembur</span>
+              <span>2. Skema Penggajian Berbasis Proyek</span>
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {/* Cara Pembayaran Gaji */}
-              <div className="rounded-lg bg-emerald-50/40 p-3.5 border border-emerald-100">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-emerald-800">
-                    Cara Pembayaran Gaji
+            <div className="rounded-xl bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-4 border border-blue-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-blue-100/90 px-2.5 py-0.5 text-xs font-bold text-blue-800">
+                    <span>💼</span>
+                    <span>Fleksibel per Proyek</span>
                   </span>
-                  <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold ${wageInfo.color}`}>
-                    {wageInfo.label}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-xl font-bold tracking-tight text-emerald-700">
-                    {formatCurrency(employee.nominal_upah)}
-                  </span>
-                  <span className="text-xs font-medium text-slate-500">
-                    {wageInfo.unit}
+                  <span className="text-[11px] text-slate-500">
+                    Ditetapkan Manual oleh Direktur
                   </span>
                 </div>
-                <p className="mt-1.5 text-[11px] text-slate-500">
-                  {wageInfo.desc}
+                <p className="mt-1.5 text-xs text-slate-600 leading-relaxed max-w-lg">
+                  Besaran upah kerja (Per Jam / Per Hari) dan kompensasi lembur ditentukan sesuai bobot proyek saat penugasan pekerja di lapangan.
                 </p>
               </div>
-
-              {/* Gaji Tambahan Lembur */}
-              <div className="rounded-lg bg-blue-50/40 p-3.5 border border-blue-100">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-blue-800">
-                    Gaji Tambahan untuk Lembur
-                  </span>
-                  {employee.lembur_aktif ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-800">
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-                      Aktif
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                      Tidak Aktif
-                    </span>
-                  )}
-                </div>
-                <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-xl font-bold tracking-tight text-blue-700">
-                    {employee.lembur_aktif ? formatCurrency(employee.tarif_lembur) : 'Rp0'}
-                  </span>
-                  <span className="text-xs font-medium text-slate-500">
-                    / jam
-                  </span>
-                </div>
-                <p className="mt-1.5 text-[11px] text-slate-500">
-                  {employee.lembur_aktif
-                    ? 'Karyawan mendapatkan bayaran tambahan saat bekerja melebihi jam kerja.'
-                    : 'Karyawan tidak memiliki perhitungan gaji lembur.'}
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose()
+                  navigate(`/admin/penugasan?karyawan=${employee.id_karyawan}`)
+                }}
+                className="shrink-0 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Lihat Penugasan</span>
+                <span>→</span>
+              </button>
             </div>
           </div>
 
@@ -1508,7 +1479,6 @@ function DataKaryawan() {
   // Filters & Sorting
   const [search, setSearch] = useState('')
   const [positionFilter, setPositionFilter] = useState('')
-  const [wageTypeFilter, setWageTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState(initialStatus)
   const [sortOrder, setSortOrder] = useState('terbaru')
   const [page, setPage] = useState(1)
@@ -1620,19 +1590,16 @@ function DataKaryawan() {
         const matchesPosition =
           !positionFilter || employee.jabatan === positionFilter
 
-        const matchesWageType =
-          !wageTypeFilter || employee.jenis_upah === wageTypeFilter
-
         const matchesStatus =
           !statusFilter ||
           (statusFilter === 'aktif' ? isEmployeeActive : !isEmployeeActive)
 
-        return matchesSearch && matchesPosition && matchesWageType && matchesStatus
+        return matchesSearch && matchesPosition && matchesStatus
       })
       .sort((left, right) => sortOrder === 'terbaru'
         ? Number(right.id_karyawan) - Number(left.id_karyawan)
         : left.nama.localeCompare(right.nama, 'id', { sensitivity: 'base' }) * (sortOrder === 'asc' ? 1 : -1))
-  }, [employees, positionFilter, search, sortOrder, statusFilter, wageTypeFilter])
+  }, [employees, positionFilter, search, sortOrder, statusFilter])
 
   // Statistics
   const totalEmployees = employees.length
@@ -1653,12 +1620,11 @@ function DataKaryawan() {
     currentPage * PAGE_SIZE,
   )
 
-  const hasActiveFilters = Boolean(search || positionFilter || wageTypeFilter || statusFilter)
+  const hasActiveFilters = Boolean(search || positionFilter || statusFilter)
 
   function handleResetFilters() {
     setSearch('')
     setPositionFilter('')
-    setWageTypeFilter('')
     setStatusFilter('')
     setPage(1)
   }
@@ -1799,7 +1765,7 @@ function DataKaryawan() {
             )}
           </div>
           <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-            Kelola data karyawan, ID unik otomatis, akun login sistem, pengaturan gaji, dan catatan khusus admin.
+            Kelola data karyawan, ID unik otomatis, penugasan proyek, akun login sistem, dan catatan khusus admin.
           </p>
         </div>
 
@@ -2055,28 +2021,6 @@ function DataKaryawan() {
               />
             </div>
 
-            {/* Filter Jenis Gaji */}
-            <div className="relative min-w-[140px] flex-1 sm:flex-initial">
-              <select
-                value={wageTypeFilter}
-                onChange={(e) => {
-                  setWageTypeFilter(e.target.value)
-                  setPage(1)
-                }}
-                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50/60 py-2 pl-3 pr-8 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
-              >
-                <option value="">Semua Cara Pembayaran</option>
-                <option value="per_jam">Gaji Per Jam</option>
-                <option value="per_hari">Gaji Per Hari</option>
-                <option value="per_bulan">Gaji Bulanan</option>
-                <option value="borongan">Upah Borongan</option>
-              </select>
-              <EmployeeIcon
-                name="chevron"
-                className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-              />
-            </div>
-
             {/* Filter Status */}
             <div className="relative min-w-[120px] flex-1 sm:flex-initial">
               <select
@@ -2157,22 +2101,17 @@ function DataKaryawan() {
                   Nomor HP
                 </th>
 
-                {/* 6. Jenis Gaji */}
+                {/* 6. Skema Upah */}
                 <th className="px-3.5 py-3.5" scope="col">
-                  Jenis Gaji
+                  Skema Upah
                 </th>
 
-                {/* 7. Nominal Gaji */}
-                <th className="px-3.5 py-3.5" scope="col">
-                  Nominal Gaji
-                </th>
-
-                {/* 8. Status */}
+                {/* 7. Status */}
                 <th className="px-3.5 py-3.5 text-center w-28" scope="col">
                   Status
                 </th>
 
-                {/* 9. Aksi */}
+                {/* 8. Aksi */}
                 <th className="px-3.5 py-3.5 text-right w-48" scope="col">
                   Aksi
                 </th>
@@ -2182,7 +2121,7 @@ function DataKaryawan() {
             <tbody className="divide-y divide-slate-100">
               {!isReady ? (
                 <tr>
-                  <td colSpan="9" className="px-4 py-12 text-center text-sm text-slate-500">
+                  <td colSpan="8" className="px-4 py-12 text-center text-sm text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <svg
                         className="h-6 w-6 animate-spin text-blue-600"
@@ -2211,7 +2150,7 @@ function DataKaryawan() {
                 </tr>
               ) : pageEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-4 py-12 text-center">
+                  <td colSpan="8" className="px-4 py-12 text-center">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                       <EmployeeIcon name="search" className="h-6 w-6" />
                     </div>
@@ -2291,35 +2230,18 @@ function DataKaryawan() {
                         {employee.nomor_hp || <span className="text-slate-300 font-sans">—</span>}
                       </td>
 
-                      {/* 6. Jenis Gaji */}
+                      {/* 6. Skema Upah */}
                       <td className="whitespace-nowrap px-3.5 py-3">
-                        <span
-                          className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${wageInfo.color}`}
-                        >
-                          {wageInfo.label}
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 border border-blue-200/80">
+                          <span>💼</span>
+                          <span>Fleksibel per Proyek</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          Ditetapkan saat penugasan
                         </span>
                       </td>
 
-                      {/* 7. Nominal Gaji */}
-                      <td className="whitespace-nowrap px-3.5 py-3">
-                        {Number(employee.nominal_upah) > 0 ? (
-                          <div className="flex items-baseline gap-1 font-semibold text-slate-800 tabular-nums">
-                            <span>{formatCurrency(employee.nominal_upah)}</span>
-                            <span className="text-[11px] font-normal text-slate-400">
-                              {wageInfo.unit}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic text-[11px]">Ditetapkan per proyek</span>
-                        )}
-                        {employee.lembur_aktif && (
-                          <span className="text-[10px] text-blue-600 font-medium block">
-                            + Lembur {formatCurrency(employee.tarif_lembur)}/jam
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 8. Status */}
+                      {/* 7. Status */}
                       <td className="whitespace-nowrap px-3.5 py-3 text-center">
                         {isEmployeeActive ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
