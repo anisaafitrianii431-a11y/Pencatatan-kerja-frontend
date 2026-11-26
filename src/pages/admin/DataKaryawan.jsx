@@ -10,7 +10,7 @@ import {
 import AvatarAdmin from '../../components/AvatarAdmin.jsx'
 import ModalKonfirmasiHapus from '../../components/ModalKonfirmasiHapus.jsx'
 import { useAuth } from '../../auth/useAuth.js'
-import { getMasterRoles } from '../../services/masterRoleApi.js'
+import { getMasterRoles, createMasterRole } from '../../services/masterRoleApi.js'
 import { getPenugasanByKaryawan } from '../../services/penugasanApi.js'
 
 const PAGE_SIZE = 8
@@ -638,6 +638,13 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
   const [isLoadingRoles, setIsLoadingRoles] = useState(false)
   const [isCustomJabatan, setIsCustomJabatan] = useState(false)
 
+  // Fitur Buat Master Role Baru Langsung di Form
+  const [showNewRoleForm, setShowNewRoleForm] = useState(false)
+  const [newRoleData, setNewRoleData] = useState({ nama_role: '', hierarchy_level: 1, deskripsi: '' })
+  const [isSavingNewRole, setIsSavingNewRole] = useState(false)
+  const [newRoleError, setNewRoleError] = useState('')
+  const [newRoleSuccess, setNewRoleSuccess] = useState('')
+
   useEffect(() => {
     let isMounted = true
     setIsLoadingRoles(true)
@@ -679,6 +686,40 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
       ...prev,
       jenis_upah: type,
     }))
+  }
+
+  async function handleCreateQuickRole(e) {
+    if (e) e.preventDefault()
+    if (!newRoleData.nama_role.trim()) {
+      setNewRoleError('Nama jabatan wajib diisi.')
+      return
+    }
+    setIsSavingNewRole(true)
+    setNewRoleError('')
+    try {
+      await createMasterRole({
+        nama_role: newRoleData.nama_role.trim(),
+        hierarchy_level: parseInt(newRoleData.hierarchy_level, 10) || 1,
+        deskripsi: newRoleData.deskripsi.trim(),
+        default_gaji_min_bulanan: 0,
+        default_gaji_max_bulanan: 0,
+        is_active: 1
+      })
+      const updated = await getMasterRoles({ is_active: 1 })
+      const sorted = updated.sort((a, b) => a.hierarchy_level - b.hierarchy_level)
+      setMasterRoles(sorted)
+      const savedName = newRoleData.nama_role.trim()
+      setValues((prev) => ({ ...prev, jabatan: savedName }))
+      setIsCustomJabatan(false)
+      setShowNewRoleForm(false)
+      setNewRoleData({ nama_role: '', hierarchy_level: 1, deskripsi: '' })
+      setNewRoleSuccess(`Jabatan "${savedName}" berhasil dibuat & langsung dipilih!`)
+      setTimeout(() => setNewRoleSuccess(''), 4000)
+    } catch (err) {
+      setNewRoleError(err.message || 'Gagal membuat master role baru')
+    } finally {
+      setIsSavingNewRole(false)
+    }
   }
 
   async function handleSubmit(event) {
@@ -744,10 +785,10 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
         kode_karyawan: predictedKode,
         jabatan: jabatan || null,
         nomor_hp: nomorHp || null,
-        jenis_upah: values.jenis_upah,
-        nominal_upah: nominal,
-        lembur_aktif: lemburAktif,
-        tarif_lembur: lemburAktif ? tarifLembur : 0,
+        jenis_upah: values.jenis_upah || 'per_jam',
+        nominal_upah: Number(values.nominal_upah) || 0,
+        lembur_aktif: false,
+        tarif_lembur: 0,
         catatan_admin: values.catatan_admin.trim() || null,
         status: values.status,
         kata_sandi: values.kata_sandi.trim(),
@@ -894,23 +935,127 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
 
             {/* Jabatan */}
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                 <label
                   htmlFor="form-jabatan"
                   className="block text-xs font-semibold text-slate-700"
                 >
                   Jabatan / Posisi Kerja
                 </label>
-                {masterRoles.length > 0 && (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsCustomJabatan(!isCustomJabatan)}
-                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition cursor-pointer"
+                    onClick={() => {
+                      setShowNewRoleForm(!showNewRoleForm)
+                      setNewRoleError('')
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200/80 px-2.5 py-1 rounded-lg hover:bg-blue-100 transition cursor-pointer"
                   >
-                    {isCustomJabatan ? '← Pilih dari Master Role' : '+ Ketik Jabatan Manual'}
+                    <span>{showNewRoleForm ? '✕ Batal Buat Role' : '+ Buat Role Baru'}</span>
                   </button>
-                )}
+                  {masterRoles.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomJabatan(!isCustomJabatan)
+                        setShowNewRoleForm(false)
+                      }}
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition cursor-pointer underline"
+                    >
+                      {isCustomJabatan ? 'Pilih dari Master Role' : 'Ketik Manual'}
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Notifikasi Sukses Tambah Role Baru */}
+              {newRoleSuccess && (
+                <div className="mb-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-fade-in">
+                  <span>✓</span>
+                  <span>{newRoleSuccess}</span>
+                </div>
+              )}
+
+              {/* Form Mini: Buat Master Role Baru Langsung di Sini */}
+              {showNewRoleForm && (
+                <div className="mb-3 rounded-2xl border-2 border-blue-300 bg-blue-50/70 p-3.5 space-y-3 shadow-xs animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-blue-200/80 pb-2">
+                    <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                      <span>✨</span>
+                      <span>Buat Master Role Baru (Langsung Terpilih)</span>
+                    </span>
+                    <span className="text-[10px] text-blue-700 font-semibold bg-blue-100/80 px-2 py-0.5 rounded-full">
+                      Tersimpan ke Master Role
+                    </span>
+                  </div>
+
+                  {newRoleError && (
+                    <div className="rounded-xl bg-rose-50 border border-rose-200 p-2 text-xs font-semibold text-rose-700">
+                      {newRoleError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Nama Jabatan Baru <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="contoh: Operator Genset, Mandor, dsb."
+                        value={newRoleData.nama_role}
+                        onChange={(e) => setNewRoleData({ ...newRoleData, nama_role: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-800 font-bold focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Level Pangkat
+                      </label>
+                      <select
+                        value={newRoleData.hierarchy_level}
+                        onChange={(e) => setNewRoleData({ ...newRoleData, hierarchy_level: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-800 font-bold focus:border-blue-500 outline-none cursor-pointer"
+                      >
+                        <option value="1">Lvl 1 (Helper)</option>
+                        <option value="2">Lvl 2 (Teknisi)</option>
+                        <option value="3">Lvl 3 (Senior/Spv)</option>
+                        <option value="4">Lvl 4 (Manajer)</option>
+                        <option value="5">Lvl 5 (Direktur)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Kualifikasi / deskripsi tugas jabatan (opsional)..."
+                      value={newRoleData.deskripsi}
+                      onChange={(e) => setNewRoleData({ ...newRoleData, deskripsi: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowNewRoleForm(false)}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateQuickRole}
+                      disabled={isSavingNewRole}
+                      className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-blue-500 disabled:opacity-50 transition cursor-pointer active:scale-95"
+                    >
+                      <span>{isSavingNewRole ? 'Menyimpan...' : 'Simpan & Pilih Jabatan'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {!isCustomJabatan && masterRoles.length > 0 ? (
                 <div className="space-y-1.5">
@@ -926,14 +1071,14 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
                       }
                     }}
                     disabled={isLoadingRoles}
-                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 cursor-pointer disabled:opacity-50"
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 cursor-pointer disabled:opacity-50 font-semibold"
                   >
                     <option value="">
                       {isLoadingRoles ? 'Memuat master role...' : '-- Pilih Jabatan dari Master Role --'}
                     </option>
                     {masterRoles.map((r) => (
                       <option key={r.id_role} value={r.nama_role}>
-                        Level {r.hierarchy_level}: {r.nama_role} (Standar: {currencyFormatter.format(r.default_gaji_min_bulanan)} – {currencyFormatter.format(r.default_gaji_max_bulanan)})
+                        Level {r.hierarchy_level}: {r.nama_role}
                       </option>
                     ))}
                     <option value="__custom__">+ Ketik Manual / Jabatan Khusus Lainnya...</option>
@@ -942,10 +1087,7 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
                   {selectedRole && (
                     <div className="rounded-lg bg-blue-50/70 border border-blue-100 p-2 text-[11px] text-blue-900 flex items-center justify-between">
                       <span>
-                        Plafon Standar ({selectedRole.nama_role}):{' '}
-                        <strong>
-                          {currencyFormatter.format(selectedRole.default_gaji_min_bulanan)} – {currencyFormatter.format(selectedRole.default_gaji_max_bulanan)} / bln
-                        </strong>
+                        Jabatan Terpilih: <strong>{selectedRole.nama_role}</strong>
                       </span>
                       <span className="font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full text-[10px]">
                         Level {selectedRole.hierarchy_level}
@@ -967,11 +1109,7 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
                   />
                   {masterRoles.length === 0 && (
                     <p className="mt-1 text-[11px] text-slate-400">
-                      💡 Tip: Anda juga dapat mendaftarkan master jabatan melalui menu{' '}
-                      <a href="/admin/master-role" target="_blank" rel="noreferrer" className="text-blue-600 font-semibold underline">
-                        Master Role
-                      </a>{' '}
-                      agar bisa dipilih otomatis.
+                      💡 Tip: Anda juga dapat mendaftarkan master jabatan melalui tombol "+ Buat Role Baru" di atas.
                     </p>
                   )}
                 </div>
@@ -979,124 +1117,12 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             </div>
           </fieldset>
 
-          {/* BAGIAN B: PENGATURAN SKEMA UPAH & LEMBUR */}
-          <fieldset className="space-y-4 rounded-xl border border-emerald-200/90 bg-emerald-50/30 p-4">
-            <legend className="px-2 text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-              <EmployeeIcon name="banknote" className="h-3.5 w-3.5 text-emerald-600" />
-              <span>B. Skema Upah &amp; Kompensasi Lembur</span>
-            </legend>
-
-            {/* Pilihan Satuan Upah */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Pilihan Skema Upah / Gaji
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { id: 'per_jam', label: 'Per Jam', sub: 'Hitungan durasi jam' },
-                  { id: 'per_hari', label: 'Per Hari', sub: 'Hitungan per hari kerja' },
-                  { id: 'per_bulan', label: 'Bulanan', sub: 'Gaji tetap bulanan' },
-                  { id: 'borongan', label: 'Borongan', sub: 'Per paket pekerjaan' },
-                ].map((tier) => {
-                  const isSelected = values.jenis_upah === tier.id
-                  return (
-                    <button
-                      key={tier.id}
-                      type="button"
-                      onClick={() => handleWageTypeChange(tier.id)}
-                      className={`flex flex-col text-left p-3 rounded-xl border transition cursor-pointer ${
-                        isSelected
-                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/20 font-bold'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className="text-xs font-bold">{tier.label}</span>
-                      <span className="text-[10px] text-slate-500 mt-0.5">{tier.sub}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Input Nominal Upah */}
-            <div>
-              <label htmlFor="form-nominal-upah" className="block text-xs font-semibold text-slate-700 mb-1">
-                {currentWageConfig.inputLabel}
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                  Rp
-                </span>
-                <input
-                  id="form-nominal-upah"
-                  type="number"
-                  min="0"
-                  step="1000"
-                  placeholder="contoh: 25000"
-                  value={values.nominal_upah}
-                  onChange={(e) => setValues((prev) => ({ ...prev, nominal_upah: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 pl-9 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 font-semibold"
-                />
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500">{currentWageConfig.desc}</p>
-            </div>
-
-            {/* Pengaturan Kompensasi Lembur */}
-            <div className="rounded-xl border border-blue-200/80 bg-white p-3.5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="block text-xs font-bold text-slate-800">
-                    Kompensasi Gaji Lembur
-                  </span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Aktifkan jika karyawan berhak menerima bayaran tambahan untuk jam lembur.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={values.lembur_aktif}
-                    onChange={(e) => setValues((prev) => ({ ...prev, lembur_aktif: e.target.checked }))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-
-              {values.lembur_aktif && (
-                <div className="pt-2 border-t border-slate-100">
-                  <label htmlFor="form-tarif-lembur" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Tarif Lembur Per Jam (Rp)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                      Rp
-                    </span>
-                    <input
-                      id="form-tarif-lembur"
-                      type="number"
-                      min="0"
-                      step="1000"
-                      placeholder="contoh: 20000"
-                      value={values.tarif_lembur}
-                      onChange={(e) => setValues((prev) => ({ ...prev, tarif_lembur: e.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white p-2.5 pl-9 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 font-semibold"
-                    />
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Nominal ini dihitung untuk setiap kelebihan jam kerja di atas jam standar kerja proyek.
-                  </p>
-                </div>
-              )}
-            </div>
-          </fieldset>
-
-          {/* BAGIAN C: AKUN LOGIN KARYAWAN ATAU STATUS */}
+          {/* BAGIAN B: AKUN LOGIN KARYAWAN ATAU STATUS */}
           {!isEdit ? (
             <fieldset className="space-y-4 rounded-xl border border-blue-200/90 bg-blue-50/30 p-4">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
                 <EmployeeIcon name="lock" className="h-3.5 w-3.5 text-blue-600" />
-                <span>C. Akun Login Karyawan</span>
+                <span>B. Akun Login Karyawan</span>
               </legend>
 
               <div className="rounded-lg bg-white p-3 border border-blue-100 flex items-start gap-2.5 text-xs text-slate-600">
@@ -1223,12 +1249,12 @@ function EmployeeFormModal({ mode, employee, existingEmployees, isSaving, onClos
             </fieldset>
           )}
 
-          {/* BAGIAN D: CATATAN KHUSUS ADMIN */}
+          {/* BAGIAN C: CATATAN KHUSUS ADMIN */}
           <fieldset className="space-y-2 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4">
             <div className="flex items-center justify-between">
               <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <EmployeeIcon name="fileText" className="h-3.5 w-3.5 text-amber-600" />
-                <span>D. Catatan Khusus Admin</span>
+                <span>C. Catatan Khusus Admin</span>
               </legend>
               <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200/70">
                 Hanya Terlihat Oleh Admin
@@ -2276,12 +2302,16 @@ function DataKaryawan() {
 
                       {/* 7. Nominal Gaji */}
                       <td className="whitespace-nowrap px-3.5 py-3">
-                        <div className="flex items-baseline gap-1 font-semibold text-slate-800 tabular-nums">
-                          <span>{formatCurrency(employee.nominal_upah)}</span>
-                          <span className="text-[11px] font-normal text-slate-400">
-                            {wageInfo.unit}
-                          </span>
-                        </div>
+                        {Number(employee.nominal_upah) > 0 ? (
+                          <div className="flex items-baseline gap-1 font-semibold text-slate-800 tabular-nums">
+                            <span>{formatCurrency(employee.nominal_upah)}</span>
+                            <span className="text-[11px] font-normal text-slate-400">
+                              {wageInfo.unit}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Ditetapkan per proyek</span>
+                        )}
                         {employee.lembur_aktif && (
                           <span className="text-[10px] text-blue-600 font-medium block">
                             + Lembur {formatCurrency(employee.tarif_lembur)}/jam

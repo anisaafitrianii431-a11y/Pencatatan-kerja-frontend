@@ -146,7 +146,7 @@ export default function RoleSlotBoard({ idPekerjaan, onRefresh }) {
             <span>Papan Slot Kuota Tim & Skema Gaji</span>
           </h3>
           <p className="mt-0.5 text-xs text-slate-500">
-            Terurut berdasarkan hierarki jabatan. Kuota slot dan rentang gaji dikunci otomatis sesuai blueprint.
+            Terurut berdasarkan hierarki jabatan. Kuota slot ditentukan blueprint, tarif upah ditentukan fleksibel saat penugasan pekerja.
           </p>
         </div>
 
@@ -201,17 +201,11 @@ export default function RoleSlotBoard({ idPekerjaan, onRefresh }) {
                     </span>
                   </div>
 
-                  {/* Rentang Gaji Min - Max */}
-                  <div className="mt-2 text-xs">
-                    <span className="text-slate-400 text-[11px] block">Plafon Bulanan:</span>
-                    <span className="font-bold text-slate-800">
-                      {formatRupiah(slot.gaji_min_bulanan)} – {formatRupiah(slot.gaji_max_bulanan)}
+                  {/* Info Upah Fleksibel */}
+                  <div className="mt-1.5 text-xs text-slate-500">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                      💼 Tarif upah ditentukan fleksibel per penugasan
                     </span>
-                    {konversi.per_hari && (
-                      <span className="text-[10px] text-slate-500 block mt-0.5">
-                        (Ekuivalen: {formatRupiah(konversi.per_hari.min)} – {formatRupiah(konversi.per_hari.max)} / hari)
-                      </span>
-                    )}
                   </div>
                 </div>
 
@@ -362,60 +356,22 @@ export default function RoleSlotBoard({ idPekerjaan, onRefresh }) {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Kuota Slot (Min: {r.terisi_slot || 1})
-                        </label>
-                        <input
-                          type="number"
-                          min={r.terisi_slot || 1}
-                          value={r.kuota_slot}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1
-                            const updated = [...editingRoles]
-                            updated[i].kuota_slot = Math.max(r.terisi_slot || 1, val)
-                            setEditingRoles(updated)
-                          }}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Min Bulanan (Rp)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={r.gaji_min_bulanan}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0
-                            const updated = [...editingRoles]
-                            updated[i].gaji_min_bulanan = val
-                            setEditingRoles(updated)
-                          }}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Max Bulanan (Rp)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={r.gaji_max_bulanan}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0
-                            const updated = [...editingRoles]
-                            updated[i].gaji_max_bulanan = val
-                            setEditingRoles(updated)
-                          }}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800"
-                        />
-                      </div>
+                    <div className="pt-2">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Kuota Slot Pekerja (Minimal: {r.terisi_slot || 1})
+                      </label>
+                      <input
+                        type="number"
+                        min={r.terisi_slot || 1}
+                        value={r.kuota_slot}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 1
+                          const updated = [...editingRoles]
+                          updated[i].kuota_slot = Math.max(r.terisi_slot || 1, val)
+                          setEditingRoles(updated)
+                        }}
+                        className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800 font-bold"
+                      />
                     </div>
                   </div>
                 ))}

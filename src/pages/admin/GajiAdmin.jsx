@@ -33,7 +33,7 @@ import {
   Info,
   Briefcase
 } from 'lucide-react';
-import { GajiService, KaryawanService, formatRupiah, getFileUrl } from '../../services/api';
+import { GajiService, KaryawanService, PekerjaanService, formatRupiah, getFileUrl } from '../../services/api';
 import Modal from '../../components/Modal';
 import { useAuth } from '../../auth/useAuth.js';
 import KopSuratCetak from '../../components/KopSuratCetak';
@@ -68,8 +68,14 @@ export default function GajiAdmin({ currentUser }) {
 
   // Master Data
   const [karyawanMaster, setKaryawanMaster] = useState([]);
+  const [pekerjaanMaster, setPekerjaanMaster] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Filter Proyek Per Tab
+  const [filterProyek, setFilterProyek] = useState('semua');
+  const [filterProyekPembayaran, setFilterProyekPembayaran] = useState('semua');
+  const [filterRiwayatProyek, setFilterRiwayatProyek] = useState('semua');
 
   // Notifications
   const [errorMsg, setErrorMsg] = useState('');
@@ -154,6 +160,15 @@ export default function GajiAdmin({ currentUser }) {
     }
   };
 
+  const loadPekerjaan = async () => {
+    try {
+      const data = await PekerjaanService.getAll();
+      setPekerjaanMaster(data || []);
+    } catch {
+      // Ignore
+    }
+  };
+
   const loadKalkulasi = async (targetPeriode) => {
     try {
       const p = targetPeriode || periode;
@@ -189,6 +204,7 @@ export default function GajiAdmin({ currentUser }) {
     try {
       await Promise.all([
         loadKaryawan(),
+        loadPekerjaan(),
         loadKalkulasi(targetPeriode),
         loadPembayaran(targetPeriode),
         loadRiwayat()
@@ -321,15 +337,28 @@ export default function GajiAdmin({ currentUser }) {
       await GajiService.tetapkanGaji({
         periode: row.periode,
         id_karyawan: row.id_karyawan,
+        id_pekerjaan: row.id_pekerjaan,
+        id_penugasan: row.id_penugasan,
+        jabatan: row.jabatan,
+        jenis_upah: row.jenis_upah,
+        total_jam: row.total_jam,
+        total_hari: row.total_hari,
+        jam_normal: row.jam_normal,
+        jam_lembur: row.jam_lembur,
+        tarif: row.tarif,
+        total_upah: row.total_upah,
+        upah_normal: row.upah_normal,
+        upah_lembur: row.upah_lembur,
+        catatan_lembur: row.catatan_lembur,
+        total_ganti: row.total_ganti,
         bonus: row.bonus,
         potongan: row.potongan,
         catatan_penyesuaian: row.catatan_penyesuaian
       });
-      setSuccessMsg(`Hasil perhitungan gaji ${row.nama_karyawan} periode ${row.periode} berhasil ditetapkan & dikunci sebagai snapshot!`);
+      setSuccessMsg(`Hasil perhitungan gaji ${row.nama_karyawan} (${row.nama_pekerjaan || 'Proyek'}) periode ${row.periode} berhasil ditetapkan & dikunci!`);
       await loadKalkulasi(periode);
       await loadPembayaran(periode);
       await loadRiwayat();
-      window.dispatchEvent(new CustomEvent('gaji_updated'));
       window.dispatchEvent(new CustomEvent('gaji_updated'));
     } catch (err) {
       setErrorMsg(err.message || 'Gagal menetapkan gaji karyawan');
@@ -475,8 +504,10 @@ export default function GajiAdmin({ currentUser }) {
       const matchSearch = searchKalkulasi === '' || 
         item.nama_karyawan?.toLowerCase().includes(searchKalkulasi.toLowerCase()) ||
         item.kode_karyawan?.toLowerCase().includes(searchKalkulasi.toLowerCase()) ||
+        item.nama_pekerjaan?.toLowerCase().includes(searchKalkulasi.toLowerCase()) ||
         item.jabatan?.toLowerCase().includes(searchKalkulasi.toLowerCase());
 
+      const matchProyek = filterProyek === 'semua' || String(item.id_pekerjaan) === String(filterProyek);
       const matchUpah = filterJenisUpah === 'semua' || item.jenis_upah === filterJenisUpah;
       const totalGaji = Number(item.gaji_bersih || item.total_upah || 0);
       let matchStatus = true;
@@ -488,9 +519,9 @@ export default function GajiAdmin({ currentUser }) {
         matchStatus = item.sudah_ditetapkan;
       }
 
-      return matchSearch && matchUpah && matchStatus;
+      return matchSearch && matchProyek && matchUpah && matchStatus;
     });
-  }, [kalkulasiList, searchKalkulasi, filterJenisUpah, filterPenetapan]);
+  }, [kalkulasiList, searchKalkulasi, filterProyek, filterJenisUpah, filterPenetapan]);
 
   // Tab 1 Stats
   const statsKalkulasi = useMemo(() => {
@@ -507,8 +538,10 @@ export default function GajiAdmin({ currentUser }) {
       const matchSearch = searchPembayaran === '' || 
         item.nama_karyawan?.toLowerCase().includes(searchPembayaran.toLowerCase()) ||
         item.kode_karyawan?.toLowerCase().includes(searchPembayaran.toLowerCase()) ||
+        item.nama_pekerjaan?.toLowerCase().includes(searchPembayaran.toLowerCase()) ||
         item.jabatan?.toLowerCase().includes(searchPembayaran.toLowerCase());
 
+      const matchProyek = filterProyekPembayaran === 'semua' || String(item.id_pekerjaan) === String(filterProyekPembayaran);
       const sisa = Number(item.sisa_pembayaran ?? 0);
       const totalGaji = Number(item.gaji_bersih || item.total_upah || 0);
 
@@ -527,9 +560,9 @@ export default function GajiAdmin({ currentUser }) {
         matchStatus = item.status_bayar === filterStatusBayar;
       }
 
-      return matchSearch && matchStatus;
+      return matchSearch && matchProyek && matchStatus;
     });
-  }, [pembayaranList, searchPembayaran, filterStatusBayar]);
+  }, [pembayaranList, searchPembayaran, filterProyekPembayaran, filterStatusBayar]);
 
   // Tab 2 Stats
   const statsPembayaran = useMemo(() => {
@@ -547,10 +580,12 @@ export default function GajiAdmin({ currentUser }) {
       const matchSearch = searchRiwayat === '' || 
         item.nama_karyawan?.toLowerCase().includes(searchRiwayat.toLowerCase()) ||
         item.kode_karyawan?.toLowerCase().includes(searchRiwayat.toLowerCase()) ||
+        item.nama_pekerjaan?.toLowerCase().includes(searchRiwayat.toLowerCase()) ||
         item.jabatan?.toLowerCase().includes(searchRiwayat.toLowerCase());
 
       const matchKaryawan = filterRiwayatKaryawan === 'semua' || String(item.id_karyawan) === String(filterRiwayatKaryawan);
       const matchPeriode = filterRiwayatPeriode === 'semua' || item.periode === filterRiwayatPeriode;
+      const matchProyek = filterRiwayatProyek === 'semua' || String(item.id_pekerjaan) === String(filterRiwayatProyek);
 
       const sisa = Number(item.sisa_pembayaran ?? 0);
       const totalGaji = Number(item.gaji_bersih || item.total_upah || 0);
@@ -564,9 +599,9 @@ export default function GajiAdmin({ currentUser }) {
         matchStatus = item.status_bayar === filterRiwayatStatus;
       }
 
-      return matchSearch && matchKaryawan && matchPeriode && matchStatus;
+      return matchSearch && matchKaryawan && matchPeriode && matchProyek && matchStatus;
     });
-  }, [riwayatList, searchRiwayat, filterRiwayatKaryawan, filterRiwayatPeriode, filterRiwayatStatus]);
+  }, [riwayatList, searchRiwayat, filterRiwayatKaryawan, filterRiwayatPeriode, filterRiwayatProyek, filterRiwayatStatus]);
 
   // Helper Periode Lists for Filter
   const availablePeriodes = useMemo(() => {
@@ -904,6 +939,23 @@ export default function GajiAdmin({ currentUser }) {
 
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-semibold">Proyek:</span>
+                <select 
+                  value={filterProyek}
+                  onChange={(e) => setFilterProyek(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer max-w-[170px] truncate"
+                >
+                  <option value="semua">Semua Proyek</option>
+                  {pekerjaanMaster.map((p) => (
+                    <option key={p.id_pekerjaan} value={p.id_pekerjaan}>
+                      {p.nama_pekerjaan}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs text-slate-600">
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 <span className="font-semibold">Skema:</span>
                 <select 
@@ -955,9 +1007,9 @@ export default function GajiAdmin({ currentUser }) {
                 <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                   <tr>
                     <th className="px-4 py-3.5">Karyawan</th>
-                    <th className="px-4 py-3.5">Jenis Upah</th>
-                    <th className="px-4 py-3.5">Tarif Upah</th>
-                    <th className="px-4 py-3.5">Presensi Disetujui</th>
+                    <th className="px-4 py-3.5">Proyek & Jabatan</th>
+                    <th className="px-4 py-3.5">Skema & Tarif</th>
+                    <th className="px-4 py-3.5">Jam Normal / Lembur</th>
                     <th className="px-4 py-3.5 text-right">Gaji Pokok</th>
                     <th className="px-4 py-3.5 text-right">Penyesuaian</th>
                     <th className="px-4 py-3.5 text-right">Gaji Bersih</th>
@@ -985,7 +1037,7 @@ export default function GajiAdmin({ currentUser }) {
                     filteredKalkulasi.map((row) => {
                       const isDitetapkan = row.sudah_ditetapkan;
                       return (
-                        <tr key={row.id_karyawan} className="hover:bg-slate-50/70 transition-colors">
+                        <tr key={row.id_gaji || `${row.id_karyawan}_${row.id_pekerjaan || 'null'}`} className="hover:bg-slate-50/70 transition-colors">
                           <td className="px-4 py-3">
                             <button
                               type="button"
@@ -998,59 +1050,48 @@ export default function GajiAdmin({ currentUser }) {
                             </button>
                             <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
                               <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100">{row.kode_karyawan}</span>
-                              <span>•</span>
-                              <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 border border-indigo-200" title="Terhubung dengan Master Role">
-                                Level {row.hierarchy_level || 1} • {row.nama_role || row.jabatan}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                              <Briefcase className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span className="truncate max-w-[200px]" title={row.nama_pekerjaan}>{row.nama_pekerjaan || 'Proyek Lapangan'}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <span className="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 border border-indigo-200">
+                                {row.jabatan || row.nama_role || 'Pelaksana'}
+                              </span>
+                              {row.kode_pekerjaan && (
+                                <span className="text-[10px] text-slate-400 font-mono">({row.kode_pekerjaan})</span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div>{renderBadgeUpah(row.jenis_upah)}</div>
+                            <div className="text-[11px] font-semibold text-slate-800 mt-1">
+                              {formatRupiah(row.tarif)}
+                              <span className="text-[10px] text-slate-400 font-normal ml-0.5">
+                                {row.jenis_upah === 'per_jam' ? '/jam' : row.jenis_upah === 'per_hari' ? '/hari' : '/bln'}
                               </span>
                             </div>
                           </td>
 
                           <td className="px-4 py-3">
-                            {renderBadgeUpah(row.jenis_upah)}
-                          </td>
-
-                          <td className="px-4 py-3 font-semibold text-slate-800">
-                            {row.jenis_upah === 'multi' ? (
-                              <span className="text-xs text-indigo-700 font-bold">
-                                {row.pekerjaan_list?.length ? `${row.pekerjaan_list.length} Tarif Proyek` : 'Sesuai Proyek'}
-                              </span>
-                            ) : (
-                              <>
-                                {formatRupiah(row.tarif)}
-                                <span className="text-[10px] text-slate-400 ml-1">
-                                  {row.jenis_upah === 'per_jam' ? '/jam' : row.jenis_upah === 'per_hari' ? '/hari' : '/bln'}
-                                </span>
-                              </>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <div className="font-semibold text-slate-800">
-                              {row.jenis_upah === 'per_jam' 
-                                ? `${row.total_jam} Jam` 
-                                : row.jenis_upah === 'per_hari' 
-                                ? `${row.total_hari} Hari Kerja` 
-                                : row.jenis_upah === 'per_bulan'
-                                ? (row.total_hari > 0 ? `${row.total_hari} Hari • 1 Bulan` : '0 Hari (Belum Hadir)')
-                                : `${row.total_jam} Jam • ${row.total_hari} Hari`}
+                            <div className="font-semibold text-slate-800 flex items-center gap-1">
+                              <span>{row.jam_normal !== undefined ? row.jam_normal : row.total_jam}j Normal</span>
+                              {row.total_hari > 0 && <span className="text-[10px] text-slate-400">({row.total_hari} Hari)</span>}
                             </div>
                             <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                              <span className="text-[10px] text-slate-400">
-                                {row.total_sesi} sesi valid
-                              </span>
-                              {row.total_jam_lembur > 0 && row.lembur_diizinkan === 1 ? (
+                              {Number(row.jam_lembur || 0) > 0 ? (
                                 <span className="inline-flex items-center text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                                  +{row.total_jam_lembur}j Lembur
-                                </span>
-                              ) : row.lembur_diizinkan === 1 ? (
-                                <span className="inline-flex items-center text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-100">
-                                  Lembur Diizinkan
+                                  +{row.jam_lembur}j Lembur
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center text-[9px] font-medium text-slate-400 bg-slate-50 px-1 py-0.2 rounded border border-slate-200">
-                                  Lembur Ditutup
-                                </span>
+                                <span className="text-[10px] text-slate-400">0j Lembur</span>
                               )}
+                              <span className="text-[10px] text-slate-400">• Total {row.total_jam || 0}j</span>
                             </div>
                           </td>
 
@@ -1294,6 +1335,23 @@ export default function GajiAdmin({ currentUser }) {
 
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-semibold">Proyek:</span>
+                <select 
+                  value={filterProyekPembayaran}
+                  onChange={(e) => setFilterProyekPembayaran(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer max-w-[170px] truncate"
+                >
+                  <option value="semua">Semua Proyek</option>
+                  {pekerjaanMaster.map((p) => (
+                    <option key={p.id_pekerjaan} value={p.id_pekerjaan}>
+                      {p.nama_pekerjaan}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs text-slate-600">
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 <span className="font-semibold">Filter Data:</span>
                 <select 
@@ -1334,6 +1392,7 @@ export default function GajiAdmin({ currentUser }) {
                 <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                   <tr>
                     <th className="px-4 py-3.5">Karyawan</th>
+                    <th className="px-4 py-3.5">Proyek & Jabatan</th>
                     <th className="px-4 py-3.5">Periode</th>
                     <th className="px-4 py-3.5">Jenis & Tarif</th>
                     <th className="px-4 py-3.5 text-right">Total Gaji Bersih</th>
@@ -1346,7 +1405,7 @@ export default function GajiAdmin({ currentUser }) {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan="8" className="text-center py-12 text-slate-400">
+                      <td colSpan="9" className="text-center py-12 text-slate-400">
                         <div className="inline-flex items-center gap-2">
                           <RotateCcw className="w-4 h-4 animate-spin text-blue-600" />
                           <span>Memuat daftar pembayaran gaji...</span>
@@ -1355,7 +1414,7 @@ export default function GajiAdmin({ currentUser }) {
                     </tr>
                   ) : filteredPembayaran.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="text-center py-12 text-slate-400">
+                      <td colSpan="9" className="text-center py-12 text-slate-400">
                         Belum ada data gaji yang ditetapkan untuk periode ini. Silakan tetapkan gaji di Tab 1 terlebih dahulu.
                       </td>
                     </tr>
@@ -1378,8 +1437,16 @@ export default function GajiAdmin({ currentUser }) {
                             </button>
                             <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                               <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100">{row.kode_karyawan}</span>
-                              <span>•</span>
-                              <span>{row.jabatan}</span>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                              <Briefcase className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span className="truncate max-w-[180px]">{row.nama_pekerjaan || 'Proyek Lapangan'}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {row.jabatan || 'Pelaksana'}
                             </div>
                           </td>
 
@@ -1487,17 +1554,33 @@ export default function GajiAdmin({ currentUser }) {
           </div>
 
           {/* Filter Bar Tab 3 */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
             {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input 
                 type="text"
-                placeholder="Cari karyawan..."
+                placeholder="Cari karyawan / proyek..."
                 value={searchRiwayat}
                 onChange={(e) => setSearchRiwayat(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            {/* Filter Proyek */}
+            <div>
+              <select
+                value={filterRiwayatProyek}
+                onChange={(e) => setFilterRiwayatProyek(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer truncate"
+              >
+                <option value="semua">Semua Proyek</option>
+                {pekerjaanMaster.map((p) => (
+                  <option key={p.id_pekerjaan} value={p.id_pekerjaan}>
+                    {p.nama_pekerjaan}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Filter Karyawan */}
@@ -1557,6 +1640,7 @@ export default function GajiAdmin({ currentUser }) {
                   <tr>
                     <th className="px-4 py-3.5">No. Dokumen & Periode</th>
                     <th className="px-4 py-3.5">Karyawan</th>
+                    <th className="px-4 py-3.5">Proyek & Jabatan</th>
                     <th className="px-4 py-3.5">Skema Upah</th>
                     <th className="px-4 py-3.5">Total Jam / Hari</th>
                     <th className="px-4 py-3.5 text-right">Gaji Bersih</th>
@@ -1569,7 +1653,7 @@ export default function GajiAdmin({ currentUser }) {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan="9" className="text-center py-12 text-slate-400">
+                      <td colSpan="10" className="text-center py-12 text-slate-400">
                         <div className="inline-flex items-center gap-2">
                           <RotateCcw className="w-4 h-4 animate-spin text-blue-600" />
                           <span>Memuat riwayat arsip penggajian...</span>
@@ -1578,7 +1662,7 @@ export default function GajiAdmin({ currentUser }) {
                     </tr>
                   ) : filteredRiwayat.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="text-center py-12 text-slate-400">
+                      <td colSpan="10" className="text-center py-12 text-slate-400">
                         Belum ada data riwayat penggajian yang tersimpan.
                       </td>
                     </tr>
@@ -1610,8 +1694,16 @@ export default function GajiAdmin({ currentUser }) {
                             </button>
                             <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                               <span className="font-mono text-blue-600 bg-blue-50 px-1 rounded">{row.kode_karyawan}</span>
-                              <span>•</span>
-                              <span>{row.jabatan}</span>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                              <Briefcase className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span className="truncate max-w-[180px]">{row.nama_pekerjaan || 'Proyek Lapangan'}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {row.jabatan || 'Pelaksana'}
                             </div>
                           </td>
 
@@ -2273,26 +2365,40 @@ export default function GajiAdmin({ currentUser }) {
                       <td className="px-3 py-2 font-mono font-bold text-blue-700 w-1/4">{slipModal.kode_karyawan}</td>
                     </tr>
                     <tr className="border-b border-slate-200">
+                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Proyek &amp; Penugasan</td>
+                      <td className="px-3 py-2 font-bold text-blue-900">
+                        {slipModal.nama_pekerjaan || 'Proyek Lapangan'}
+                        {slipModal.kode_pekerjaan && (
+                          <span className="text-[10px] text-slate-500 font-mono ml-1 font-normal">({slipModal.kode_pekerjaan})</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Jabatan &amp; Role</td>
                       <td className="px-3 py-2 text-slate-800">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-bold">{slipModal.nama_role || slipModal.jabatan}</span>
+                          <span className="font-bold">{slipModal.jabatan || slipModal.nama_role}</span>
                           <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
-                            Level {slipModal.hierarchy_level || 1} • Master Role
+                            Level {slipModal.hierarchy_level || 1}
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Kebijakan Lembur Proyek</td>
-                      <td className="px-3 py-2 font-semibold">
-                        {slipModal.lembur_diizinkan === 1 ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            ✓ Diizinkan Admin Proyek
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                            ✕ Dinonaktifkan Admin
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Skema &amp; Tarif Upah</td>
+                      <td className="px-3 py-2 font-semibold text-slate-800">
+                        {renderBadgeUpah(slipModal.jenis_upah)} {formatRupiah(slipModal.tarif)}
+                        <span className="text-[10px] text-slate-500 ml-1">
+                          {slipModal.jenis_upah === 'per_jam' ? '/jam' : slipModal.jenis_upah === 'per_hari' ? '/hari' : '/bulan'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Rincian Jam Kerja</td>
+                      <td className="px-3 py-2 font-semibold text-slate-800">
+                        <span>{slipModal.jam_normal !== undefined ? slipModal.jam_normal : slipModal.total_jam}j Normal</span>
+                        {Number(slipModal.jam_lembur || 0) > 0 && (
+                          <span className="ml-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                            +{slipModal.jam_lembur}j Lembur
                           </span>
                         )}
+                        <span className="text-[10px] text-slate-400 ml-1">({slipModal.total_hari} Hari)</span>
                       </td>
                     </tr>
                     <tr>
@@ -2300,12 +2406,7 @@ export default function GajiAdmin({ currentUser }) {
                       <td className="px-3 py-2 font-semibold text-slate-800">{formatPeriodeIndo(slipModal.periode)}</td>
                       <td className="px-3 py-2 bg-slate-50 font-bold text-slate-600">Total Durasi Kerja</td>
                       <td className="px-3 py-2 font-semibold text-slate-800">
-                        {slipModal.total_jam} Jam ({slipModal.total_hari} Hari)
-                        {slipModal.total_jam_lembur > 0 && slipModal.lembur_diizinkan === 1 && (
-                          <span className="ml-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
-                            +{slipModal.total_jam_lembur}j Lembur
-                          </span>
-                        )}
+                        {slipModal.total_jam} Jam ({slipModal.total_hari} Hari Kerja)
                       </td>
                     </tr>
                   </tbody>

@@ -82,7 +82,9 @@ export async function createAbsensi(data) {
 }
 
 export async function checkoutAbsensi(id, jamPulang, extra = {}) {
-  return apiPut(`/absensi/${id}`, { jam_pulang: jamPulang, ...extra })
+  const safeId = (id && id !== 'undefined' && id !== 'null') ? id : ''
+  const url = safeId ? `/absensi/${safeId}` : '/absensi/pulang'
+  return apiPut(url, { jam_pulang: jamPulang, action: 'pulang', id_absensi: safeId || undefined, ...extra })
 }
 
 export async function getAbsensiById(id) {
@@ -99,7 +101,13 @@ export async function absenPulang(idAbsensi, jamPulang = '', isOvernight = false
 }
 
 export async function verifikasiAbsensi(id, statusVerifikasi, catatanAdmin = '') {
-  return apiPut(`/absensi/${id}/verifikasi`, {
+  const effectiveId = typeof id === 'object' && id !== null ? (id.id_absensi || id.id) : id
+  if (!effectiveId || effectiveId === 'undefined') {
+    throw new Error('ID Absensi tidak ditemukan untuk melakukan verifikasi.')
+  }
+  return apiPut(`/absensi/${effectiveId}/verifikasi`, {
+    id_absensi: effectiveId,
+    action: 'verifikasi',
     status_verifikasi: statusVerifikasi,
     catatan_admin: catatanAdmin,
   })

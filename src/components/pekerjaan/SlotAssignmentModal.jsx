@@ -70,7 +70,7 @@ export default function SlotAssignmentModal({
     if (jenisUpah === 'per_hari') defVal = Math.round(minBulanan / hariKerja)
     else if (jenisUpah === 'per_jam') defVal = Math.round(minBulanan / (hariKerja * jamKerja))
     else if (jenisUpah === 'per_tahun') defVal = minBulanan * 12
-    setNominalUpah(String(defVal))
+    setNominalUpah(defVal > 0 ? String(defVal) : '')
   }, [roleBudget, jenisUpah, hariKerja, jamKerja])
 
   // Filter kandidat berdasarkan role / jabatan
@@ -395,27 +395,22 @@ export default function SlotAssignmentModal({
                 min="0"
                 value={nominalUpah}
                 onChange={(e) => setNominalUpah(e.target.value)}
-                className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 focus:outline-none ${
-                  isSalaryInRange ? 'border-slate-200 focus:border-blue-500' : 'border-rose-300 focus:border-rose-500 bg-rose-50/30'
-                }`}
+                placeholder="Masukkan nominal upah"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Kotak Panduan Batas Role & Live Normalisasi */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+          {/* Info Upah Proyek Manual Sesuai Keputusan Direktur */}
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-1.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Batas Plafon Role ({roleBudget?.nama_role}):</span>
-              <span className="font-bold text-slate-800">
-                {formatRupiah(roleUnitLimits.min)} – {formatRupiah(roleUnitLimits.max)} {roleUnitLimits.unitLabel}
-              </span>
+              <span className="text-slate-600 font-medium">Jabatan / Role Proyek:</span>
+              <span className="font-bold text-slate-900">{roleBudget?.nama_role || 'Staf Proyek'}</span>
             </div>
-
-            <div className="flex items-center justify-between border-t border-slate-200/80 pt-2">
-              <span className="text-slate-500 font-medium">Normalisasi Nilai Bulanan:</span>
-              <span className={`font-bold ${isSalaryInRange ? 'text-emerald-700' : 'text-rose-600'}`}>
-                {formatRupiah(normalizedMonthly)} / bulan
-                {isSalaryInRange ? ' (Sesuai Batas)' : ' (Di Luar Batas Plafon)'}
+            <div className="flex items-center justify-between border-t border-blue-100/80 pt-1.5">
+              <span className="text-slate-600 font-medium">Tarif Upah Penugasan:</span>
+              <span className="font-bold text-blue-700">
+                {Number(nominalUpah) > 0 ? `${formatRupiah(nominalUpah)} ${roleUnitLimits.unitLabel}` : '—'}
               </span>
             </div>
           </div>

@@ -168,17 +168,12 @@ const menuItems = [
   { 
     label: 'Data Pekerjaan', 
     icon: 'jobs', 
-    match: (p) => p.startsWith('/admin/pekerjaan') 
+    match: (p) => p.startsWith('/admin/pekerjaan') || p.startsWith('/admin/master-role')
   },
   { 
     label: 'Data Karyawan', 
     icon: 'employees', 
     match: (p) => p.startsWith('/admin/karyawan') 
-  },
-  { 
-    label: 'Master Role', 
-    icon: 'role', 
-    match: (p) => p.startsWith('/admin/master-role') 
   },
   { 
     label: 'Manajemen Pengguna', 

@@ -340,16 +340,21 @@ export default function RekapAbsensiAdmin() {
     setTimeout(() => setNotification(null), 4000)
   }
 
-  const handleVerify = async (id_absensi, status, note = adminNote) => {
+  const handleVerify = async (target, status, note = adminNote) => {
+    const id_absensi = typeof target === 'object' && target !== null ? (target.id_absensi || target.id) : target
+    if (!id_absensi || id_absensi === 'undefined') {
+      showNotice('error', 'ID Absensi tidak ditemukan. Mohon segarkan data.')
+      return
+    }
     try {
       await verifikasiAbsensi(id_absensi, status, note)
       showNotice('success', `Status presensi berhasil diubah menjadi "${status}".`)
       setAttendances((prev) =>
         prev.map((item) =>
-          item.id_absensi === id_absensi ? { ...item, status_verifikasi: status, catatan_admin: note } : item,
+          (item.id_absensi === id_absensi || item.id === id_absensi) ? { ...item, status_verifikasi: status, catatan_admin: note } : item,
         ),
       )
-      if (selectedAttendance && selectedAttendance.id_absensi === id_absensi) {
+      if (selectedAttendance && (selectedAttendance.id_absensi === id_absensi || selectedAttendance.id === id_absensi)) {
         setSelectedAttendance((prev) => ({ ...prev, status_verifikasi: status, catatan_admin: note }))
       }
       // Sinkronisasi data ke Dashboard Admin & Modul Penggajian secara otomatis
@@ -1726,7 +1731,7 @@ export default function RekapAbsensiAdmin() {
                                     <button
                                       type="button"
                                       title="Setujui Cepat"
-                                      onClick={() => handleVerify(item.id_absensi, 'disetujui')}
+                                      onClick={() => handleVerify(item, 'disetujui')}
                                       className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs"
                                     >
                                       Setujui
@@ -1734,7 +1739,7 @@ export default function RekapAbsensiAdmin() {
                                     <button
                                       type="button"
                                       title="Tolak Cepat"
-                                      onClick={() => handleVerify(item.id_absensi, 'ditolak')}
+                                      onClick={() => handleVerify(item, 'ditolak')}
                                       className="rounded-lg bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 transition shadow-2xs"
                                     >
                                       Tolak
@@ -2194,7 +2199,7 @@ export default function RekapAbsensiAdmin() {
                                 <button
                                   type="button"
                                   title="Setujui Sesi"
-                                  onClick={() => handleVerify(item.id_absensi, 'disetujui')}
+                                  onClick={() => handleVerify(item, 'disetujui')}
                                   className="rounded bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
                                 >
                                   Setujui
@@ -2202,7 +2207,7 @@ export default function RekapAbsensiAdmin() {
                                 <button
                                   type="button"
                                   title="Tolak Sesi"
-                                  onClick={() => handleVerify(item.id_absensi, 'ditolak')}
+                                  onClick={() => handleVerify(item, 'ditolak')}
                                   className="rounded bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100"
                                 >
                                   Tolak
@@ -2516,7 +2521,7 @@ export default function RekapAbsensiAdmin() {
                     <button
                       type="button"
                       onClick={() => {
-                        handleVerify(selectedAttendance.id_absensi, 'menunggu', adminNote)
+                        handleVerify(selectedAttendance, 'menunggu', adminNote)
                         setSelectedAttendance(null)
                       }}
                       className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
@@ -2527,7 +2532,7 @@ export default function RekapAbsensiAdmin() {
                   <button
                     type="button"
                     onClick={() => {
-                      handleVerify(selectedAttendance.id_absensi, 'ditolak', adminNote)
+                      handleVerify(selectedAttendance, 'ditolak', adminNote)
                       setSelectedAttendance(null)
                     }}
                     className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-sm transition cursor-pointer"
@@ -2537,7 +2542,7 @@ export default function RekapAbsensiAdmin() {
                   <button
                     type="button"
                     onClick={() => {
-                      handleVerify(selectedAttendance.id_absensi, 'disetujui', adminNote)
+                      handleVerify(selectedAttendance, 'disetujui', adminNote)
                       setSelectedAttendance(null)
                     }}
                     className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition cursor-pointer flex items-center gap-1"

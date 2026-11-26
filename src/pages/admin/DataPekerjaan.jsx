@@ -3024,12 +3024,22 @@ function DataPekerjaan() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/admin/master-role')}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-blue-600 hover:border-slate-300 transition cursor-pointer"
+            title="Kelola Master Role & Hierarki Jabatan"
+          >
+            <span>🏷️</span>
+            <span>Master Role</span>
+          </button>
+
           {canCreate('pekerjaan') && (
             <button
               type="button"
               onClick={() => setModal({ mode: 'create' })}
               disabled={isLoading || Boolean(error)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 cursor-pointer"
             >
               <WorkIcon name="plus" className="h-4 w-4" />
               <span>Tambah Pekerjaan</span>

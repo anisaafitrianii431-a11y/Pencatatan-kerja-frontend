@@ -14,6 +14,7 @@ import { getFileUrl } from '../../services/api.js'
 import KameraAbsensi from '../../components/KameraAbsensi.jsx'
 import ModalPeriksaAbsensi from '../../components/ModalPeriksaAbsensi.jsx'
 import { useAuth } from '../../auth/useAuth.js'
+import { isAdminRole } from '../../utils/roles.js'
 import {
   formatWeekdayAndDate,
   getGoogleMapsUrl,
@@ -167,13 +168,24 @@ export default function RekapAbsensiPekerja({
     }
   })()
 
-  const normalizedWorkerId =
+  const isUserAdmin = isAdminRole(storedUser?.peran || storedUser?.role)
+
+  const initialWorkerId =
     Number(workerId) ||
     Number(storedUser?.id_karyawan) ||
     Number(storedUser?.employeeId) ||
-    0
-  const effectiveWorkerName =
-    workerName || storedUser?.nama || storedUser?.name || 'Pekerja'
+    (isUserAdmin ? 25 : 0)
+
+  const [activeWorkerId, setActiveWorkerId] = useState(initialWorkerId)
+
+  const normalizedWorkerId = activeWorkerId || initialWorkerId || 25
+  const effectiveWorkerName = useMemo(() => {
+    if (workerName) return workerName
+    if (!isUserAdmin) return storedUser?.nama || storedUser?.name || 'Pekerja'
+    if (normalizedWorkerId === 25) return 'Putra (Teknisi Listrik)'
+    if (normalizedWorkerId === 24) return 'Andi (Helper Biasa)'
+    return 'Pekerja'
+  }, [workerName, isUserAdmin, storedUser, normalizedWorkerId])
 
   const [jobs, setJobs] = useState([])
   const [assignments, setAssignments] = useState([])
@@ -405,11 +417,12 @@ export default function RekapAbsensiPekerja({
       })
       return
     }
-    if (mode === 'pulang' && !availability.canCheckOut && !activeAbsensi) {
+    const resolvedActive = activeAbsensi || availability.activeSession || null
+    if (mode === 'pulang' && !availability.canCheckOut && !resolvedActive) {
       return
     }
     setSubmitError('')
-    setCameraSession({ job, mode, activeAbsensi })
+    setCameraSession({ job, mode, activeAbsensi: resolvedActive })
   }
 
   const openSessionDetail = (item) => {
@@ -448,10 +461,12 @@ export default function RekapAbsensiPekerja({
             `Absen masuk pada "${cameraSession.job.nama_pekerjaan}" berhasil dikirim. Menunggu persetujuan Admin.`,
         })
       } else {
-        const activeId = cameraSession.activeAbsensi?.id_absensi
+        const activeId = cameraSession.activeAbsensi?.id_absensi || cameraSession.job?.activeAbsensi?.id_absensi
         const res = await absenPulang(activeId, jam, is_overnight, {
           titik_pulang: titik_lokasi,
           foto_pulang: foto,
+          id_pekerjaan: cameraSession.job?.id_pekerjaan,
+          id_karyawan: normalizedWorkerId || cameraSession.activeAbsensi?.id_karyawan,
         })
         setFeedback({
           type: 'success',
@@ -520,6 +535,37 @@ export default function RekapAbsensiPekerja({
             </button>
           </div>
         </div>
+
+        {/* Banner Pemilih Akun Pekerja untuk Admin / Super Admin */}
+        {isUserAdmin && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-xs shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 text-xs font-bold text-white shadow-xs">
+                ⚡
+              </span>
+              <div>
+                <p className="font-bold text-indigo-950">Mode Uji Coba Absensi (Admin / Super Admin)</p>
+                <p className="text-indigo-700 text-[11px]">Sedang menguji absensi untuk teknisi. Klik tombol di kanan untuk beralih antara Putra &amp; Andi:</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveWorkerId(25)}
+                className={`rounded-xl px-3.5 py-1.5 font-bold transition ${normalizedWorkerId === 25 ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100'}`}
+              >
+                Putra (ID: 25 - Teknisi Listrik)
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveWorkerId(24)}
+                className={`rounded-xl px-3.5 py-1.5 font-bold transition ${normalizedWorkerId === 24 ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100'}`}
+              >
+                Andi (ID: 24 - Helper Biasa)
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Feedback Banner */}
         {feedback && (

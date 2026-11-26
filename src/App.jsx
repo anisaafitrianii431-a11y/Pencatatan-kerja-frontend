@@ -555,12 +555,10 @@ function AdminLayoutWrapper() {
     activeItem = 'Pengeluaran & Kwitansi'
   } else if (path.startsWith('/admin/gaji') || path.startsWith('/admin/detail-jam') || path.startsWith('/admin/kontribusi')) {
     activeItem = 'Gaji'
-  } else if (path.startsWith('/admin/pekerjaan')) {
+  } else if (path.startsWith('/admin/pekerjaan') || path.startsWith('/admin/master-role')) {
     activeItem = 'Data Pekerjaan'
   } else if (path.startsWith('/admin/karyawan')) {
     activeItem = 'Data Karyawan'
-  } else if (path.startsWith('/admin/master-role')) {
-    activeItem = 'Master Role'
   } else if (path.startsWith('/admin/pengguna')) {
     activeItem = 'Manajemen Pengguna'
   } else if (path.startsWith('/admin/hak-akses')) {

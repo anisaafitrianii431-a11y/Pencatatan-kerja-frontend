@@ -308,9 +308,7 @@ export default function SalaryHistoryModal({
                   value={nominalUpah}
                   onChange={(e) => setNominalUpah(e.target.value)}
                   placeholder="Contoh: 5000000"
-                  className={`w-full rounded-xl border bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none ${
-                    isSalaryInRange ? 'border-slate-200 focus:border-blue-500' : 'border-rose-300 bg-rose-50/30'
-                  }`}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
@@ -327,17 +325,14 @@ export default function SalaryHistoryModal({
               </div>
             </div>
 
-            {/* Plafon Role & Normalisasi */}
+            {/* Info Role & Penetapan Upah */}
             {roleBudget && (
               <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 bg-white p-2.5 rounded-lg border border-slate-200">
                 <span>
-                  Batas Role ({roleBudget.nama_role}):{' '}
-                  <strong className="text-slate-800">
-                    {formatRupiah(roleUnitLimits.min)} – {formatRupiah(roleUnitLimits.max)} {roleUnitLimits.label}
-                  </strong>
+                  Jabatan Proyek: <strong className="text-slate-800">{roleBudget.nama_role}</strong>
                 </span>
-                <span className={isSalaryInRange ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-semibold'}>
-                  Normalisasi: {formatRupiah(normalizedMonthly)}/bln {isSalaryInRange ? '✓' : '(Di Luar Plafon)'}
+                <span className="text-blue-700 font-semibold">
+                  Tarif baru ditentukan fleksibel oleh Direktur
                 </span>
               </div>
             )}

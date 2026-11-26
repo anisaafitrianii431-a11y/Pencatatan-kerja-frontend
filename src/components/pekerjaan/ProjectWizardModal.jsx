@@ -106,11 +106,10 @@ export default function ProjectWizardModal({
     }
 
     if (step === 3) {
-      // Step 3 bersifat opsional tapi jika diisi harus valid
       if (formData.role_budgets.length > 0) {
         for (const b of formData.role_budgets) {
-          if (Number(b.gaji_min_bulanan) > Number(b.gaji_max_bulanan)) {
-            setErrorMessage(`Batas Min role ${b.nama_role || ''} tidak boleh melebihi batas Max.`)
+          if ((Number(b.kuota_slot) || 0) < 1) {
+            setErrorMessage(`Kuota slot role ${b.nama_role || ''} minimal 1 pekerja.`)
             return false
           }
         }
@@ -747,16 +746,16 @@ export default function ProjectWizardModal({
                               <span className="font-bold text-slate-900">{b.nama_role}</span>
                               <span className="text-[11px] text-slate-500 ml-2">({b.kuota_slot} pekerja)</span>
                             </div>
-                            <span className="font-semibold text-slate-800">
-                              {formatRupiah(b.gaji_min_bulanan)} – {formatRupiah(b.gaji_max_bulanan)}/bln
+                            <span className="text-xs text-slate-600 bg-white border border-blue-200/80 px-2.5 py-1 rounded-lg font-medium">
+                              Upah fleksibel saat penugasan
                             </span>
                           </div>
                         ))}
 
                         <div className="pt-3 flex flex-wrap items-center justify-between text-xs font-bold text-blue-950">
-                          <span>Proyeksi Total Anggaran (Min – Grand Max):</span>
-                          <span>
-                            {formatRupiah(summaryMeta.grandMin)} – {formatRupiah(summaryMeta.grandTotalWithBuffer)}
+                          <span>Total Kebutuhan Pekerja:</span>
+                          <span className="text-blue-700 font-bold">
+                            {summaryMeta.totalSlot} Slot Pekerja
                           </span>
                         </div>
                       </div>

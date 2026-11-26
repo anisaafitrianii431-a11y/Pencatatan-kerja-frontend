@@ -67,14 +67,14 @@ export async function safeFetchJson(url, options = {}) {
         const employeeId = u.id_karyawan || u.employeeId;
         const uCode = (u.kode_karyawan || u.username || u.name || '').toUpperCase();
         if (!userId) {
-          userId = role === 'admin' ? 1 : (employeeId || 2);
+          userId = (role === 'super_admin' || role === 'superadmin') ? 22 : (role === 'admin' ? 1 : (employeeId || 2));
         }
         const effectiveToken = storedToken || u.token;
         authHeader = {
           'Authorization': effectiveToken ? (effectiveToken.startsWith('Bearer ') ? effectiveToken : `Bearer ${effectiveToken}`) : `Bearer ${userId}`,
           'X-User-Id': String(userId),
           'X-Employee-Id': employeeId ? String(employeeId) : '',
-          'X-User-Role': role || (userId === 1 ? 'admin' : 'karyawan')
+          'X-User-Role': role || (userId === 1 ? 'admin' : (userId === 22 ? 'super_admin' : 'karyawan'))
         };
       }
       if (!authHeader['X-User-Id'] && typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {

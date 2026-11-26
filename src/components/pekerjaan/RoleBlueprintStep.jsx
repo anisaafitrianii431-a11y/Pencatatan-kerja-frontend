@@ -75,29 +75,10 @@ export default function RoleBlueprintStep({
       .sort((a, b) => a.hierarchy_level - b.hierarchy_level)
 
     const errors = []
-    for (let i = 0; i < enriched.length - 1; i++) {
-      const lower = enriched[i]
-      const higher = enriched[i + 1]
-
-      if (lower.hierarchy_level === higher.hierarchy_level) {
-        errors.push(`Level hierarki sama (${lower.hierarchy_level}) antara "${lower.nama_role}" dan "${higher.nama_role}". Harap sesuaikan master role.`)
-      } else if (lower.max >= higher.min) {
-        errors.push(
-          `Batas Max "${lower.nama_role}" (${formatRupiah(lower.max)}) harus lebih kecil dari batas Min "${higher.nama_role}" (${formatRupiah(higher.min)}).`,
-        )
-      }
-    }
-
-    // Periksa juga apakah ada min > max pada role yang sama
-    enriched.forEach((b) => {
-      if (b.min > b.max) {
-        errors.push(`Batas Min "${b.nama_role}" (${formatRupiah(b.min)}) tidak boleh lebih besar dari Max (${formatRupiah(b.max)}).`)
-      }
-    })
-
+    // Sesuai Prompt Final: Hapus ketergantungan pada gaji minimum, maksimum, dan validasi rentang gaji hirarki
     return {
-      isValid: errors.length === 0,
-      errors,
+      isValid: true,
+      errors: [],
     }
   }, [roleBudgets, availableRoles])
 
@@ -152,8 +133,8 @@ export default function RoleBlueprintStep({
       nama_role: master.nama_role,
       hierarchy_level: master.hierarchy_level,
       kuota_slot: 1,
-      gaji_min_bulanan: master.default_gaji_min_bulanan || 3000000,
-      gaji_max_bulanan: master.default_gaji_max_bulanan || 4500000,
+      gaji_min_bulanan: 0,
+      gaji_max_bulanan: 0,
     }
 
     const updated = [...roleBudgets, newRow].sort((a, b) => {
@@ -186,9 +167,9 @@ export default function RoleBlueprintStep({
         <div className="flex items-start gap-2.5">
           <span className="text-base">📐</span>
           <div>
-            <h4 className="font-bold text-blue-950">Blueprint Struktur Tim & Kuota Gaji</h4>
+            <h4 className="font-bold text-blue-950">Blueprint Struktur Tim & Kuota Pekerja</h4>
             <p className="mt-1 text-blue-800">
-              Tentukan jabatan apa saja yang dibutuhkan pada proyek ini, batas kuota pekerja per jabatan, dan plafon rentang gaji bulanan (Min – Max). Sistem akan mengonversi batas ini ke satuan per hari, per jam, dan per tahun secara otomatis.
+              Tentukan kebutuhan jabatan dan kuota jumlah pekerja pada proyek ini. Besaran tarif upah (per jam atau per hari) tidak mengikat tingkatan jabatan dan akan ditentukan secara manual dan fleksibel oleh Direktur saat penugasan pekerja di lapangan.
             </p>
           </div>
         </div>
@@ -248,7 +229,7 @@ export default function RoleBlueprintStep({
               </option>
               {unselectedRoles.map((r) => (
                 <option key={r.id_role} value={r.id_role}>
-                  Lvl {r.hierarchy_level}: {r.nama_role} (Default: {formatRupiah(r.default_gaji_min_bulanan)} – {formatRupiah(r.default_gaji_max_bulanan)})
+                  Lvl {r.hierarchy_level}: {r.nama_role}
                 </option>
               ))}
             </select>
@@ -337,72 +318,28 @@ export default function RoleBlueprintStep({
                     </button>
                   </div>
 
-                  {/* Input Kuota & Rentang Bulanan */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
+                  {/* Input Kuota Slot & Info Upah */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 items-center">
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                         Kuota Slot Pekerja <span className="text-rose-500">*</span>
                       </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={b.kuota_slot}
-                        onChange={(e) => handleFieldChange(idx, 'kuota_slot', Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Gaji Min Bulanan (Rp) <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={b.gaji_min_bulanan}
-                        onChange={(e) => handleFieldChange(idx, 'gaji_min_bulanan', parseFloat(e.target.value) || 0)}
-                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Gaji Max Bulanan (Rp) <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={b.gaji_max_bulanan}
-                        onChange={(e) => handleFieldChange(idx, 'gaji_max_bulanan', parseFloat(e.target.value) || 0)}
-                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Live Konversi 4 Satuan */}
-                  <div className="mt-3 rounded-lg bg-slate-50 p-2.5 border border-slate-100 text-[11px] text-slate-600">
-                    <span className="font-semibold text-slate-700 block mb-1">
-                      Konversi Otomatis Batas Upah ({hariKerja} hari/bln, {jamKerja} jam/hari):
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div className="bg-white p-1.5 rounded border border-slate-200/60">
-                        <span className="text-slate-400 block text-[10px]">Per Hari (÷ {hariKerja})</span>
-                        <span className="font-semibold text-slate-800">
-                          {formatRupiah(harianMin)} – {formatRupiah(harianMax)}
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={b.kuota_slot}
+                          onChange={(e) => handleFieldChange(idx, 'kuota_slot', Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-32 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-none"
+                        />
+                        <span className="text-xs text-slate-500 font-medium">Orang / Pekerja</span>
                       </div>
-                      <div className="bg-white p-1.5 rounded border border-slate-200/60">
-                        <span className="text-slate-400 block text-[10px]">Per Jam (÷ {hariKerja * jamKerja})</span>
-                        <span className="font-semibold text-slate-800">
-                          {formatRupiah(jamMin)} – {formatRupiah(jamMax)}
-                        </span>
-                      </div>
-                      <div className="bg-white p-1.5 rounded border border-slate-200/60">
-                        <span className="text-slate-400 block text-[10px]">Per Tahun (× 12)</span>
-                        <span className="font-semibold text-slate-800">
-                          {formatRupiah(tahunMin)} – {formatRupiah(tahunMax)}
-                        </span>
-                      </div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 border border-slate-200/70 p-2.5 text-xs text-slate-600">
+                      <span className="font-semibold text-slate-700 block text-[11px]">💡 Skema Penetapan Upah:</span>
+                      <span className="text-[11px] text-slate-500">
+                        Tarif upah (Per Jam / Per Hari) diinput fleksibel dan manual oleh Direktur saat penugasan pekerja.
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -412,48 +349,39 @@ export default function RoleBlueprintStep({
         )}
       </div>
 
-      {/* Live Preview Estimasi Budget Proyek */}
+      {/* Ringkasan Tim Proyek */}
       {roleBudgets.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-200/80 pb-2 mb-3">
-            <span className="font-bold text-xs uppercase tracking-wider text-slate-700">
-              Live Estimasi Total Budget Proyek (Estimasi {budgetEstimation.durasiBulan} Bulan)
+        <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/50 to-slate-50 p-4 shadow-xs">
+          <div className="flex items-center justify-between border-b border-blue-200/80 pb-2 mb-3">
+            <span className="font-bold text-xs uppercase tracking-wider text-blue-900">
+              Ringkasan Kebutuhan Tim Proyek
             </span>
-            <span className="text-[11px] font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-              Total Kuota: {roleBudgets.reduce((acc, r) => acc + (Number(r.kuota_slot) || 0), 0)} Pekerja
+            <span className="text-[11px] font-semibold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
+              Estimasi {budgetEstimation.durasiBulan} Bulan Kerja
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-slate-500 font-medium text-[11px]">Batas Bawah (Min)</span>
-              <p className="font-bold text-slate-900 text-sm mt-0.5">{formatRupiah(budgetEstimation.totalMin)}</p>
-              <span className="text-[10px] text-slate-400">Semua pekerja di tarif batas bawah</span>
+              <span className="text-slate-500 font-medium text-[11px]">Total Role Dibutuhkan</span>
+              <p className="font-bold text-slate-900 text-base mt-0.5">{roleBudgets.length} Role</p>
+              <span className="text-[10px] text-slate-400">Variasi jabatan dalam tim</span>
             </div>
 
             <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs">
-              <span className="text-blue-700 font-medium text-[11px]">Estimasi Titik Tengah (Midpoint)</span>
-              <p className="font-bold text-blue-950 text-sm mt-0.5">{formatRupiah(budgetEstimation.totalMid)}</p>
-              <span className="text-[10px] text-blue-600/80">Rata-rata proyeksi pengeluaran tim</span>
+              <span className="text-blue-700 font-medium text-[11px]">Total Kuota Pekerja</span>
+              <p className="font-bold text-blue-950 text-base mt-0.5">
+                {roleBudgets.reduce((acc, r) => acc + (Number(r.kuota_slot) || 0), 0)} Pekerja
+              </p>
+              <span className="text-[10px] text-blue-600/80">Total slot yang siap ditugaskan</span>
             </div>
 
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-slate-500 font-medium text-[11px]">Batas Atas (Max)</span>
-              <p className="font-bold text-slate-900 text-sm mt-0.5">{formatRupiah(budgetEstimation.totalMax)}</p>
-              {lemburAktif && (
-                <p className="text-[10px] font-semibold text-amber-700 mt-0.5">
-                  + Buffer Lembur ({bufferLembur}%): {formatRupiah(budgetEstimation.bufferNominal)}
-                </p>
-              )}
+              <span className="text-slate-500 font-medium text-[11px]">Skema Upah</span>
+              <p className="font-bold text-slate-900 text-xs mt-1">Manual Per Pekerja</p>
+              <span className="text-[10px] text-slate-400">Ditetapkan fleksibel saat penugasan</span>
             </div>
           </div>
-
-          {lemburAktif && (
-            <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-slate-200/80">
-              <span className="font-semibold text-slate-700">Grand Total Max (Termasuk Buffer Lembur):</span>
-              <span className="font-bold text-emerald-800 text-sm">{formatRupiah(budgetEstimation.grandTotalMax)}</span>
-            </div>
-          )}
         </div>
       )}
     </div>
