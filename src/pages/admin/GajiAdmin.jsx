@@ -1464,6 +1464,16 @@ export default function GajiAdmin({ currentUser }) {
                             <div>{renderBadgeUpah(row.jenis_upah)}</div>
                             <div className="text-[11px] text-slate-500 font-medium mt-1">
                               {formatRupiah(row.tarif)}
+                              {Number(row.total_hari || 0) > 0 && row.jenis_upah === 'per_hari' && (
+                                <span className="ml-1 text-[10px] text-slate-600 font-bold">
+                                  ({row.total_hari} hari)
+                                </span>
+                              )}
+                              {Number(row.total_jam || 0) > 0 && row.jenis_upah === 'per_jam' && (
+                                <span className="ml-1 text-[10px] text-slate-600 font-bold">
+                                  ({Number(row.total_jam).toFixed(2)} jam)
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -1930,7 +1940,7 @@ export default function GajiAdmin({ currentUser }) {
               <input
                 type="number"
                 min="0"
-                step="1000"
+                step="any"
                 value={bonusInput}
                 onChange={(e) => setBonusInput(Number(e.target.value))}
                 placeholder="0"
@@ -1946,7 +1956,7 @@ export default function GajiAdmin({ currentUser }) {
               <input
                 type="number"
                 min="0"
-                step="1000"
+                step="any"
                 value={potonganInput}
                 onChange={(e) => setPotonganInput(Number(e.target.value))}
                 placeholder="0"
@@ -2056,9 +2066,9 @@ export default function GajiAdmin({ currentUser }) {
               </div>
               <input 
                 type="number"
-                min="1000"
+                min="1"
                 max={Number(bayarModal.sisa_pembayaran ?? bayarModal.gaji_bersih ?? 0)}
-                step="1000"
+                step="any"
                 required
                 value={nominalBayarInput}
                 onChange={(e) => setNominalBayarInput(e.target.value)}

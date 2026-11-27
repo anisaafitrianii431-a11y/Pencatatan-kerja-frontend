@@ -131,8 +131,11 @@ export default function ProjectWizardModal({
   }
 
   const handleSubmit = async () => {
-    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
-      return
+    for (const step of [1, 2, 3]) {
+      if (!validateStep(step)) {
+        setCurrentStep(step)
+        return
+      }
     }
 
     setIsSubmitting(true)
@@ -168,8 +171,6 @@ export default function ProjectWizardModal({
         role_budgets: formData.role_budgets.map((b) => ({
           id_role: Number(b.id_role),
           kuota_slot: Number(b.kuota_slot) || 1,
-          gaji_min_bulanan: Number(b.gaji_min_bulanan) || 0,
-          gaji_max_bulanan: Number(b.gaji_max_bulanan) || 0,
         })),
       }
 
