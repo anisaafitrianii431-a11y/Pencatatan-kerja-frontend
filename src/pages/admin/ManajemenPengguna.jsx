@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   getUsers,
+  getAssignableRoles,
+  createUser,
   resetUserPassword,
   toggleUserStatus,
 } from '../../services/userApi.js'
@@ -310,7 +312,8 @@ function UserResetPasswordModal({ user, isSaving, onClose, onReset }) {
  * KOMPONEN UTAMA: ManajemenPengguna
  */
 function ManajemenPengguna() {
-  const { canUpdate } = useAuth()
+  const { canUpdate, user: currentUser } = useAuth()
+  const isSuperAdmin = currentUser?.peran === 'super_admin'
   const navigate = useNavigate()
   const [users, setUsers] = useState([])
   const [isReady, setIsReady] = useState(false)
@@ -318,6 +321,9 @@ function ManajemenPengguna() {
   const [errorMsg, setErrorMsg] = useState('')
   const [notice, setNotice] = useState(null)
   const [resetModalUser, setResetModalUser] = useState(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [assignableRoles, setAssignableRoles] = useState([])
+  const [newUser, setNewUser] = useState({ username: '', email: '', password: '', peran: '' })
 
   // Filters & Sorting
   const [search, setSearch] = useState('')
@@ -341,6 +347,16 @@ function ManajemenPengguna() {
   useEffect(() => {
     loadUsers()
   }, [])
+
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    getAssignableRoles()
+      .then((roles) => {
+        setAssignableRoles(roles)
+        setNewUser((current) => ({ ...current, peran: current.peran || roles[0]?.role_name || '' }))
+      })
+      .catch((err) => showNotice(`Daftar role tidak dapat dimuat: ${err.message}`, 'error'))
+  }, [isSuperAdmin])
 
   function showNotice(message, type = 'success') {
     setNotice({ message, type })
@@ -431,6 +447,28 @@ function ManajemenPengguna() {
     }
   }
 
+  async function handleCreateUser(event) {
+    event.preventDefault()
+    setIsSaving(true)
+    try {
+      const created = await createUser({
+        username: newUser.username.trim(),
+        email: newUser.email.trim(),
+        password: newUser.password,
+        peran: newUser.peran,
+        aktif: 1,
+      })
+      setUsers((current) => [created, ...current])
+      setCreateModalOpen(false)
+      setNewUser({ username: '', email: '', password: '', peran: assignableRoles[0]?.role_name || '' })
+      showNotice(`Akun ${created.username} berhasil dibuat.`, 'success')
+    } catch (err) {
+      showNotice(`Gagal membuat akun: ${err.message}`, 'error')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-8">
       {/* 1. HEADER HALAMAN */}
@@ -459,7 +497,12 @@ function ManajemenPengguna() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isSuperAdmin && (
+            <button type="button" onClick={() => setCreateModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-violet-800">
+              <span aria-hidden="true">＋</span> Buat Akun Pengguna
+            </button>
+          )}
           <div className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-2 text-xs font-semibold text-blue-800 shadow-2xs">
             <UserIcon name="shield" className="h-4 w-4 text-blue-600" />
             <span>Terintegrasi Data Karyawan</span>
@@ -516,6 +559,27 @@ function ManajemenPengguna() {
           >
             Coba lagi
           </button>
+        </div>
+      )}
+
+      {createModalOpen && isSuperAdmin && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget && !isSaving) setCreateModalOpen(false) }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="create-user-title" className="my-auto w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+              <h2 id="create-user-title" className="text-lg font-bold text-slate-900">Buat Akun Pengguna</h2>
+              <p className="mt-1 text-xs text-slate-500">Buat akun akses sistem dan tetapkan role yang sudah terdaftar.</p>
+            </div>
+            <form onSubmit={handleCreateUser} className="space-y-4 p-6">
+              <label className="block text-xs font-semibold text-slate-700">Username<input required maxLength={50} autoComplete="username" value={newUser.username} onChange={(event) => setNewUser({ ...newUser, username: event.target.value })} className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-violet-500" /></label>
+              <label className="block text-xs font-semibold text-slate-700">Email<input required type="email" autoComplete="email" value={newUser.email} onChange={(event) => setNewUser({ ...newUser, email: event.target.value })} className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-violet-500" /></label>
+              <label className="block text-xs font-semibold text-slate-700">Kata sandi (minimal 6 karakter)<input required minLength={6} type="password" autoComplete="new-password" value={newUser.password} onChange={(event) => setNewUser({ ...newUser, password: event.target.value })} className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-violet-500" /></label>
+              <label className="block text-xs font-semibold text-slate-700">Role<select required value={newUser.peran} onChange={(event) => setNewUser({ ...newUser, peran: event.target.value })} className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-violet-500"><option value="" disabled>Pilih role</option>{assignableRoles.map((role) => <option key={role.role_name} value={role.role_name}>{role.display_name}</option>)}</select></label>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <button type="button" disabled={isSaving} onClick={() => setCreateModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Batal</button>
+                <button type="submit" disabled={isSaving || !newUser.peran} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">{isSaving ? 'Menyimpan…' : 'Buat Akun'}</button>
+              </div>
+            </form>
+          </section>
         </div>
       )}
 

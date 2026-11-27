@@ -35,6 +35,15 @@ export async function getUserById(id) {
   return normalizeUser(await apiGet(`/users/${id}`))
 }
 
+export async function getAssignableRoles() {
+  const roles = await apiGet('/role-permissions/roles')
+  return Array.isArray(roles) ? roles.filter((role) => role.role_name !== 'super_admin') : []
+}
+
+export async function createUser(payload) {
+  return normalizeUser(await apiPost('/users', payload))
+}
+
 export async function resetUserPassword(id, kataSandi, konfirmasiKataSandi) {
   const user = await apiPost(`/users/${id}/reset-password`, {
     kata_sandi: kataSandi?.trim(),
