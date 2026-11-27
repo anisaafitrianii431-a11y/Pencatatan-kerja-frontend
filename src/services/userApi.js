@@ -44,6 +44,10 @@ export async function createUser(payload) {
   return normalizeUser(await apiPost('/users', payload))
 }
 
+export async function updateUserRole(id, peran) {
+  return normalizeUser(await apiPut(`/users/${id}/role`, { peran }))
+}
+
 export async function resetUserPassword(id, kataSandi, konfirmasiKataSandi) {
   const user = await apiPost(`/users/${id}/reset-password`, {
     kata_sandi: kataSandi?.trim(),
