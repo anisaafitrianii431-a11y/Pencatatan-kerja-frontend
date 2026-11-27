@@ -773,132 +773,392 @@ export default function PengeluaranKaryawan({ currentUser }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 mb-1">
-            <span>Pengeluaran Pribadi &amp; Kantor</span>
+      {/* ============================================================== */}
+      {/* HERO BANNER MODUL PENGELUARAN                                  */}
+      {/* ============================================================== */}
+      <header className="relative flex flex-col gap-5 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-800 via-teal-800 to-slate-900 p-6 text-white shadow-lg shadow-emerald-950/15 lg:flex-row lg:items-center lg:justify-between sm:p-7">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+            <span>Area Kerja Karyawan</span>
+            <span className="text-emerald-400">•</span>
+            <span>Reimbursement &amp; Catatan Pengeluaran</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center space-x-2">
-            <Receipt className="w-7 h-7 text-blue-600" />
-            <span>Rekap Pengeluaran</span>
+          <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+            Rekap Pengeluaran &amp; Nota
           </h1>
-          <p className="text-sm text-slate-500">
-            Pantau pengeluaran yang Anda catat: jumlah diajukan, disetujui, ditolak, dan sumber dananya.
+          <p className="mt-1 max-w-2xl text-sm text-emerald-100/95 leading-relaxed">
+            Pantau seluruh nota pengeluaran yang Anda ajukan: dana talangan pribadi yang akan diganti pada slip gaji bulanan, pertanggungjawaban kas kantor, serta status approval Admin.
           </p>
+          <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs text-emerald-100">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1 backdrop-blur-sm">
+              💰 Reimbursement Masuk Slip Gaji: <strong className="text-amber-300 font-extrabold">{formatRupiah(summaryStats.pribadi.filter((item) => item.status_verifikasi === 'disetujui' && item.status_ganti !== 'sudah').reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1 backdrop-blur-sm">
+              📄 Total Diajukan: <strong>{formatRupiah(summaryStats.total)} ({pengeluaranList.length} Nota)</strong>
+            </span>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={loadData}
+            disabled={loading}
             aria-label="Segarkan data pengeluaran"
-            className="p-2.5 min-h-[40px] min-w-[40px] text-slate-600 hover:text-blue-600 bg-white border border-slate-200 rounded-xl transition shadow-sm cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-emerald-900 shadow-sm transition hover:bg-emerald-50 sm:text-sm cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 text-emerald-700 ${loading ? 'animate-spin' : ''}`} />
+            <span>{loading ? 'Memuat...' : 'Segarkan Data'}</span>
           </button>
-          <button type="button" onClick={exportSummaryCsv} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Ekspor CSV</button>
+          <button
+            type="button"
+            onClick={exportSummaryCsv}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm cursor-pointer"
+          >
+            <span>Ekspor CSV</span>
+          </button>
         </div>
-      </div>
+      </header>
 
       {/* Notifications */}
       {errorMsg && (
-        <div role="alert" className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl flex items-center space-x-3 text-sm">
+        <div role="alert" className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl flex items-center space-x-3 text-sm shadow-xs">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
       {successMsg && (
-        <div role="status" className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl flex items-center space-x-3 text-sm">
+        <div role="status" className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl flex items-center space-x-3 text-sm shadow-xs">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-bold text-slate-900">Rincian Sumber Dana Belanja</h2>
-          <p className="text-sm text-slate-600">
-            Uang pribadi yang akan diganti di gaji: <strong className="text-amber-700 font-extrabold">{formatRupiah(summaryStats.pribadi.filter((item) => item.status_verifikasi === 'disetujui' && item.status_ganti !== 'sudah').reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</strong>
-          </p>
+      {/* ============================================================== */}
+      {/* RINCIAN SUMBER DANA BELANJA & TALANGAN                          */}
+      {/* ============================================================== */}
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Rincian Sumber Dana Belanja &amp; Talangan</h2>
+            <p className="text-xs text-slate-500">
+              Alokasi pengeluaran berdasarkan dana talangan pribadi dan uang kas operasional proyek.
+            </p>
+          </div>
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-semibold">
+            <span className="text-slate-600">Reimbursement masuk slip gaji: </span>
+            <strong className="text-amber-800 font-extrabold">
+              {formatRupiah(summaryStats.pribadi.filter((item) => item.status_verifikasi === 'disetujui' && item.status_ganti !== 'sudah').reduce((sum, item) => sum + Number(item.nominal || 0), 0))}
+            </strong>
+          </div>
         </div>
-        <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-slate-100">
-          <div className="bg-blue-600" style={{ width: `${summaryStats.total ? (summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} />
-          <div className="bg-amber-600" style={{ width: `${summaryStats.total ? (summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%` }} />
+
+        {/* 2 Kolom Ringkasan Dana */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Card Uang Pribadi */}
+          <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/60 to-orange-50/40 p-4 space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-200">
+                <Receipt className="w-3.5 h-3.5 text-amber-700" />
+                Uang Pribadi (Talangan / Reimburse)
+              </span>
+              <span className="text-xs font-bold text-slate-600 bg-white px-2 py-0.5 rounded-full border border-amber-200/60">
+                {summaryStats.pribadi.length} Nota
+              </span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-extrabold text-amber-900">
+              {formatRupiah(summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0))}
+            </p>
+            <p className="text-[11px] text-amber-700 font-medium leading-relaxed">
+              Biaya operasional lapangan yang ditalangi lebih dahulu oleh pekerja &amp; diganti otomatis pada slip gaji bulanan saat disetujui.
+            </p>
+          </div>
+
+          {/* Card Uang Kas Kantor */}
+          <div className="rounded-2xl border border-blue-200/80 bg-gradient-to-br from-blue-50/60 to-indigo-50/40 p-4 space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800 border border-blue-200">
+                <Wallet className="w-3.5 h-3.5 text-blue-700" />
+                Uang Kas Proyek / Kantor
+              </span>
+              <span className="text-xs font-bold text-slate-600 bg-white px-2 py-0.5 rounded-full border border-blue-200/60">
+                {summaryStats.kantor.length} Nota
+              </span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-extrabold text-blue-900">
+              {formatRupiah(summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0))}
+            </p>
+            <p className="text-[11px] text-blue-700 font-medium leading-relaxed">
+              Belanja menggunakan uang muka kas operasional yang dipegang Penanggung Jawab (PJ) tanpa memotong gaji pribadi.
+            </p>
+          </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-5 text-sm">
-          <span><b className="rounded-full bg-blue-100 px-3 py-1 text-blue-800">Uang Kas Kantor</b> {formatRupiah(summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.kantor.length} nota</span>
-          <span><b className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">Uang Pribadi (Talangan)</b> {formatRupiah(summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0))} · {summaryStats.pribadi.length} nota</span>
+
+        {/* Progress Distribusi */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex justify-between text-[11px] font-semibold text-slate-500">
+            <span>Distribusi Sumber Dana</span>
+            <span>
+              Total Keseluruhan:{' '}
+              <strong className="text-slate-800 font-bold">
+                {formatRupiah(summaryStats.total)}
+              </strong>
+            </span>
+          </div>
+          <div className="flex h-3 overflow-hidden rounded-full bg-slate-100 shadow-inner">
+            <div
+              className="bg-amber-500 transition-all duration-500"
+              style={{
+                width: `${summaryStats.total ? (summaryStats.pribadi.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%`,
+              }}
+              title="Uang Pribadi"
+            />
+            <div
+              className="bg-blue-600 transition-all duration-500"
+              style={{
+                width: `${summaryStats.total ? (summaryStats.kantor.reduce((s, x) => s + Number(x.nominal || 0), 0) / summaryStats.total) * 100 : 0}%`,
+              }}
+              title="Uang Kas Kantor"
+            />
+          </div>
         </div>
       </section>
 
-      {summaryStats.missingReceipt.length > 0 && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><p><strong>{summaryStats.missingReceipt.length} transaksi belum ada foto nota.</strong> Lengkapi agar lebih cepat diperiksa.</p><button type="button" onClick={() => { setActiveTab('riwayat'); setSummaryStatus('semua'); setSummaryFund('semua'); setSummaryReceipt('tanpa-foto'); setSummaryQuery(''); const next = new URLSearchParams(searchParams); next.delete('pekerjaan'); setSearchParams(next); window.setTimeout(() => document.getElementById('riwayat-pengeluaran-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100); }} className="rounded-xl border border-amber-300 bg-white px-4 py-2 font-semibold">Tampilkan transaksi itu</button></section>}
+      {summaryStats.missingReceipt.length > 0 && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <p>
+              <strong>{summaryStats.missingReceipt.length} transaksi belum melampirkan foto nota fisik.</strong> Lengkapi agar proses approval oleh Admin lebih cepat.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('riwayat');
+              setSummaryStatus('semua');
+              setSummaryFund('semua');
+              setSummaryReceipt('tanpa-foto');
+              setSummaryQuery('');
+              const next = new URLSearchParams(searchParams);
+              next.delete('pekerjaan');
+              setSearchParams(next);
+              window.setTimeout(
+                () => document.getElementById('riwayat-pengeluaran-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                100,
+              );
+            }}
+            className="rounded-xl border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100 transition cursor-pointer shadow-2xs"
+          >
+            Tampilkan Transaksi Tanpa Nota
+          </button>
+        </section>
+      )}
 
-      {/* Tab Navigasi Single-Row */}
-      <div
-        role="tablist"
-        aria-label="Menu Pengeluaran Karyawan"
-        onKeyDown={handleTabKeyDown}
-        className="flex flex-nowrap overflow-x-auto border-b border-slate-200 gap-x-6 text-sm font-bold"
-      >
-        <button
-          ref={tabRiwayatRef}
-          id="tab-riwayat"
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'riwayat'}
-          tabIndex={activeTab === 'riwayat' ? 0 : -1}
-          onClick={() => handleSelectTab('riwayat')}
-          className={`pb-3 border-b-2 flex items-center space-x-2 whitespace-nowrap shrink-0 transition cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 ${
-            activeTab === 'riwayat'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
+      {/* Tab Navigasi Kapsul Modern */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-2">
+        <div
+          role="tablist"
+          aria-label="Menu Pengeluaran Karyawan"
+          onKeyDown={handleTabKeyDown}
+          className="inline-flex items-center rounded-2xl bg-white p-1.5 border border-slate-200 shadow-xs gap-1.5"
         >
-          <Receipt className="w-4 h-4" />
-          <span>Riwayat Pengeluaran Saya ({displayedPengeluaranList.length})</span>
-        </button>
+          <button
+            ref={tabRiwayatRef}
+            id="tab-riwayat"
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'riwayat'}
+            tabIndex={activeTab === 'riwayat' ? 0 : -1}
+            onClick={() => handleSelectTab('riwayat')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeTab === 'riwayat'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Receipt className="w-4 h-4" />
+            <span>Riwayat Pengeluaran Saya</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                activeTab === 'riwayat' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {displayedPengeluaranList.length}
+            </span>
+          </button>
 
-        <button
-          ref={tabUangKantorRef}
-          id="tab-uang-kantor"
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'uang-kantor'}
-          tabIndex={activeTab === 'uang-kantor' ? 0 : -1}
-          onClick={() => handleSelectTab('uang-kantor')}
-          className={`pb-3 border-b-2 flex items-center space-x-2 whitespace-nowrap shrink-0 transition cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 ${
-            activeTab === 'uang-kantor'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Wallet className="w-4 h-4" />
-          <span>Pertanggungjawaban Uang Kantor ({kantorOutflowsList.length})</span>
-        </button>
+          <button
+            ref={tabUangKantorRef}
+            id="tab-uang-kantor"
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'uang-kantor'}
+            tabIndex={activeTab === 'uang-kantor' ? 0 : -1}
+            onClick={() => handleSelectTab('uang-kantor')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeTab === 'uang-kantor'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            <span>Pertanggungjawaban Uang Kantor</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                activeTab === 'uang-kantor' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700'
+              }`}
+            >
+              {kantorOutflowsList.length}
+            </span>
+          </button>
+        </div>
+
+        <span className="text-xs font-semibold text-slate-500">
+          {activeTab === 'riwayat'
+            ? `${displayedPengeluaranList.length} nota diajukan`
+            : `${kantorOutflowsList.length} nota kas kantor`}
+        </span>
       </div>
 
       {/* Tab Panel 1: Riwayat Pengeluaran Saya */}
       <div role="tabpanel" aria-labelledby="tab-riwayat" hidden={activeTab !== 'riwayat'}>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div>
-              <h2 id="riwayat-pengeluaran-heading" className="font-bold text-slate-800 text-sm">Riwayat Pengeluaran &amp; Kuitansi Saya</h2>
-              <p className="text-xs text-slate-400">Daftar seluruh nota belanja (Uang Pribadi &amp; Uang Kantor) yang Anda ajukan</p>
+              <h2 id="riwayat-pengeluaran-heading" className="font-bold text-slate-900 text-sm sm:text-base">
+                Riwayat Pengeluaran &amp; Kuitansi Saya
+              </h2>
+              <p className="text-xs text-slate-500">
+                Daftar seluruh nota belanja (Uang Pribadi &amp; Uang Kantor) yang Anda ajukan
+              </p>
             </div>
-            <div className="text-xs text-slate-500 font-semibold">
+            <div className="text-xs text-slate-700 font-bold bg-white border border-slate-200 px-3 py-1 rounded-full shadow-2xs">
               {displayedPengeluaranList.length} Transaksi
             </div>
           </div>
 
-          <div className="grid gap-3 border-b border-slate-100 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5">
-            <label className="text-xs font-semibold text-slate-600">Bulan<select value={summaryMonth} onChange={(e) => setSummaryMonth(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Semua bulan</option>{MONTH_OPTIONS.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}</select></label>
-            <label className="text-xs font-semibold text-slate-600">Status<select value={summaryStatus} onChange={(e) => setSummaryStatus(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="semua">Semua status</option><option value="menunggu">Menunggu</option><option value="disetujui">Disetujui</option><option value="ditolak">Ditolak</option></select></label>
-            <label className="text-xs font-semibold text-slate-600">Pekerjaan<select value={selectedJobId} onChange={(e) => { const next = new URLSearchParams(searchParams); e.target.value ? next.set('pekerjaan', e.target.value) : next.delete('pekerjaan'); setSearchParams(next); }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Semua pekerjaan</option>{pekerjaanList.map((job) => <option key={job.id_pekerjaan} value={job.id_pekerjaan}>{job.nama_pekerjaan}</option>)}</select></label>
-            <label className="text-xs font-semibold text-slate-600">Sumber dana<select value={summaryFund} onChange={(e) => setSummaryFund(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="semua">Semua sumber dana</option><option value="pribadi">Uang pribadi</option><option value="kantor">Uang kantor</option></select></label>
-            <label className="text-xs font-semibold text-slate-600">Bukti nota<select value={summaryReceipt} onChange={(e) => setSummaryReceipt(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="semua">Semua</option><option value="ada-foto">Ada foto</option><option value="tanpa-foto">Belum ada foto</option></select></label>
-            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Cari keterangan<input value={summaryQuery} onChange={(e) => setSummaryQuery(e.target.value)} placeholder="Cari keterangan..." className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
-            <div className="flex items-end justify-between gap-3 text-sm text-slate-500 xl:col-span-3"><span>{displayedPengeluaranList.length} transaksi · {formatRupiah(displayedPengeluaranList.reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</span><button type="button" onClick={() => { setSummaryStatus('semua'); setSummaryFund('semua'); setSummaryReceipt('semua'); setSummaryMonth(''); setSummaryQuery(''); const next = new URLSearchParams(searchParams); next.delete('pekerjaan'); setSearchParams(next); }} className="font-semibold text-emerald-700">Reset filter</button></div>
+          <div className="grid gap-3 border-b border-slate-100 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Bulan</label>
+              <select
+                value={summaryMonth}
+                onChange={(e) => setSummaryMonth(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
+              >
+                <option value="">Semua Bulan</option>
+                {MONTH_OPTIONS.map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Status Audit</label>
+              <select
+                value={summaryStatus}
+                onChange={(e) => setSummaryStatus(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
+              >
+                <option value="semua">Semua Status</option>
+                <option value="menunggu">Menunggu</option>
+                <option value="disetujui">Disetujui</option>
+                <option value="ditolak">Ditolak</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Pekerjaan / Proyek</label>
+              <select
+                value={selectedJobId}
+                onChange={(e) => {
+                  const next = new URLSearchParams(searchParams);
+                  e.target.value ? next.set('pekerjaan', e.target.value) : next.delete('pekerjaan');
+                  setSearchParams(next);
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
+              >
+                <option value="">Semua Pekerjaan</option>
+                {pekerjaanList.map((job) => (
+                  <option key={job.id_pekerjaan} value={job.id_pekerjaan}>
+                    {job.nama_pekerjaan}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Sumber Dana</label>
+              <select
+                value={summaryFund}
+                onChange={(e) => setSummaryFund(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
+              >
+                <option value="semua">Semua Sumber Dana</option>
+                <option value="pribadi">Uang Pribadi (Talangan)</option>
+                <option value="kantor">Uang Kas Kantor</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Bukti Nota Fisik</label>
+              <select
+                value={summaryReceipt}
+                onChange={(e) => setSummaryReceipt(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
+              >
+                <option value="semua">Semua Nota</option>
+                <option value="ada-foto">Ada Foto Nota</option>
+                <option value="tanpa-foto">Belum Ada Foto Nota</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-2 lg:col-span-2 xl:col-span-3">
+              <label className="text-xs font-bold text-slate-600 block mb-1">Cari Keterangan / Barang</label>
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  value={summaryQuery}
+                  onChange={(e) => setSummaryQuery(e.target.value)}
+                  placeholder="Cari rincian pengeluaran, barang belanja..."
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-9 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                />
+                {summaryQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSummaryQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm sm:col-span-2 lg:col-span-1 xl:col-span-2 self-end pb-0.5">
+              <span className="font-semibold text-slate-700">
+                Total: <strong className="text-emerald-700">{formatRupiah(displayedPengeluaranList.reduce((sum, item) => sum + Number(item.nominal || 0), 0))}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSummaryStatus('semua');
+                  setSummaryFund('semua');
+                  setSummaryReceipt('semua');
+                  setSummaryMonth('');
+                  setSummaryQuery('');
+                  const next = new URLSearchParams(searchParams);
+                  next.delete('pekerjaan');
+                  setSearchParams(next);
+                }}
+                className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Filter</span>
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -943,7 +1203,32 @@ export default function PengeluaranKaryawan({ currentUser }) {
 
                     return (
                       <React.Fragment key={p.id_pengeluaran}>
-                      {index === 0 || String(previousJobId) !== String(p.id_pekerjaan) ? <tr className="border-y border-slate-200 bg-slate-50"><th colSpan={9} className="px-4 py-3 text-left"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-bold text-slate-900">{resolveProjectName(p)} <span className="ml-2 font-normal text-slate-500">{jobSummary.items.length} transaksi</span></span><span className="flex flex-wrap gap-2 text-[11px]"><span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">Menunggu {formatRupiah(jobSummary.pending)}</span><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">Disetujui {formatRupiah(jobSummary.approved)}</span><strong className="self-center text-slate-800">Subtotal {formatRupiah(jobSummary.total)}</strong></span></div></th></tr> : null}
+                      {index === 0 || String(previousJobId) !== String(p.id_pekerjaan) ? (
+                        <tr className="border-y border-slate-200 bg-slate-50/90">
+                          <th colSpan={9} className="px-4 py-3 text-left">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
+                                <span className="text-emerald-700">📁</span>
+                                <span>{resolveProjectName(p)}</span>
+                                <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                  {jobSummary.items.length} transaksi
+                                </span>
+                              </span>
+                              <span className="flex flex-wrap items-center gap-2 text-[11px]">
+                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-bold text-amber-800 border border-amber-200">
+                                  Menunggu {formatRupiah(jobSummary.pending)}
+                                </span>
+                                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-bold text-emerald-800 border border-emerald-200">
+                                  Disetujui {formatRupiah(jobSummary.approved)}
+                                </span>
+                                <strong className="self-center text-slate-800 bg-white border border-slate-200 px-2.5 py-0.5 rounded-full shadow-2xs">
+                                  Subtotal {formatRupiah(jobSummary.total)}
+                                </strong>
+                              </span>
+                            </div>
+                          </th>
+                        </tr>
+                      ) : null}
                       <tr className="hover:bg-slate-50/80 transition">
                         <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
                           {p.tanggal}

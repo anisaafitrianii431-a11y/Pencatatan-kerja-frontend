@@ -136,8 +136,10 @@ export async function getPekerjaanSaya(employeeId, employeeName = '') {
   }
 
   const targetWorkerId = Number(worker.id_karyawan)
+  // API clients or older backend responses may return numeric IDs as strings.
+  // Normalize both sides so a valid admin assignment always matches its job.
   const jobsById = new Map(
-    jobs.map((job) => [job.id_pekerjaan, job]),
+    jobs.map((job) => [Number(job.id_pekerjaan), job]),
   )
 
   // Filter penugasan aktif

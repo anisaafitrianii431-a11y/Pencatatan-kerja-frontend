@@ -81,6 +81,12 @@ function Icon({ name, className = 'h-5 w-5' }) {
         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
       </>
     ),
+    arrow: <path d="M5 12h14m-7-7 7 7-7 7" />,
+    activity: (
+      <>
+        <path d="M3 12h4l3-8 4 16 3-8h4" />
+      </>
+    ),
   }
 
   return (
@@ -102,7 +108,7 @@ function Icon({ name, className = 'h-5 w-5' }) {
 function StatusBadge({ status }) {
   if (status === 'disetujui') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         Disetujui Admin
       </span>
@@ -110,14 +116,14 @@ function StatusBadge({ status }) {
   }
   if (status === 'ditolak') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-rose-600/20">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700 border border-rose-200">
         <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
         Ditolak Admin
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-600/20">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-200">
       <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
       Menunggu Approval
     </span>
@@ -127,21 +133,21 @@ function StatusBadge({ status }) {
 function JobStatusBadge({ status }) {
   if (status === 'berjalan') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-bold text-sky-800 border border-sky-200">
+        <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
         Sedang Berjalan
       </span>
     )
   }
   if (status === 'selesai') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200">
         Selesai
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-600/20">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-200">
       Belum Mulai
     </span>
   )
@@ -215,7 +221,7 @@ export default function RekapAbsensiPekerja({
   }, [])
 
   // Modal Kamera Ambil Absen & Dialog Detail Absensi
-  const [cameraSession, setCameraSession] = useState(null) // { mode: 'masuk'|'pulang', job, activeAbsensi }
+  const [cameraSession, setCameraSession] = useState(null)
   const [selectedDetail, setSelectedDetail] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -507,40 +513,53 @@ export default function RekapAbsensiPekerja({
         onClose={() => setSelectedDetail(null)}
       />
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Header Breadcrumb */}
-        <div className="mb-6">
-          <nav className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-            <span>Karyawan</span>
-            <span>/</span>
-            <span className="text-emerald-600">Absensi</span>
-          </nav>
-          <div className="mt-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                Absensi
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Halo, <strong>{effectiveWorkerName}</strong>. Lakukan absensi sesuai pekerjaan yang Anda ambil dengan kamera &amp; titik GPS, lalu tinjau detailnya pada Rekap Absen hingga disetujui Admin.
-              </p>
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+        {/* ============================================================== */}
+        {/* MODERN HERO BANNER                                             */}
+        {/* ============================================================== */}
+        <header className="relative flex flex-col gap-5 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-800 via-teal-800 to-slate-900 p-6 text-white shadow-lg shadow-emerald-950/15 lg:flex-row lg:items-center lg:justify-between sm:p-7">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+              <span>Area Kerja Karyawan</span>
+              <span className="text-emerald-400">•</span>
+              <span>Presensi &amp; Jam Kerja Resmi</span>
             </div>
+            <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+              Absensi Kerja
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-emerald-100/95 leading-relaxed">
+              Halo, <strong className="text-white">{effectiveWorkerName}</strong>. Lakukan absensi masuk dan pulang pada proyek yang Anda jalankan dengan kamera &amp; GPS, lalu pantau persetujuan jam kerja dari Admin.
+            </p>
+            <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs text-emerald-100">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1 backdrop-blur-sm">
+                <Icon name="calendar" className="h-3.5 w-3.5 text-emerald-300" />
+                <span>Hari Ini: <strong>{formatWeekdayAndDate(todayDate).label}</strong></span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1 backdrop-blur-sm">
+                <Icon name="briefcase" className="h-3.5 w-3.5 text-emerald-300" />
+                <span>Proyek Aktif: <strong>{myAssignments.length} Pekerjaan</strong></span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2.5">
             <button
               type="button"
               onClick={loadWorkerData}
               disabled={isLoading}
-              className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:self-auto"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-emerald-900 shadow-sm transition hover:bg-emerald-50 sm:text-sm cursor-pointer disabled:opacity-50"
             >
-              <Icon name="refresh" className={`h-4 w-4 text-emerald-600 ${isLoading ? 'animate-spin' : ''}`} />
-              Segarkan
+              <Icon name="refresh" className={`h-4 w-4 text-emerald-700 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>{isLoading ? 'Memuat...' : 'Segarkan Data'}</span>
             </button>
           </div>
-        </div>
+        </header>
 
         {/* Banner Pemilih Akun Pekerja untuk Admin / Super Admin */}
         {isUserAdmin && (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-xs shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-xs shadow-sm">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 text-xs font-bold text-white shadow-xs">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-xs font-bold text-white shadow-xs">
                 ⚡
               </span>
               <div>
@@ -552,14 +571,14 @@ export default function RekapAbsensiPekerja({
               <button
                 type="button"
                 onClick={() => setActiveWorkerId(25)}
-                className={`rounded-xl px-3.5 py-1.5 font-bold transition ${normalizedWorkerId === 25 ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100'}`}
+                className={`rounded-xl px-3.5 py-1.5 font-bold transition cursor-pointer ${normalizedWorkerId === 25 ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100'}`}
               >
                 Putra (ID: 25 - Teknisi Listrik)
               </button>
               <button
                 type="button"
                 onClick={() => setActiveWorkerId(24)}
-                className={`rounded-xl px-3.5 py-1.5 font-bold transition ${normalizedWorkerId === 24 ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100'}`}
+                className={`rounded-xl px-3.5 py-1.5 font-bold transition cursor-pointer ${normalizedWorkerId === 24 ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100'}`}
               >
                 Andi (ID: 24 - Helper Biasa)
               </button>
@@ -571,114 +590,133 @@ export default function RekapAbsensiPekerja({
         {feedback && (
           <div
             role="status"
-            className={`mb-6 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs sm:text-sm font-semibold shadow-sm ${feedback.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border-rose-200 bg-rose-50 text-rose-800'
-              }`}
+            className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs sm:text-sm font-semibold shadow-xs ${
+              feedback.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-rose-200 bg-rose-50 text-rose-800'
+            }`}
           >
             <span>{feedback.text}</span>
             <button
               type="button"
               onClick={() => setFeedback(null)}
               aria-label="Tutup notifikasi"
-              className="rounded-lg px-2 py-1 text-xs opacity-70 hover:opacity-100"
+              className="rounded-lg px-2 py-1 text-xs opacity-70 hover:opacity-100 cursor-pointer"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Opsi Fitur Utama Absensi: 1. Absen Pekerjaan & 2. Rekap Absen */}
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab('absen')}
-            className={`inline-flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-bold transition shadow-xs ${activeTab === 'absen'
-              ? 'bg-emerald-600 text-white shadow-emerald-600/20'
-              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+        {/* Tab Switcher: 1. Absen Pekerjaan & 2. Rekap Absen */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-2">
+          <div className="inline-flex items-center rounded-2xl bg-white p-1.5 border border-slate-200 shadow-xs gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('absen')}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
+                activeTab === 'absen'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
-          >
-            <Icon name="camera" className="h-4 w-4" />
-            <span>Absen Pekerjaan</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${activeTab === 'absen' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                }`}
             >
-              {myAssignments.length}
-            </span>
-          </button>
+              <Icon name="camera" className="h-4 w-4" />
+              <span>Absen Pekerjaan</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  activeTab === 'absen' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {myAssignments.length}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('rekap')}
-            className={`inline-flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-bold transition shadow-xs ${activeTab === 'rekap'
-              ? 'bg-emerald-600 text-white shadow-emerald-600/20'
-              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            <button
+              type="button"
+              onClick={() => setActiveTab('rekap')}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
+                activeTab === 'rekap'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
-          >
-            <Icon name="calendar" className="h-4 w-4" />
-            <span>Rekap Absen</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${activeTab === 'rekap' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'
-                }`}
             >
-              {rekapStats.totalSesi}
-            </span>
-          </button>
+              <Icon name="calendar" className="h-4 w-4" />
+              <span>Rekap Absen Harian</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  activeTab === 'rekap' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700'
+                }`}
+              >
+                {rekapStats.totalSesi}
+              </span>
+            </button>
+          </div>
+
+          <span className="text-xs font-semibold text-slate-500">
+            {activeTab === 'absen'
+              ? `${readyAttendanceCount} proyek siap absen hari ini`
+              : `${filteredRekapList.length} sesi absensi tercatat`}
+          </span>
         </div>
 
         {/* ============================================================== */}
-        {/* OPSI 1: ABSEN TERHADAP PEKERJAAN YANG DIAMBIL                  */}
+        {/* TAB 1: ABSEN TERHADAP PEKERJAAN YANG DIAMBIL                   */}
         {/* ============================================================== */}
         {activeTab === 'absen' && (
           <div className="space-y-6">
             {/* Ringkasan Cepat */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-slate-500">Pekerjaan Diambil</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">{myAssignments.length}</p>
-                <p className="mt-1 text-xs font-medium text-emerald-600">
+              <div className="rounded-2xl border border-blue-200/80 bg-blue-50/50 p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Pekerjaan Diambil</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-blue-900">{myAssignments.length}</p>
+                <p className="mt-1 text-xs font-semibold text-blue-700">
                   {readyAttendanceCount > 0
-                    ? `${readyAttendanceCount} siap absen hari ini`
+                    ? `🟢 ${readyAttendanceCount} siap absen hari ini`
                     : 'Semua absen terkunci / selesai'}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-slate-500">Sedang Berjalan</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-600">
+              <div className="rounded-2xl border border-sky-200/80 bg-sky-50/50 p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Sedang Berjalan</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-sky-900">
                   {myAssignments.filter(({ job }) => job?.status === 'berjalan').length}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">Proyek aktif saat ini</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Proyek aktif saat ini</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-slate-500">Sesi Kerja Aktif</p>
-                <p className="mt-1 text-2xl font-bold text-blue-600">{rekapStats.activeCount}</p>
-                <p className="mt-1 text-xs text-slate-500">Belum absen pulang</p>
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Sesi Kerja Aktif</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-emerald-900">{rekapStats.activeCount}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Belum absen pulang</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-slate-500">Menunggu Approval Admin</p>
-                <p className="mt-1 text-2xl font-bold text-amber-600">{rekapStats.waitingCount}</p>
-                <p className="mt-1 text-xs text-slate-500">Dicek lokasi &amp; foto</p>
+              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Menunggu Approval</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-amber-900">{rekapStats.waitingCount}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Dicek foto &amp; titik lokasi</p>
               </div>
             </div>
 
             {/* Kartu Pekerjaan untuk Ambil Absen */}
             <div>
               <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-base font-bold text-slate-900">
-                  Pilih Pekerjaan yang Diambil untuk Absen
-                </h2>
-                <span className="text-xs text-slate-500">
-                  Klik <strong className="text-emerald-700">Ambil Absen</strong> untuk membuka kamera langsung &amp; titik GPS lokasi proyek.
-                </span>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Pilih Pekerjaan untuk Ambil Absen
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Klik tombol untuk membuka kamera langsung &amp; mendeteksi titik koordinat GPS lokasi proyek.
+                  </p>
+                </div>
               </div>
 
               {myAssignments.length === 0 ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500 shadow-sm">
-                  Belum ada pekerjaan yang ditugaskan kepada Anda. Hubungi Administrator untuk mendapatkan penugasan.
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500 shadow-xs">
+                  <Icon name="briefcase" className="h-10 w-10 text-slate-400 mx-auto mb-2" />
+                  <p className="font-bold text-slate-800">Belum Ada Pekerjaan yang Ditugaskan</p>
+                  <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+                    Hubungi Administrator untuk mendapatkan penugasan resmi sebelum melakukan absensi.
+                  </p>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {myAssignments.map(({ assignment, job }) => {
                     const jobAtt =
                       attendanceByJob.get(Number(job.id_pekerjaan)) ||
@@ -690,77 +728,80 @@ export default function RekapAbsensiPekerja({
                     return (
                       <article
                         key={assignment.id_penugasan}
-                        className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
+                        className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"
                       >
                         <div>
                           <div className="flex items-center justify-between gap-2">
                             <JobStatusBadge status={job.status} />
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                              {assignment.jenis_penugasan === 'mandiri' ? 'Diambil Mandiri' : 'Ditetapkan Admin'}
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200">
+                              {assignment.jenis_penugasan === 'mandiri' ? 'Diambil Mandiri' : '👑 Ditugaskan Admin'}
                             </span>
                           </div>
 
-                          <h3 className="mt-3 text-base font-bold text-slate-900 line-clamp-2">
+                          <h3 className="mt-3.5 text-base font-extrabold leading-snug text-slate-900 line-clamp-2 group-hover:text-emerald-700 transition-colors">
                             {job.nama_pekerjaan}
                           </h3>
-                          <p className="mt-1 text-xs text-slate-500 line-clamp-2">
+                          <p className="mt-1 text-xs text-slate-500 line-clamp-2 leading-relaxed">
                             {job.deskripsi || 'Tidak ada deskripsi detail pekerjaan.'}
                           </p>
 
-                          <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600">
+                          {/* Informasi Lokasi & GPS */}
+                          <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs text-slate-600">
                             <p className="flex items-center gap-1.5">
                               <Icon name="location" className="h-4 w-4 text-slate-400 shrink-0" />
-                              <span className="truncate">{job.lokasi || 'Lokasi proyek belum diisi'}</span>
+                              <span className="truncate font-semibold">{job.lokasi || 'Lokasi proyek belum diisi'}</span>
                             </p>
-                            <div className="flex items-center justify-between gap-2 text-[11px]">
-                              <span className="text-slate-500">Metode lokasi:</span>
+                            <div className="flex items-center justify-between gap-2 text-[11px] border-t border-slate-200/50 pt-2">
+                              <span className="text-slate-400">Aturan Lokasi:</span>
                               {job.metode_lokasi === 'wfh' ? (
-                                <span className="font-semibold text-emerald-700">WFH · bebas radius</span>
+                                <span className="font-bold text-emerald-700">WFH · Bebas Radius</span>
                               ) : job.titik_lokasi ? (
                                 <a
                                   href={jobMapUrl}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="font-mono font-semibold text-emerald-700 hover:underline truncate"
+                                  className="font-mono font-bold text-emerald-700 hover:underline truncate"
+                                  title="Buka titik koordinat di Google Maps"
                                 >
-                                  GPS: {job.titik_lokasi} · {job.radius_meter || 100} m
+                                  GPS: {job.radius_meter || 100} m
                                 </a>
                               ) : (
                                 <span className="text-amber-600 font-medium">Belum disetel Admin</span>
                               )}
                             </div>
-                            <p className="flex items-center gap-1.5">
-                              <Icon name="calendar" className="h-4 w-4 text-slate-400 shrink-0" />
-                              <span>Mulai: {formatShortDate(job.tanggal_mulai)}</span>
-                            </p>
-                            <p className="flex items-center gap-1.5 font-medium text-slate-900">
-                              <Icon name="clock" className="h-4 w-4 text-emerald-600 shrink-0" />
-                              <span>Deadline: {formatShortDate(job.target_selesai)}</span>
-                            </p>
+                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="text-slate-400">Jadwal Mulai:</span>
+                              <span className="font-medium text-slate-800">{formatShortDate(job.tanggal_mulai)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="text-slate-400">Target Selesai:</span>
+                              <span className="font-bold text-slate-900">{formatShortDate(job.target_selesai)}</span>
+                            </div>
                           </div>
 
-                          {/* Status Sesi / Verifikasi Terakhir untuk Pekerjaan Ini */}
+                          {/* Status Sesi Aktif / Terakhir */}
                           {activeSession ? (
-                            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 text-[11px] space-y-1">
+                            <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs space-y-1.5 shadow-inner">
                               <div className="flex items-center justify-between gap-2">
-                                <p className="font-bold text-emerald-800">
+                                <p className="font-bold text-emerald-900 flex items-center gap-1.5">
+                                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
                                   Sesi Aktif • Masuk {String(activeSession.jam_masuk || '').slice(0, 5)}
                                 </p>
                                 <StatusBadge status={activeSession.status_verifikasi} />
                               </div>
-                              <div className="flex items-center justify-between text-slate-600">
+                              <div className="flex items-center justify-between text-[11px] text-slate-600 pt-0.5">
                                 <span>{formatWeekdayAndDate(activeSession.tanggal, true).label}</span>
                                 <button
                                   type="button"
                                   onClick={() => openSessionDetail(activeSession)}
-                                  className="font-semibold text-emerald-700 hover:underline"
+                                  className="font-bold text-emerald-700 hover:underline cursor-pointer"
                                 >
-                                  Detail Sesi
+                                  Detail Sesi →
                                 </button>
                               </div>
                             </div>
                           ) : latestSession ? (
-                            <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50 p-2.5 text-[11px] space-y-1">
+                            <div className="mt-3.5 rounded-xl border border-slate-200/90 bg-slate-50 p-2.5 text-[11px] space-y-1">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="font-semibold text-slate-700 truncate">
                                   {formatWeekdayAndDate(latestSession.tanggal, true).label}
@@ -774,7 +815,7 @@ export default function RekapAbsensiPekerja({
                                 <button
                                   type="button"
                                   onClick={() => openSessionDetail(latestSession)}
-                                  className="font-semibold text-emerald-700 hover:underline"
+                                  className="font-bold text-emerald-700 hover:underline cursor-pointer"
                                 >
                                   Lihat Detail
                                 </button>
@@ -783,7 +824,8 @@ export default function RekapAbsensiPekerja({
                           ) : null}
                         </div>
 
-                        <div className="mt-5 pt-3 border-t border-slate-100 space-y-2.5">
+                        {/* Tombol Aksi Kamera Absensi */}
+                        <div className="mt-5 pt-3 border-t border-slate-100 space-y-2">
                           {activeSession ? (
                             !canUpdate('absensi') ? (
                               <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-center text-xs font-semibold text-amber-800">
@@ -793,7 +835,7 @@ export default function RekapAbsensiPekerja({
                               <button
                                 type="button"
                                 onClick={() => openCameraModal(job, 'pulang', activeSession)}
-                                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-rose-700"
+                                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-rose-700 active:scale-95 cursor-pointer"
                               >
                                 <Icon name="camera" className="h-4 w-4" />
                                 <span>Ambil Absen Pulang (Kamera &amp; GPS)</span>
@@ -805,7 +847,7 @@ export default function RekapAbsensiPekerja({
                                 type="button"
                                 disabled
                                 aria-describedby={`lock-reason-${assignment.id_penugasan}`}
-                                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 cursor-not-allowed"
+                                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-500 cursor-not-allowed"
                               >
                                 <Icon name="lock" className="h-4 w-4 shrink-0" />
                                 <span>{jobAtt.lockLabel}</span>
@@ -829,14 +871,14 @@ export default function RekapAbsensiPekerja({
                             <button
                               type="button"
                               onClick={() => openCameraModal(job, 'masuk')}
-                              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700"
+                              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95 cursor-pointer"
                             >
                               <Icon name="camera" className="h-4 w-4" />
                               <span>Ambil Absen Masuk (Kamera &amp; GPS)</span>
                             </button>
                           )}
 
-                          <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
                             <span>Penugasan #{assignment.id_penugasan}</span>
                             <span>{jobAtt?.count || 0} sesi tercatat</span>
                           </div>
@@ -848,74 +890,75 @@ export default function RekapAbsensiPekerja({
               )}
             </div>
 
-            {/* Banner Ajakan Membuka Opsi Rekap Absen */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-5 py-4">
+            {/* Banner Ajakan Membuka Tab Rekap Absen */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-5 shadow-xs">
               <div>
                 <p className="text-sm font-bold text-slate-900">
                   Ingin melihat seluruh riwayat absen tersusun per hari, tanggal, jam kerja, &amp; status approval Admin?
                 </p>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Terdapat {rekapStats.totalSesi} catatan absensi yang dapat Anda tinjau di tab Rekap Absen.
+                  Terdapat {rekapStats.totalSesi} catatan sesi absensi yang dapat Anda tinjau langsung di tab Rekap Absen Harian.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveTab('rekap')}
-                className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 cursor-pointer"
               >
-                Lihat Rekap Absen →
+                <span>Lihat Rekap Absen Harian</span>
+                <Icon name="arrow" className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
         )}
 
         {/* ============================================================== */}
-        {/* OPSI 2: REKAP ABSEN (TERSTRUKTUR HARI, TANGGAL, PEKERJAAN & JAM) */}
+        {/* TAB 2: REKAP ABSEN (TERSTRUKTUR HARI, TANGGAL, PEKERJAAN & JAM) */}
         {/* ============================================================== */}
         {activeTab === 'rekap' && (
           <div className="space-y-6">
             {/* Ringkasan Statistik Rekap */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm">
-                <p className="text-xs font-semibold text-emerald-800">Total Jam Kerja Disetujui</p>
-                <p className="mt-2 text-2xl font-bold text-emerald-700">{rekapStats.labelDisetujui}</p>
-                <p className="mt-1 text-[11px] text-emerald-600">Terverifikasi Admin untuk slip gaji</p>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Total Jam Disetujui</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-emerald-900">{rekapStats.labelDisetujui}</p>
+                <p className="mt-1 text-[11px] text-emerald-700 font-medium">Terverifikasi untuk slip gaji</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold text-slate-500">Hari Hadir Disetujui</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{rekapStats.approvedDaysCount} Hari</p>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Hari Hadir Disetujui</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-slate-900">{rekapStats.approvedDaysCount} Hari</p>
                 <p className="mt-1 text-[11px] text-slate-400">
                   Dari {rekapStats.approvedSessions.length} sesi disetujui
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold text-slate-500">Total Catatan Absen</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{rekapStats.totalSesi} Sesi</p>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Catatan Absen</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-slate-900">{rekapStats.totalSesi} Sesi</p>
                 <p className="mt-1 text-[11px] text-slate-400">Akumulasi total: {rekapStats.labelSemua}</p>
               </div>
 
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
-                <p className="text-xs font-semibold text-amber-800">Menunggu Approval Admin</p>
-                <p className="mt-2 text-2xl font-bold text-amber-700">{rekapStats.waitingCount}</p>
-                <p className="mt-1 text-[11px] text-amber-600">Menunggu pengecekan foto &amp; titik lokasi</p>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Menunggu Approval</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-extrabold text-amber-900">{rekapStats.waitingCount}</p>
+                <p className="mt-1 text-[11px] text-amber-700 font-medium">Menunggu verifikasi foto &amp; GPS</p>
               </div>
             </div>
 
             {/* Filter Rekap Absen */}
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Icon name="filter" className="h-4 w-4 text-emerald-600" />
-                  <label htmlFor="rekap-filter-job" className="text-xs font-semibold text-slate-700">
+                  <label htmlFor="rekap-filter-job" className="text-xs font-bold text-slate-700">
                     Pekerjaan:
                   </label>
                   <select
                     id="rekap-filter-job"
                     value={filterJob}
                     onChange={(e) => setFilterJob(e.target.value)}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:border-emerald-500 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
                   >
                     <option value="">Semua Pekerjaan</option>
                     {jobs.map((job) => (
@@ -928,7 +971,7 @@ export default function RekapAbsensiPekerja({
 
                 <div className="flex items-center gap-2">
                   <Icon name="calendar" className="h-4 w-4 text-emerald-600" />
-                  <label htmlFor="rekap-filter-month" className="text-xs font-semibold text-slate-700">
+                  <label htmlFor="rekap-filter-month" className="text-xs font-bold text-slate-700">
                     Bulan:
                   </label>
                   <input
@@ -936,19 +979,19 @@ export default function RekapAbsensiPekerja({
                     type="month"
                     value={filterMonth}
                     onChange={(e) => setFilterMonth(e.target.value)}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:border-emerald-500 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
                   />
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label htmlFor="rekap-filter-status" className="text-xs font-semibold text-slate-700">
-                    Status Approval:
+                  <label htmlFor="rekap-filter-status" className="text-xs font-bold text-slate-700">
+                    Status:
                   </label>
                   <select
                     id="rekap-filter-status"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:border-emerald-500 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 cursor-pointer"
                   >
                     <option value="">Semua Status</option>
                     <option value="menunggu">Menunggu Approval</option>
@@ -966,47 +1009,50 @@ export default function RekapAbsensiPekerja({
                     setFilterMonth('')
                     setFilterStatus('')
                   }}
-                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-800"
+                  className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 cursor-pointer"
                 >
-                  Reset Filter
+                  <Icon name="refresh" className="h-3.5 w-3.5" />
+                  <span>Reset Filter</span>
                 </button>
               )}
             </div>
 
             {/* Tabel Rinci Rekap Absen */}
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-6 py-4">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">
                     Rekap Absen Harian &amp; Rincian Pekerjaan
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Tersusun berdasarkan hari, tanggal, data pekerjaan yang diambil, jam kerja, bukti foto kamera, serta persetujuan Admin.
+                    Tersusun berdasarkan hari, tanggal, pekerjaan yang diambil, jam kerja, foto bukti, serta persetujuan Admin.
                   </p>
                 </div>
-                <span className="rounded-full bg-white border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">
+                <span className="rounded-full bg-white border border-slate-200 px-3 py-1 text-xs font-bold text-slate-700 shadow-xs">
                   {filteredRekapList.length} Catatan
                 </span>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <thead className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
                       <th scope="col" className="px-4 py-3.5 w-12 text-center">No.</th>
                       <th scope="col" className="px-4 py-3.5 min-w-[160px]">Hari &amp; Tanggal</th>
-                      <th scope="col" className="px-4 py-3.5 min-w-[210px]">Detail Data Pekerjaan</th>
+                      <th scope="col" className="px-4 py-3.5 min-w-[210px]">Data Pekerjaan</th>
                       <th scope="col" className="px-4 py-3.5 min-w-[155px]">Jam Kerja</th>
                       <th scope="col" className="px-4 py-3.5 min-w-[175px]">Lokasi GPS &amp; Foto</th>
                       <th scope="col" className="px-4 py-3.5 text-center">Status Approval</th>
-                      <th scope="col" className="px-4 py-3.5 text-center">Detail</th>
+                      <th scope="col" className="px-4 py-3.5 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {filteredRekapList.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-10 text-center text-slate-400">
-                          Belum ada data absensi sesuai kriteria filter. Silakan ambil absen di menu <strong>Absen Pekerjaan</strong>.
+                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                          <Icon name="calendar" className="h-8 w-8 text-slate-300 mx-auto mb-1.5" />
+                          <p className="font-semibold text-slate-600">Belum ada data absensi sesuai kriteria filter.</p>
+                          <p className="text-xs text-slate-400 mt-0.5">Silakan ambil absen di tab <strong>Absen Pekerjaan</strong>.</p>
                         </td>
                       </tr>
                     ) : (
@@ -1029,7 +1075,7 @@ export default function RekapAbsensiPekerja({
                               <span className="inline-block rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200/70">
                                 {dayMeta.weekday || 'Hari'}
                               </span>
-                              <p className="mt-1 font-semibold text-slate-900">{dayMeta.fullDate}</p>
+                              <p className="mt-1 font-bold text-slate-900">{dayMeta.fullDate}</p>
                             </td>
                             <td className="px-4 py-3.5 space-y-1">
                               <p className="font-bold text-slate-900">
@@ -1042,7 +1088,7 @@ export default function RekapAbsensiPekerja({
                               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                 {jenisTugas && (
                                   <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                                    {jenisTugas === 'mandiri' ? 'Diambil Mandiri' : 'Ditetapkan Admin'}
+                                    {jenisTugas === 'mandiri' ? 'Diambil Mandiri' : '👑 Ditetapkan Admin'}
                                   </span>
                                 )}
                                 {(job?.status || item.status_pekerjaan) && (
@@ -1071,7 +1117,7 @@ export default function RekapAbsensiPekerja({
                                   )}
                                 </p>
                               </div>
-                              <p className="font-bold text-emerald-700">
+                              <p className="font-extrabold text-emerald-700">
                                 Durasi: {item.durasi_format || `${item.durasi_jam || 0} jam`}
                               </p>
                             </td>
@@ -1085,12 +1131,12 @@ export default function RekapAbsensiPekerja({
                                     type="button"
                                     onClick={() => openSessionDetail(item)}
                                     aria-label={`Lihat foto absen masuk ${dayMeta.label}`}
-                                    className="overflow-hidden rounded-md border border-slate-200 bg-slate-100"
+                                    className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100 transition hover:scale-105 cursor-pointer shadow-xs"
                                   >
                                     <img
                                       src={getFileUrl(item.foto_lokasi)}
                                       alt="Foto masuk"
-                                      className="h-9 w-12 object-cover"
+                                      className="h-10 w-12 object-cover"
                                     />
                                   </button>
                                 )}
@@ -1099,12 +1145,12 @@ export default function RekapAbsensiPekerja({
                                     type="button"
                                     onClick={() => openSessionDetail(item)}
                                     aria-label={`Lihat foto absen pulang ${dayMeta.label}`}
-                                    className="overflow-hidden rounded-md border border-slate-200 bg-slate-100"
+                                    className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100 transition hover:scale-105 cursor-pointer shadow-xs"
                                   >
                                     <img
                                       src={getFileUrl(item.foto_pulang)}
                                       alt="Foto pulang"
-                                      className="h-9 w-12 object-cover"
+                                      className="h-10 w-12 object-cover"
                                     />
                                   </button>
                                 )}
@@ -1122,10 +1168,10 @@ export default function RekapAbsensiPekerja({
                               <button
                                 type="button"
                                 onClick={() => openSessionDetail(item)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
+                                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 cursor-pointer shadow-xs"
                               >
                                 <Icon name="eye" className="h-3.5 w-3.5 text-emerald-600" />
-                                <span>Lihat Detail</span>
+                                <span>Detail</span>
                               </button>
                             </td>
                           </tr>
@@ -1138,7 +1184,7 @@ export default function RekapAbsensiPekerja({
             </div>
 
             {/* Ringkasan Akumulasi per Pekerjaan */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
               <h2 className="text-sm font-bold text-slate-900">
                 Ringkasan Jam Kerja Disetujui per Pekerjaan
               </h2>
@@ -1155,24 +1201,24 @@ export default function RekapAbsensiPekerja({
                   rekapStats.perJobList.map((row) => (
                     <div
                       key={row.id_pekerjaan}
-                      className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 space-y-2 text-xs"
+                      className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 space-y-2 text-xs transition hover:bg-slate-50 hover:border-emerald-200"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-bold text-slate-900">{row.nama_pekerjaan}</p>
                           <p className="text-[11px] text-slate-500">{row.lokasi}</p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
                           {row.sesiDisetujui}/{row.totalSesi} Disetujui
                         </span>
                       </div>
                       <div className="flex items-center justify-between pt-1">
-                        <span className="text-slate-500">Jam Disetujui:</span>
+                        <span className="text-slate-500 font-medium">Jam Disetujui:</span>
                         <span className="font-bold text-emerald-700">
                           {row.labelDisetujui} ({row.percentage}%)
                         </span>
                       </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
                         <div
                           className="h-full rounded-full bg-emerald-600 transition-all duration-500"
                           style={{ width: `${row.percentage}%` }}

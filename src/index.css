@@ -1146,25 +1146,16 @@ body {
 }
 
 .worker-theme .worker-dashboard > section[aria-label="Statistik pekerjaan pekerja"] article {
-  border-color: #dbeafe;
-  box-shadow: 0 8px 18px -14px rgb(15 23 42 / 30%);
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 14px -10px rgb(15 23 42 / 18%);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.worker-theme .worker-dashboard > section[aria-label="Statistik pekerjaan pekerja"] article:nth-child(1),
-.worker-theme .worker-dashboard > section[aria-label="Statistik pekerjaan pekerja"] article:nth-child(3) {
-  background-color: #ecfdf5;
+.worker-theme .worker-dashboard > section[aria-label="Statistik pekerjaan pekerja"] article:hover {
+  transform: translateY(-2px);
   border-color: #a7f3d0;
-}
-
-.worker-theme .worker-dashboard > section[aria-label="Statistik pekerjaan pekerja"] article:nth-child(2),
-.worker-theme .worker-dashboard > section[aria-label="Statistik pekerjaan pekerja"] article:nth-child(5) {
-  background-color: #fffbeb;
-  border-color: #fde68a;
-}
-
-.worker-theme .worker-dashboard > section[aria-label="Statistik pekerjaan pekerja"] article:nth-child(4) {
-  background-color: #d1fae5;
-  border-color: #a7f3d0;
+  box-shadow: 0 10px 22px -14px rgb(5 150 105 / 24%);
 }
 
 .worker-theme main section.rounded-2xl {
@@ -1516,6 +1507,188 @@ dialog::backdrop {
   tr {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+
+  .salary-print-projects {
+    color: #0f172a;
+    font-size: 9.5pt;
+    line-height: 1.4;
+  }
+
+  .salary-print-project {
+    margin: 0 0 6mm;
+    padding: 0;
+  }
+
+  .salary-print-project-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6mm;
+    margin: 0 0 3mm;
+    padding: 2.8mm 3.5mm;
+    border: 1px solid #94a3b8;
+    border-radius: 1.5mm;
+    background: #f8fafc !important;
+    break-after: avoid-page;
+  }
+
+  .salary-print-project-heading h2 {
+    margin: 0.5mm 0 0.8mm;
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .salary-print-project-heading p {
+    margin: 0;
+    color: #475569;
+    font-size: 8.5pt;
+  }
+
+  .salary-print-overline {
+    color: #334155 !important;
+    font-size: 7.5pt !important;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .salary-print-rate {
+    min-width: 44mm;
+    padding: 1.8mm 3mm;
+    border: 1px solid #cbd5e1;
+    border-radius: 1.5mm;
+    background: #ffffff !important;
+    color: #475569;
+    font-size: 8pt;
+    text-align: right;
+  }
+
+  .salary-print-rate strong {
+    display: inline-block;
+    margin-top: 0.5mm;
+    color: #0f172a;
+    font-size: 9.5pt;
+    font-weight: 700;
+  }
+
+  .salary-print-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2mm 6mm;
+    margin: 0 0 2.5mm;
+    padding: 1.5mm 2.5mm;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc !important;
+    color: #334155;
+    font-size: 8.5pt;
+    font-weight: 600;
+  }
+
+  .salary-print-section-title {
+    margin: 3mm 0 1.2mm;
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .salary-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 3mm;
+    font-size: 8.5pt !important;
+  }
+
+  .salary-print-table th,
+  .salary-print-table td {
+    border: 1px solid #cbd5e1;
+    padding: 1.6mm 2.5mm;
+    vertical-align: top;
+  }
+
+  .salary-print-table th {
+    background: #f1f5f9 !important;
+    color: #1e293b;
+    font-size: 8pt;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .salary-print-table .text-right {
+    text-align: right;
+  }
+
+  .salary-print-table .text-center {
+    text-align: center;
+  }
+
+  .salary-print-subtotal {
+    width: 78mm;
+    margin: 2.5mm 0 0 auto;
+    padding: 2mm 3mm;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc !important;
+    font-size: 8.5pt;
+    break-inside: avoid-page;
+  }
+
+  .salary-print-subtotal > div,
+  .salary-print-adjustments > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 6mm;
+    padding: 0.9mm 0;
+  }
+
+  .salary-print-project-total {
+    margin-top: 1mm;
+    padding-top: 1.5mm !important;
+    border-top: 1px solid #64748b;
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .salary-print-adjustments {
+    width: 78mm;
+    margin: 2mm 0 2mm auto;
+    font-size: 8.5pt;
+  }
+
+  .salary-print-grand-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8mm;
+    margin-top: 4mm;
+    padding: 3mm 4mm;
+    background: #f1f5f9 !important;
+    border: 1.5px solid #334155;
+    border-radius: 1.5mm;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #0f172a;
+    break-inside: avoid-page;
+  }
+
+  .salary-print-grand-total strong {
+    color: #0f172a;
+    font-size: 11.5pt;
+    font-weight: 800;
+  }
+
+  .salary-print-spelled {
+    margin: 2mm 0 0;
+    padding: 1.5mm 2.5mm;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc !important;
+    color: #334155;
+    font-size: 8.5pt;
+    font-style: italic;
+    text-align: right;
   }
 
   /* Modal slip print mode (Admin Slip Gaji Modal) */
